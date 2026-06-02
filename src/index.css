@@ -1,0 +1,113 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0A0A0F;
+  --color-card: rgba(255, 255, 255, 0.04);
+  --color-card-hover: rgba(255, 255, 255, 0.08);
+  --color-primary: #FF2D9A;
+  --color-primary-hover: #E01E82;
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary: #7B2CFF;
+  --color-accent: #1A1A24;
+  --color-accent-foreground: #FFFFFF;
+  --color-popover: #121212;
+  --color-popover-foreground: #FFFFFF;
+  --color-foreground: #FFFFFF;
+  --color-success: #00FFA3;
+  --color-danger: #FF4D6D;
+  --color-muted: #1A1A24;
+  --color-muted-foreground: #8F8F9D;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-sidebar: rgba(10, 10, 15, 0.8);
+  
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Inter", sans-serif;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-white font-sans antialiased selection:bg-primary/30 selection:text-white;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+    background-attachment: fixed;
+  }
+  option {
+    background-color: #0A0A0F;
+    color: white;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-[rgba(255,255,255,0.04)] backdrop-blur-[20px] border border-white/10;
+  }
+  .glass-card {
+    @apply bg-[rgba(255,255,255,0.04)] backdrop-blur-[20px] border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)];
+  }
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-[#FF2D9A] to-[#7B2CFF];
+  }
+  .bg-mesh {
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(255, 45, 154, 0.15) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(123, 44, 255, 0.1) 0px, transparent 50%);
+  }
+  .neon-border {
+    @apply border border-transparent;
+    background: linear-gradient(#0A0A0F, #0A0A0F) padding-box,
+                linear-gradient(135deg, #FF2D9A, #7B2CFF) border-box;
+  }
+  .neon-glow {
+    box-shadow: 0 0 15px rgba(255, 45, 154, 0.3), 0 0 30px rgba(123, 44, 255, 0.2);
+  }
+  .neon-text {
+    text-shadow: 0 0 10px rgba(255, 45, 154, 0.5);
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+    background-clip: padding-box;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
