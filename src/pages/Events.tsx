@@ -99,6 +99,7 @@ export default function Events() {
     title: '',
     city: '',
     venue_id: '',
+    vendor_id: '',
     genre: [],
     event_type: [],
     date: '',
@@ -166,13 +167,21 @@ export default function Events() {
     }
   });
 
-  const { data: clubs } = useQuery({
-    queryKey: ['clubs'],
+  const { data: vendors } = useQuery({
+    queryKey: ['mongo-vendors'],
     queryFn: async () => {
-      const res = await fetch('/api/clubs', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch('/api/mongo/vendors', { headers: { Authorization: `Bearer ${token}` } });
       return res.json();
     }
   });
+
+  const vendorList = Array.isArray(vendors) ? vendors : [];
+  const getVendorId = (event: any) => {
+    if (!event) return '';
+    if (typeof event.vendor_id === 'object') return event.vendor_id?._id || event.vendor_id?.id || '';
+    return event.vendor_id || event.venue_id || '';
+  };
+  const getVendorName = (vendorId: string) => vendorList.find((vendor: any) => (vendor._id || vendor.id) === vendorId)?.name || '';
 
   const filteredEvents = (Array.isArray(events) ? events : [])?.filter((e: any) => {
     const matchesSearch = e.title?.toLowerCase().includes(searchTerm.toLowerCase()) || e.city?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -225,6 +234,7 @@ export default function Events() {
                 title: '',
                 city: '',
                 venue_id: '',
+                vendor_id: '',
                 genre: [],
                 event_type: [],
                 date: '',
@@ -370,7 +380,7 @@ export default function Events() {
                     <h4 className="text-lg font-bold text-white truncate group-hover:text-primary transition-colors">{event.title}</h4>
                     <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-1">
                       <Building2 className="w-3 h-3" />
-                      {clubs?.find((c: any) => c.id === event.venue_id)?.name || event.city || 'The Vault, Mumbai'}
+                      {event.vendor_id?.name || getVendorName(getVendorId(event)) || event.city || '—'}
                     </div>
                   </div>
                 </div>
@@ -456,7 +466,7 @@ export default function Events() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-xs font-bold text-white">{clubs?.find((c: any) => c.id === event.venue_id)?.name || 'The Vault'}</p>
+                        <p className="text-xs font-bold text-white">{event.vendor_id?.name || getVendorName(getVendorId(event)) || '—'}</p>
                         <p className="text-[10px] text-muted-foreground">{event.city || 'Mumbai'}</p>
                       </td>
                       <td className="px-6 py-4">
@@ -867,22 +877,13 @@ export default function Events() {
                             <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Select Venue</label>
                             <div className="relative">
                               <Building2 className="absolute left-6 top-1/2 -translate-y-1/2 text-white/20 w-4 h-4" />
-                              <input 
-                                type="text" 
-                                value={clubs?.find((c: any) => c.id === eventFormData.venue_id)?.name || ''}
-                                onChange={(e) => {
-                                  const club = clubs?.find((c: any) => c.name === e.target.value);
-                                  if (club) setEventFormData({ ...eventFormData, venue_id: club.id });
-                                }}
-                                placeholder="Search venue..." 
-                                className="w-full bg-[#09090B] border border-white/5 rounded-2xl pl-14 pr-8 py-4 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 placeholder:text-white/10"
-                                list="venues-list"
+                              <FilterDropdown
+                                value={eventFormData.vendor_id || eventFormData.venue_id}
+                                onChange={(vendorId) => setEventFormData({ ...eventFormData, vendor_id: vendorId, venue_id: vendorId })}
+                                options={vendorList.map((vendor: any) => ({ label: vendor.name, value: vendor._id || vendor.id }))}
+                                placeholder="Select venue"
+                                buttonClassName="py-4 pl-14 pr-8 rounded-2xl text-sm bg-[#09090B] border-white/5 hover:border-white/10 text-white/60"
                               />
-                              <datalist id="venues-list">
-                                {clubs?.map((club: any) => (
-                                  <option key={club.id} value={club.name} />
-                                ))}
-                              </datalist>
                             </div>
                           </div>
                           <div className="space-y-3">

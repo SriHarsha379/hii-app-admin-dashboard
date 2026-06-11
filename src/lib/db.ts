@@ -24,6 +24,7 @@ db.exec(`
     email TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
     role TEXT NOT NULL, -- SUPER_ADMIN, EVENT_ADMIN, CITY_ADMIN, CLUB_ADMIN
+    organisation TEXT,
     status TEXT DEFAULT 'ACTIVE',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -185,6 +186,11 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
+
+const adminColumns = db.prepare('PRAGMA table_info(admins)').all() as { name: string }[];
+if (!adminColumns.some(column => column.name === 'organisation')) {
+  db.prepare('ALTER TABLE admins ADD COLUMN organisation TEXT').run();
+}
 
 // Seed initial local fallback data for legacy SQLite-backed admin screens.
 const cityCount = db.prepare('SELECT COUNT(*) as count FROM cities').get() as { count: number };

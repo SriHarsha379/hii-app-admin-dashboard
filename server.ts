@@ -191,15 +191,18 @@ const seedAdmin = () => {
     const names = ['Super Admin', 'Club Admin', 'Events Admin', 'Normal Admin'];
     const roles = ['SUPER_ADMIN', 'CLUB_ADMIN', 'EVENT_ADMIN', 'NORMAL_ADMIN'];
     const passwords = ['admin123', 'club123', 'events123', 'normal123'];
+    const organisations = ['HiiApp', 'The Vault', 'Elite Event Solutions', 'HiiApp'];
 
     const salt = bcrypt.genSaltSync(10);
     emails.forEach((email, i) => {
-      const adminExists = db.prepare('SELECT * FROM admins WHERE email = ?').get(email);
+      const adminExists = db.prepare('SELECT * FROM admins WHERE email = ?').get(email) as any;
       if (!adminExists) {
         const hash = bcrypt.hashSync(passwords[i], salt);
-        db.prepare('INSERT INTO admins (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)').run(
-          uuidv4(), names[i], email, hash, roles[i]
+        db.prepare('INSERT INTO admins (id, name, email, password, role, organisation) VALUES (?, ?, ?, ?, ?, ?)').run(
+          uuidv4(), names[i], email, hash, roles[i], organisations[i]
         );
+      } else if (!adminExists.organisation) {
+        db.prepare('UPDATE admins SET organisation = ? WHERE email = ?').run(organisations[i], email);
       }
     });
 
@@ -360,8 +363,9 @@ async function startServer() {
       const admin: any = db.prepare('SELECT * FROM admins WHERE email = ?').get(email);
       if (!admin) return res.status(401).json({ error: 'Invalid credentials' });
       if (!bcrypt.compareSync(password, admin.password)) return res.status(401).json({ error: 'Invalid credentials' });
-      const token = jwt.sign({ id: admin.id, role: admin.role, name: admin.name, organisation: admin.organisation || 'HiiApp' }, JWT_SECRET, { expiresIn: '24h' });
-      res.json({ token, user: { id: admin.id, name: admin.name, email: admin.email, role: admin.role } });
+      const organisation = admin.organisation || 'HiiApp';
+      const token = jwt.sign({ id: admin.id, role: admin.role, name: admin.name, organisation }, JWT_SECRET, { expiresIn: '24h' });
+      res.json({ token, user: { id: admin.id, name: admin.name, email: admin.email, role: admin.role, organisation } });
     } catch (err) {
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -431,7 +435,12 @@ async function startServer() {
 
   app.get('/api/mongo/vendors', authenticateToken, async (req, res) => {
     try {
-      const vendors = await VendorModel.find({ is_deleted: false, is_active: true })
+      const vendors = await VendorModel.find({
+        $and: [
+          { $or: [{ is_deleted: false }, { is_deleted: { $exists: false } }] },
+          { $or: [{ is_active: true }, { is_active: { $exists: false } }] },
+        ],
+      })
         .select('_id name email').lean();
       res.json(vendors);
     } catch (err) {
