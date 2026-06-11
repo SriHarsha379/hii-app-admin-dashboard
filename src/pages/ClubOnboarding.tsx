@@ -570,11 +570,7 @@ export default function ClubOnboarding() {
                         <FilterDropdown
                           value={venueFormData.type}
                           onChange={(val) => setVenueFormData({ ...venueFormData, type: val })}
-                          options={venueTypes?.map((t: any) => ({ label: t.name, value: t.name })) || [
-                            { label: 'Nightclub', value: 'Nightclub' },
-                            { label: 'Social Lounge', value: 'Lounge' },
-                            { label: 'Techno Bar', value: 'Bar' },
-                          ]}
+                          options={venueTypes?.map((t: any) => ({ label: t.name, value: t.name })) || []}
                           placeholder="Select classification"
                           buttonClassName="py-6 px-10 rounded-[28px] text-sm bg-[#09090B] border border-white/5 hover:border-white/10 transition-all text-white font-medium"
                         />

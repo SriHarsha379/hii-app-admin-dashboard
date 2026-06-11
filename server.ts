@@ -1,4 +1,6 @@
 import express from 'express';
+import dotenv from 'dotenv';
+dotenv.config();
 import path from 'path';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
@@ -6,10 +8,183 @@ import db from './src/lib/db.ts';
 import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
 import fs from 'fs';
+import mongoose from 'mongoose';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-hii-app-key-2026';
+const MONGO_URI = process.env.MONGO_URI || '';
 
-// Seed Admin if not exists
+// ─── MongoDB Models ───────────────────────────────────────────────────────────
+
+const EventSchema = new mongoose.Schema(
+  {
+    vendor_id:    { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', required: true },
+    venue_name:   { type: String, required: true, trim: true },
+    venue_image:  { type: String, required: true },
+    category_ids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }],
+    start_time:   { type: String, required: true },
+    end_time:     { type: String, required: true },
+    address:      { type: String, required: true },
+    latitude:     { type: Number },
+    longitude:    { type: Number },
+    start_date:   { type: String, required: true },
+    end_date:     { type: String, required: true },
+    is_multi_day: { type: Boolean, default: false },
+    about:        { type: String, required: true },
+    gallery_images: [{ type: String }],
+    artists: [{
+      name:     { type: String, required: true },
+      title:    { type: String },
+      subtitle: { type: String },
+      image:    { type: String },
+    }],
+    is_active:   { type: Boolean, default: true },
+    is_deleted:  { type: Boolean, default: false },
+    event_layout_images: [{ image_url: { type: String } }],
+    terms_and_conditions: [{ item: { type: String } }],
+    faqs: [{ question: { type: String }, answer: { type: String } }],
+    prohibited_items: [{ item: { type: String } }],
+  },
+  { timestamps: true }
+);
+const EventModel: any = mongoose.models.Event || mongoose.model('Event', EventSchema);
+
+const CategorySchema = new mongoose.Schema({
+  category_name: { type: String },
+  category_type: { type: Number }, // 1 = Event, 2 = Venue
+  is_active:     { type: Boolean },
+  is_deleted:    { type: Boolean },
+});
+const CategoryModel: any = mongoose.models.Category || mongoose.model('Category', CategorySchema);
+
+const VendorSchema = new mongoose.Schema({
+  name:       { type: String },
+  email:      { type: String },
+  is_active:  { type: Boolean },
+  is_deleted: { type: Boolean },
+});
+const VendorModel: any = mongoose.models.Vendor || mongoose.model('Vendor', VendorSchema);
+
+const CitySchema = new mongoose.Schema(
+  {
+    city_name: { type: String, unique: true, trim: true },
+    latitude:  { type: Number },
+    longitude: { type: Number },
+    is_active: { type: Boolean, default: true },
+    is_deleted: { type: Boolean, default: false },
+  },
+  { timestamps: true, collection: 'cities' }
+);
+const CityModel: any = mongoose.models.City || mongoose.model('City', CitySchema);
+
+const FilterOptionSchema = new mongoose.Schema(
+  {
+    name: { type: String, unique: true, required: true, trim: true },
+    status: { type: String, default: 'ACTIVE' },
+    is_active: { type: Boolean, default: true },
+    is_deleted: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+
+const GenreModel: any = mongoose.models.Genre || mongoose.model('Genre', FilterOptionSchema, 'genres');
+const EventTypeModel: any = mongoose.models.EventType || mongoose.model('EventType', FilterOptionSchema, 'event_types');
+const VenueTypeModel: any = mongoose.models.VenueType || mongoose.model('VenueType', FilterOptionSchema, 'venue_types');
+
+const requiredGenres = [
+  'Bollywood',
+  'EDM',
+  'Commercial',
+  'House',
+  'Tech House',
+  'Hip Hop',
+  'R&B',
+  'Techno',
+  'Minimal Techno',
+  'Trance',
+  'Psychedelic music',
+  'Afrobeats',
+  'Reggaeton',
+  'Deep House',
+  'Progressive House',
+  'Drum & Bass',
+  'Rock Music',
+  'Pop',
+  'Acoustic',
+];
+
+const requiredEventTypes = [
+  'DJ Night',
+  'Festival',
+  'Comedy',
+  'Live Music',
+  'Theme Party',
+  'Karaoke Night',
+  'Open Mic',
+  'Concert',
+  'Pool Party',
+  'Sundowner',
+  'Workshop',
+];
+
+const requiredVenueTypes = [
+  'Bar/Pub',
+  'Beach Club',
+  'Lounge',
+  'Nightclub',
+  'Banquet Hall',
+  'Restaurant',
+  'Cafe',
+  'Auditorium',
+  'Stadium',
+  'Resort',
+  'Rooftop',
+  'Open Air',
+  'Hotel',
+  'Garden/Lawn',
+  'Cruise Ship/Boat',
+];
+
+const requiredCities = ['Mumbai', 'Delhi', 'Bangalore', 'Goa', 'Pune', 'Hyderabad'];
+
+const mapMongoOption = (item: any) => ({
+  id: item._id,
+  name: item.name,
+  status: item.status || (item.is_active && !item.is_deleted ? 'ACTIVE' : 'INACTIVE'),
+  created_at: item.createdAt,
+});
+
+const mapMongoCity = (city: any) => ({
+  id: city._id,
+  name: city.city_name,
+  latitude: city.latitude,
+  longitude: city.longitude,
+  status: city.is_active && !city.is_deleted ? 'ACTIVE' : 'INACTIVE',
+  created_at: city.createdAt,
+});
+
+const seedMongoReferenceData = async () => {
+  const syncFilterOptions = async (model: any, names: string[]) => {
+    await Promise.all(names.map(name => model.updateOne(
+      { name },
+      { $setOnInsert: { name }, $set: { status: 'ACTIVE', is_active: true, is_deleted: false } },
+      { upsert: true }
+    )));
+  };
+
+  await Promise.all([
+    syncFilterOptions(GenreModel, requiredGenres),
+    syncFilterOptions(EventTypeModel, requiredEventTypes),
+    syncFilterOptions(VenueTypeModel, requiredVenueTypes),
+    Promise.all(requiredCities.map(cityName => CityModel.updateOne(
+      { city_name: cityName },
+      { $setOnInsert: { city_name: cityName }, $set: { is_active: true, is_deleted: false } },
+      { upsert: true }
+    ))),
+  ]);
+};
+
+// ─── SQLite Seed ──────────────────────────────────────────────────────────────
+
 const seedAdmin = () => {
   try {
     const emails = ['admin@hiiapp.com', 'club@admin', 'events@admin', 'normal@admin'];
@@ -18,133 +193,34 @@ const seedAdmin = () => {
     const passwords = ['admin123', 'club123', 'events123', 'normal123'];
 
     const salt = bcrypt.genSaltSync(10);
-    
     emails.forEach((email, i) => {
       const adminExists = db.prepare('SELECT * FROM admins WHERE email = ?').get(email);
       if (!adminExists) {
         const hash = bcrypt.hashSync(passwords[i], salt);
         db.prepare('INSERT INTO admins (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)').run(
-          uuidv4(),
-          names[i],
-          email,
-          hash,
-          roles[i]
+          uuidv4(), names[i], email, hash, roles[i]
         );
       }
     });
 
-    // Seed some mock data if empty
     const usersCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as any;
     if (usersCount.count === 0) {
       for (let i = 1; i <= 20; i++) {
         db.prepare('INSERT INTO users (id, name, email, mobile, gender, level, status) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
-          uuidv4(),
-          `User ${i}`,
-          `user${i}@example.com`,
-          `555-010${i}`,
-          i % 2 === 0 ? 'Male' : 'Female',
-          i % 5 === 0 ? 'GOLD' : 'BRONZE',
-          'ACTIVE'
+          uuidv4(), `User ${i}`, `user${i}@example.com`, `555-010${i}`,
+          i % 2 === 0 ? 'Male' : 'Female', i % 5 === 0 ? 'GOLD' : 'BRONZE', 'ACTIVE'
         );
       }
     }
 
     const clubsCount = db.prepare('SELECT COUNT(*) as count FROM clubs').get() as any;
     if (clubsCount.count === 0) {
-      const club1Id = uuidv4();
-      const club2Id = uuidv4();
-      const club3Id = uuidv4();
-      const club4Id = uuidv4();
-      const club5Id = uuidv4();
-
-      const insertClub = db.prepare(`
-        INSERT INTO clubs (id, name, city, address, contact_info, status) 
-        VALUES (?, ?, ?, ?, ?, ?)
-      `);
-      
-      insertClub.run(club1Id, 'The Vault', 'Mumbai', '123 Colaba, Mumbai', 'contact@thevault.com', 'ACTIVE');
-      insertClub.run(club2Id, 'Neon Lounge', 'Delhi', '45 Hauz Khas, Delhi', 'info@neonlounge.in', 'ACTIVE');
-      insertClub.run(club3Id, 'Beach House', 'Goa', 'Baga Beach, Goa', 'hello@beachhouse.com', 'ACTIVE');
-      insertClub.run(club4Id, 'Skyline Rooftop', 'Bangalore', '100 Ft Road, Indiranagar', 'bookings@skyline.in', 'ACTIVE');
-      insertClub.run(club5Id, 'Underground Beats', 'Mumbai', 'Lower Parel, Mumbai', 'underground@beats.com', 'ACTIVE');
-
-      const eventsCount = db.prepare('SELECT COUNT(*) as count FROM events').get() as any;
-      if (eventsCount.count === 0) {
-        const insertEvent = db.prepare(`
-          INSERT INTO events (id, title, venue_id, date_time, city, poster_url, landscape_url, synopsis, music_genre, crowd_type, status) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-        
-        insertEvent.run(
-          uuidv4(), 
-          'Techno Valley Vol. 1', 
-          club1Id, 
-          new Date(Date.now() + 86400000 * 2).toISOString(), 
-          'Mumbai', 
-          'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&q=80', 
-          'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1600&q=80',
-          'A night of deep techno and immersive visuals.', 
-          'Techno',
-          'Mixed',
-          'UPCOMING'
-        );
-        
-        insertEvent.run(
-          uuidv4(), 
-          'Bollywood Night', 
-          club2Id, 
-          new Date(Date.now() + 86400000 * 5).toISOString(), 
-          'Delhi', 
-          'https://images.unsplash.com/photo-1545128485-c400e7702796?w=800&q=80', 
-          'https://images.unsplash.com/photo-1545128485-c400e7702796?w=1600&q=80',
-          'Dance to the latest Bollywood hits with DJ Raj.', 
-          'Bollywood',
-          'Couples/Groups',
-          'UPCOMING'
-        );
-        
-        insertEvent.run(
-          uuidv4(), 
-          'Sunset Sundowner', 
-          club3Id, 
-          new Date(Date.now() + 86400000 * 7).toISOString(), 
-          'Goa', 
-          'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&q=80', 
-          'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1600&q=80',
-          'Chill vibes by the beach with live acoustic music.', 
-          'Acoustic/House',
-          'Everyone',
-          'UPCOMING'
-        );
-
-        insertEvent.run(
-          uuidv4(), 
-          'Indie Rock Fest', 
-          club4Id, 
-          new Date(Date.now() + 86400000 * 10).toISOString(), 
-          'Bangalore', 
-          'https://images.unsplash.com/photo-1501281668745-f7f5792203b4?w=800&q=80', 
-          'https://images.unsplash.com/photo-1501281668745-f7f5792203b4?w=1600&q=80',
-          'Local indie bands taking over the stage.', 
-          'Indie Rock',
-          'College/Young Adults',
-          'UPCOMING'
-        );
-
-        insertEvent.run(
-          uuidv4(), 
-          'Midnight Jazz', 
-          club5Id, 
-          new Date(Date.now() + 86400000 * 14).toISOString(), 
-          'Mumbai', 
-          'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=800&q=80', 
-          'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=1600&q=80',
-          'Smooth jazz and cocktails.', 
-          'Jazz',
-          'Couples/Mature',
-          'UPCOMING'
-        );
-      }
+      const insertClub = db.prepare(`INSERT INTO clubs (id, name, city, address, contact_info, status) VALUES (?, ?, ?, ?, ?, ?)`);
+      insertClub.run(uuidv4(), 'The Vault', 'Mumbai', '123 Colaba, Mumbai', 'contact@thevault.com', 'ACTIVE');
+      insertClub.run(uuidv4(), 'Neon Lounge', 'Delhi', '45 Hauz Khas, Delhi', 'info@neonlounge.in', 'ACTIVE');
+      insertClub.run(uuidv4(), 'Beach House', 'Goa', 'Baga Beach, Goa', 'hello@beachhouse.com', 'ACTIVE');
+      insertClub.run(uuidv4(), 'Skyline Rooftop', 'Bangalore', '100 Ft Road, Indiranagar', 'bookings@skyline.in', 'ACTIVE');
+      insertClub.run(uuidv4(), 'Underground Beats', 'Mumbai', 'Lower Parel, Mumbai', 'underground@beats.com', 'ACTIVE');
     }
 
     const adsCount = db.prepare('SELECT COUNT(*) as count FROM ads').get() as any;
@@ -160,20 +236,16 @@ const seedAdmin = () => {
     const pollsCount = db.prepare('SELECT COUNT(*) as count FROM polls').get() as any;
     if (pollsCount.count === 0) {
       db.prepare('INSERT INTO polls (id, title, city, options, end_date, status, votes) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
-        uuidv4(), 'Next DJ for Neon Lounge?', 'Delhi', JSON.stringify(['DJ Snake', 'Martin Garrix', 'David Guetta']), new Date(Date.now() + 86400000 * 5).toISOString(), 'ACTIVE', 150
-      );
-      db.prepare('INSERT INTO polls (id, title, city, options, end_date, status, votes) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
-        uuidv4(), 'Favorite Music Genre?', 'Mumbai', JSON.stringify(['Techno', 'Bollywood', 'Hip Hop', 'Jazz']), new Date(Date.now() + 86400000 * 2).toISOString(), 'ACTIVE', 320
+        uuidv4(), 'Next DJ for Neon Lounge?', 'Delhi', JSON.stringify(['DJ Snake', 'Martin Garrix', 'David Guetta']),
+        new Date(Date.now() + 86400000 * 5).toISOString(), 'ACTIVE', 150
       );
     }
 
     const contestsCount = db.prepare('SELECT COUNT(*) as count FROM contests').get() as any;
     if (contestsCount.count === 0) {
       db.prepare('INSERT INTO contests (id, title, city, rules, reward, deadline, status, participants) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
-        uuidv4(), 'Best Party Outfit', 'Mumbai', 'Upload a picture of your best party outfit.', 'VIP Pass for 2', new Date(Date.now() + 86400000 * 10).toISOString(), 'ACTIVE', 45
-      );
-      db.prepare('INSERT INTO contests (id, title, city, rules, reward, deadline, status, participants) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
-        uuidv4(), 'Guess the Track', 'Delhi', 'Guess the track played in the video clip.', 'Free Drinks Voucher', new Date(Date.now() + 86400000 * 3).toISOString(), 'ACTIVE', 120
+        uuidv4(), 'Best Party Outfit', 'Mumbai', 'Upload a picture of your best party outfit.',
+        'VIP Pass for 2', new Date(Date.now() + 86400000 * 10).toISOString(), 'ACTIVE', 45
       );
     }
 
@@ -182,10 +254,7 @@ const seedAdmin = () => {
       const userId = db.prepare('SELECT id FROM users LIMIT 1').get() as any;
       if (userId) {
         db.prepare('INSERT INTO complaints (id, user_id, username, subject, message, priority, status) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
-          uuidv4(), userId.id, 'User 1', 'Payment Failed', 'My payment for the VIP pass failed but money was deducted.', 'HIGH', 'OPEN'
-        );
-        db.prepare('INSERT INTO complaints (id, user_id, username, subject, message, priority, status) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
-          uuidv4(), userId.id, 'User 1', 'App Crash', 'The app crashes when I try to open the events page.', 'MEDIUM', 'OPEN'
+          uuidv4(), userId.id, 'User 1', 'Payment Failed', 'My payment for the VIP pass failed.', 'HIGH', 'OPEN'
         );
       }
     }
@@ -197,9 +266,6 @@ const seedAdmin = () => {
         db.prepare('INSERT INTO requests (id, user_id, username, subject, message, priority, status) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
           uuidv4(), userId.id, 'User 1', 'Feature Request', 'Please add a dark mode option.', 'LOW', 'OPEN'
         );
-        db.prepare('INSERT INTO requests (id, user_id, username, subject, message, priority, status) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
-          uuidv4(), userId.id, 'User 1', 'Account Deletion', 'I want to delete my account.', 'HIGH', 'OPEN'
-        );
       }
     }
 
@@ -209,12 +275,6 @@ const seedAdmin = () => {
       if (adminId) {
         db.prepare('INSERT INTO activity_logs (id, admin_id, action, resource, details) VALUES (?, ?, ?, ?, ?)').run(
           uuidv4(), adminId.id, 'LOGIN', 'SYSTEM', 'Admin logged in successfully.'
-        );
-        db.prepare('INSERT INTO activity_logs (id, admin_id, action, resource, details) VALUES (?, ?, ?, ?, ?)').run(
-          uuidv4(), adminId.id, 'CREATE', 'EVENT', 'Created event: Techno Valley Vol. 1'
-        );
-        db.prepare('INSERT INTO activity_logs (id, admin_id, action, resource, details) VALUES (?, ?, ?, ?, ?)').run(
-          uuidv4(), adminId.id, 'UPDATE', 'CLUB', 'Updated details for club: The Vault'
         );
       }
     }
@@ -226,43 +286,43 @@ const seedAdmin = () => {
 seedAdmin();
 
 async function startServer() {
+  // ─── Connect MongoDB ─────────────────────────────────────────────────────
+  if (MONGO_URI) {
+    try {
+      await mongoose.connect(MONGO_URI);
+      console.log('✅ MongoDB Connected (nightlifeDB)');
+      await seedMongoReferenceData();
+      console.log('✅ MongoDB reference filters synced');
+    } catch (err) {
+      console.error('❌ MongoDB connection failed:', err);
+    }
+  } else {
+    console.warn('⚠️  MONGO_URI not set — event routes will not work');
+  }
+
   const app = express();
   const PORT = 3000;
 
   app.use(express.json({ limit: '50mb' }));
 
-  // Ensure uploads directory exists
   const uploadsDir = path.join(process.cwd(), 'uploads');
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
-  // Configure multer for file uploads
   const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, 'uploads/');
-    },
+    destination: (req, file, cb) => cb(null, 'uploads/'),
     filename: (req, file, cb) => {
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
       cb(null, uniqueSuffix + path.extname(file.originalname));
     }
   });
-
-  const upload = multer({ 
-    storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
-  });
-
-  // Serve static files from uploads directory
+  const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
   app.use('/uploads', express.static(uploadsDir));
 
-  // --- Middleware ---
+  // ─── Middleware ───────────────────────────────────────────────────────────
 
   const authenticateToken = (req: any, res: any, next: any) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (token == null) return res.sendStatus(401);
-
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.sendStatus(401);
     jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
       if (err) return res.sendStatus(403);
       req.user = user;
@@ -270,89 +330,230 @@ async function startServer() {
     });
   };
 
-  const authorizeRoles = (...roles: string[]) => {
-    return (req: any, res: any, next: any) => {
-      if (!roles.includes(req.user.role)) {
-        return res.status(403).json({ error: 'Access denied' });
-      }
-      next();
-    };
+  const authorizeRoles = (...roles: string[]) => (req: any, res: any, next: any) => {
+    if (!roles.includes(req.user.role)) return res.status(403).json({ error: 'Access denied' });
+    next();
   };
 
   const logActivity = (adminId: string, action: string, resource: string, details?: string) => {
     try {
       db.prepare('INSERT INTO activity_logs (id, admin_id, action, resource, details) VALUES (?, ?, ?, ?, ?)').run(
-        uuidv4(),
-        adminId,
-        action,
-        resource,
-        details || null
+        uuidv4(), adminId, action, resource, details || null
       );
     } catch (err) {
       console.error('Activity logging error:', err);
     }
   };
 
-  // --- API Routes ---
+  // ─── Upload ───────────────────────────────────────────────────────────────
 
-  // Upload
   app.post('/api/upload', authenticateToken, upload.single('file'), (req: any, res) => {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-    const url = `/uploads/${req.file.filename}`;
-    res.json({ url });
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    res.json({ url: `/uploads/${req.file.filename}` });
   });
 
-  // Auth
+  // ─── Auth ─────────────────────────────────────────────────────────────────
+
   app.post('/api/auth/login', (req, res) => {
     const { email, password } = req.body;
     try {
       const admin: any = db.prepare('SELECT * FROM admins WHERE email = ?').get(email);
-      
       if (!admin) return res.status(401).json({ error: 'Invalid credentials' });
-      
-      const validPassword = bcrypt.compareSync(password, admin.password);
-      if (!validPassword) return res.status(401).json({ error: 'Invalid credentials' });
-
-      const token = jwt.sign({ id: admin.id, role: admin.role, name: admin.name }, JWT_SECRET, { expiresIn: '24h' });
-      res.json({ token, user: { id: admin.id, name: admin.name, email: admin.email, role: admin.role, organisation: admin.organisation } });
+      if (!bcrypt.compareSync(password, admin.password)) return res.status(401).json({ error: 'Invalid credentials' });
+      const token = jwt.sign({ id: admin.id, role: admin.role, name: admin.name, organisation: admin.organisation || 'HiiApp' }, JWT_SECRET, { expiresIn: '24h' });
+      res.json({ token, user: { id: admin.id, name: admin.name, email: admin.email, role: admin.role } });
     } catch (err) {
       res.status(500).json({ error: 'Internal server error' });
     }
   });
 
-  // Stats
-  app.get('/api/stats', authenticateToken, (req, res) => {
+  // ─── Stats (events count from MongoDB) ───────────────────────────────────
+
+  app.get('/api/stats', authenticateToken, async (req, res) => {
     try {
-      const usersCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as any;
-      const eventsCount = db.prepare('SELECT COUNT(*) as count FROM events').get() as any;
-      const activeEventsCount = db.prepare('SELECT COUNT(*) as count FROM events WHERE status IN ("LIVE", "UPCOMING")').get() as any;
-      const pastEventsCount = db.prepare('SELECT COUNT(*) as count FROM events WHERE status = "COMPLETED"').get() as any;
-      const clubsCount = db.prepare('SELECT COUNT(*) as count FROM clubs').get() as any;
+      const usersCount    = db.prepare('SELECT COUNT(*) as count FROM users').get() as any;
+      const clubsCount    = db.prepare('SELECT COUNT(*) as count FROM clubs').get() as any;
       const complaintsCount = db.prepare('SELECT COUNT(*) as count FROM complaints WHERE status = "PENDING"').get() as any;
       const requestsCount = db.prepare('SELECT COUNT(*) as count FROM requests WHERE status = "PENDING"').get() as any;
-      const adsCount = db.prepare('SELECT COUNT(*) as count FROM ads').get() as any;
+      const adsCount      = db.prepare('SELECT COUNT(*) as count FROM ads').get() as any;
+
+      const today = new Date().toISOString().split('T')[0];
+      let totalEvents = 0, activeEvents = 0, pastEvents = 0;
+      try {
+        totalEvents  = await EventModel.countDocuments({ is_deleted: false });
+        activeEvents = await EventModel.countDocuments({ is_deleted: false, is_active: true, end_date: { $gte: today } });
+        pastEvents   = await EventModel.countDocuments({ is_deleted: false, end_date: { $lt: today } });
+      } catch(mongoErr) {
+        console.error('MongoDB stats error:', mongoErr);
+      }
 
       res.json({
         totalUsers: usersCount.count,
-        activeUsers: usersCount.count, // Using total users as active for now
-        totalEvents: eventsCount.count,
-        activeEvents: activeEventsCount.count,
-        pastEvents: pastEventsCount.count,
+        activeUsers: usersCount.count,
+        totalEvents,
+        activeEvents,
+        pastEvents,
         totalClubs: clubsCount.count,
         pendingComplaints: complaintsCount.count,
         pendingRequests: requestsCount.count,
         totalAds: adsCount.count,
-        totalReservations: 1284, // Mock reservations
-        revenue: 125400 // Mock revenue
+        totalReservations: 1284,
+        revenue: 125400,
       });
     } catch (err) {
       res.status(500).json({ error: 'Internal server error' });
     }
   });
 
-  // Users
+  // ─── MongoDB: Categories & Vendors (for dropdowns) ───────────────────────
+
+  app.get('/api/mongo/cities', authenticateToken, async (req, res) => {
+    try {
+      const cities = await CityModel.find({ is_deleted: false, is_active: true })
+        .select('_id city_name latitude longitude').lean();
+      // Return in same shape as SQLite cities so frontend works without changes
+      const mapped = cities.map(mapMongoCity);
+      res.json(mapped);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch cities' });
+    }
+  });
+
+  app.get('/api/mongo/categories', authenticateToken, async (req, res) => {
+    try {
+      const categories = await CategoryModel.find({ is_deleted: false, is_active: true, category_type: 1 })
+        .select('_id category_name').lean();
+      res.json(categories);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch categories' });
+    }
+  });
+
+  app.get('/api/mongo/vendors', authenticateToken, async (req, res) => {
+    try {
+      const vendors = await VendorModel.find({ is_deleted: false, is_active: true })
+        .select('_id name email').lean();
+      res.json(vendors);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch vendors' });
+    }
+  });
+
+  // ─── Events (MongoDB) ─────────────────────────────────────────────────────
+
+  app.get('/api/events', authenticateToken, async (req, res) => {
+    try {
+      const events = await EventModel.find({ is_deleted: false })
+        .populate('category_ids', 'category_name')
+        .populate('vendor_id', 'name email')
+        .sort({ createdAt: -1 })
+        .lean();
+      // Transform to match frontend field expectations
+      const transformed = events.map((e: any) => ({
+        ...e,
+        id: e._id,
+        title: e.venue_name,
+        city: e.address || '',
+        date_time: e.start_date + ' ' + e.start_time,
+        poster_url: e.venue_image,
+        synopsis: e.about,
+        status: e.is_active ? 'UPCOMING' : 'INACTIVE',
+      }));
+      res.json(transformed);
+    } catch (err) {
+      console.error('Error fetching events:', err);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  app.get('/api/events/:id', authenticateToken, async (req, res) => {
+    try {
+      const event = await EventModel.findOne({ _id: req.params.id, is_deleted: false })
+        .populate('category_ids', 'category_name')
+        .populate('vendor_id', 'name email')
+        .lean();
+      if (!event) return res.status(404).json({ error: 'Event not found' });
+      res.json(event);
+    } catch (err) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/events', authenticateToken, async (req: any, res) => {
+    try {
+      const {
+        vendor_id, venue_name, venue_image, category_ids,
+        start_time, end_time, address, latitude, longitude,
+        start_date, end_date, is_multi_day, about,
+        gallery_images, artists, event_layout_images,
+        terms_and_conditions, faqs, prohibited_items,
+      } = req.body;
+
+      const event = await EventModel.create({
+        vendor_id,
+        venue_name,
+        venue_image:  venue_image || 'default.png',
+        category_ids: category_ids || [],
+        start_time,
+        end_time,
+        address,
+        latitude:     latitude  || 0,
+        longitude:    longitude || 0,
+        start_date,
+        end_date,
+        is_multi_day: is_multi_day || false,
+        about,
+        gallery_images:        gallery_images        || [],
+        artists:               artists               || [],
+        event_layout_images:   event_layout_images   || [],
+        terms_and_conditions:  terms_and_conditions  || [],
+        faqs:                  faqs                  || [],
+        prohibited_items:      prohibited_items      || [],
+        is_active:  true,
+        is_deleted: false,
+      });
+
+      logActivity(req.user.id, 'CREATE', `EVENT: ${venue_name}`);
+      res.status(201).json(event);
+    } catch (err) {
+      console.error('Error creating event:', err);
+      res.status(500).json({ error: 'Internal server error', details: String(err) });
+    }
+  });
+
+  app.put('/api/events/:id', authenticateToken, async (req: any, res) => {
+    try {
+      const event = await EventModel.findOneAndUpdate(
+        { _id: req.params.id, is_deleted: false },
+        { ...req.body, updatedAt: new Date() },
+        { new: true }
+      );
+      if (!event) return res.status(404).json({ error: 'Event not found' });
+      logActivity(req.user.id, 'UPDATE', `EVENT: ${event.venue_name}`);
+      res.json(event);
+    } catch (err) {
+      console.error('Error updating event:', err);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  app.delete('/api/events/:id', authenticateToken, async (req: any, res) => {
+    try {
+      const event = await EventModel.findOneAndUpdate(
+        { _id: req.params.id },
+        { is_deleted: true, is_active: false },
+        { new: true }
+      );
+      if (!event) return res.status(404).json({ error: 'Event not found' });
+      logActivity(req.user.id, 'DELETE', `EVENT: ${event.venue_name}`);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // ─── Users (SQLite) ───────────────────────────────────────────────────────
+
   app.get('/api/users', authenticateToken, (req, res) => {
     const users = db.prepare('SELECT id, name, email, mobile, gender, level, status, created_at FROM users ORDER BY created_at DESC').all();
     res.json(users);
@@ -364,245 +565,161 @@ async function startServer() {
     res.json(user);
   });
 
-  app.get('/api/cities', authenticateToken, (req, res) => {
+  // ─── Cities / Genres / EventTypes / VenueTypes (MongoDB Atlas) ───────────
+
+  const getMongoOptions = async (model: any, res: any, errorMessage: string) => {
     try {
-      const cities = db.prepare('SELECT * FROM cities WHERE status = ? ORDER BY name').all('ACTIVE');
-      res.json(cities);
-    } catch (error) {
+      const items = await model.find({ is_deleted: false, is_active: true, status: 'ACTIVE' })
+        .sort({ name: 1 })
+        .lean();
+      res.json(items.map(mapMongoOption));
+    } catch (err) {
+      res.status(500).json({ error: errorMessage });
+    }
+  };
+
+  const addMongoOption = async (model: any, req: any, res: any, errorMessage: string) => {
+    try {
+      const name = String(req.body.name || '').trim();
+      if (!name) return res.status(400).json({ error: 'Name is required' });
+
+      const item = await model.findOneAndUpdate(
+        { name },
+        { $set: { name, status: 'ACTIVE', is_active: true, is_deleted: false } },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      ).lean();
+
+      res.status(201).json(mapMongoOption(item));
+    } catch (err) {
+      res.status(500).json({ error: errorMessage });
+    }
+  };
+
+  const deleteMongoOption = async (model: any, req: any, res: any, errorMessage: string) => {
+    try {
+      await model.findByIdAndUpdate(req.params.id, {
+        status: 'INACTIVE',
+        is_active: false,
+        is_deleted: true,
+      });
+      res.json({ success: true });
+    } catch {
+      res.status(500).json({ error: errorMessage });
+    }
+  };
+
+  app.get('/api/cities', authenticateToken, async (req, res) => {
+    try {
+      const cities = await CityModel.find({ is_deleted: false, is_active: true })
+        .sort({ city_name: 1 })
+        .lean();
+      res.json(cities.map(mapMongoCity));
+    } catch {
       res.status(500).json({ error: 'Failed to fetch cities' });
     }
   });
-
-  app.post('/api/cities', authenticateToken, (req, res) => {
+  app.post('/api/cities', authenticateToken, async (req, res) => {
     try {
-      const id = uuidv4();
-      db.prepare('INSERT INTO cities (id, name) VALUES (?, ?)').run(id, req.body.name);
-      res.status(201).json({ id, name: req.body.name });
-    } catch (error) {
+      const cityName = String(req.body.name || '').trim();
+      if (!cityName) return res.status(400).json({ error: 'Name is required' });
+
+      const city = await CityModel.findOneAndUpdate(
+        { city_name: cityName },
+        { $set: { city_name: cityName, is_active: true, is_deleted: false } },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      ).lean();
+
+      res.status(201).json(mapMongoCity(city));
+    } catch {
       res.status(500).json({ error: 'Failed to add city' });
     }
   });
-
-  app.delete('/api/cities/:id', authenticateToken, (req, res) => {
+  app.delete('/api/cities/:id', authenticateToken, async (req, res) => {
     try {
-      db.prepare('UPDATE cities SET status = ? WHERE id = ?').run('INACTIVE', req.params.id);
+      await CityModel.findByIdAndUpdate(req.params.id, { is_active: false, is_deleted: true });
       res.json({ success: true });
-    } catch (error) {
+    } catch {
       res.status(500).json({ error: 'Failed to delete city' });
     }
   });
 
-  app.get('/api/genres', authenticateToken, (req, res) => {
-    try {
-      const genres = db.prepare('SELECT * FROM genres WHERE status = ? ORDER BY name').all('ACTIVE');
-      res.json(genres);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to fetch genres' });
-    }
+  app.get('/api/genres', authenticateToken, async (req, res) => {
+    await getMongoOptions(GenreModel, res, 'Failed to fetch genres');
+  });
+  app.post('/api/genres', authenticateToken, async (req, res) => {
+    await addMongoOption(GenreModel, req, res, 'Failed to add genre');
+  });
+  app.delete('/api/genres/:id', authenticateToken, async (req, res) => {
+    await deleteMongoOption(GenreModel, req, res, 'Failed to delete genre');
   });
 
-  app.post('/api/genres', authenticateToken, (req, res) => {
-    try {
-      const id = uuidv4();
-      db.prepare('INSERT INTO genres (id, name) VALUES (?, ?)').run(id, req.body.name);
-      res.status(201).json({ id, name: req.body.name });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to add genre' });
-    }
+  app.get('/api/eventTypes', authenticateToken, async (req, res) => {
+    await getMongoOptions(EventTypeModel, res, 'Failed to fetch event types');
+  });
+  app.post('/api/eventTypes', authenticateToken, async (req, res) => {
+    await addMongoOption(EventTypeModel, req, res, 'Failed to add event type');
+  });
+  app.delete('/api/eventTypes/:id', authenticateToken, async (req, res) => {
+    await deleteMongoOption(EventTypeModel, req, res, 'Failed to delete event type');
   });
 
-  app.delete('/api/genres/:id', authenticateToken, (req, res) => {
-    try {
-      db.prepare('UPDATE genres SET status = ? WHERE id = ?').run('INACTIVE', req.params.id);
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to delete genre' });
-    }
+  app.get('/api/venueTypes', authenticateToken, async (req, res) => {
+    await getMongoOptions(VenueTypeModel, res, 'Failed to fetch venue types');
+  });
+  app.post('/api/venueTypes', authenticateToken, async (req, res) => {
+    await addMongoOption(VenueTypeModel, req, res, 'Failed to add venue type');
+  });
+  app.delete('/api/venueTypes/:id', authenticateToken, async (req, res) => {
+    await deleteMongoOption(VenueTypeModel, req, res, 'Failed to delete venue type');
   });
 
-  app.get('/api/eventTypes', authenticateToken, (req, res) => {
-    try {
-      const types = db.prepare('SELECT * FROM event_types WHERE status = ? ORDER BY name').all('ACTIVE');
-      res.json(types);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to fetch event types' });
-    }
-  });
+  // ─── Clubs (SQLite) ───────────────────────────────────────────────────────
 
-  app.post('/api/eventTypes', authenticateToken, (req, res) => {
-    try {
-      const id = uuidv4();
-      db.prepare('INSERT INTO event_types (id, name) VALUES (?, ?)').run(id, req.body.name);
-      res.status(201).json({ id, name: req.body.name });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to add event type' });
-    }
-  });
-
-  app.delete('/api/eventTypes/:id', authenticateToken, (req, res) => {
-    try {
-      db.prepare('UPDATE event_types SET status = ? WHERE id = ?').run('INACTIVE', req.params.id);
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to delete event type' });
-    }
-  });
-
-  app.get('/api/venueTypes', authenticateToken, (req, res) => {
-    try {
-      const types = db.prepare('SELECT * FROM venue_types WHERE status = ? ORDER BY name').all('ACTIVE');
-      res.json(types);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to fetch venue types' });
-    }
-  });
-
-  app.post('/api/venueTypes', authenticateToken, (req, res) => {
-    try {
-      const id = uuidv4();
-      db.prepare('INSERT INTO venue_types (id, name) VALUES (?, ?)').run(id, req.body.name);
-      res.status(201).json({ id, name: req.body.name });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to add venue type' });
-    }
-  });
-
-  app.delete('/api/venueTypes/:id', authenticateToken, (req, res) => {
-    try {
-      db.prepare('UPDATE venue_types SET status = ? WHERE id = ?').run('INACTIVE', req.params.id);
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to delete venue type' });
-    }
-  });
-
-  // Events
-  app.get('/api/events', authenticateToken, (req, res) => {
-    const events = db.prepare(`
-      SELECT e.*, c.name as venue 
-      FROM events e 
-      LEFT JOIN clubs c ON e.venue_id = c.id 
-      ORDER BY e.date_time DESC
-    `).all();
-    res.json(events);
-  });
-
-  app.post('/api/events', authenticateToken, (req: any, res) => {
-    const id = uuidv4();
-    const { 
-      title, venue_id, date_time, city, synopsis, email, phone, 
-      ticket_link, music_genre, crowd_type, poster_url, landscape_url, media_gallery 
-    } = req.body;
-    try {
-      db.prepare(`
-        INSERT INTO events (id, title, venue_id, date_time, city, synopsis, email, phone, ticket_link, music_genre, crowd_type, poster_url, landscape_url, media_gallery)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        id, title, venue_id, date_time, city, synopsis, email, phone, 
-        ticket_link, music_genre, crowd_type, poster_url, landscape_url, 
-        typeof media_gallery === 'string' ? media_gallery : JSON.stringify(media_gallery || [])
-      );
-      
-      logActivity(req.user.id, 'CREATE', `EVENT: ${title}`);
-      res.status(201).json({ id, ...req.body });
-    } catch (err) {
-      console.error('Error creating event:', err);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  app.put('/api/events/:id', authenticateToken, (req: any, res) => {
-    const { id } = req.params;
-    const { 
-      title, venue_id, date_time, city, synopsis, email, phone, 
-      ticket_link, music_genre, crowd_type, poster_url, landscape_url, media_gallery,
-      hide_end_time, advertise, status
-    } = req.body;
-    try {
-      db.prepare(`
-        UPDATE events 
-        SET title = ?, venue_id = ?, date_time = ?, city = ?, synopsis = ?, 
-            email = ?, phone = ?, ticket_link = ?, music_genre = ?, 
-            crowd_type = ?, poster_url = ?, landscape_url = ?, media_gallery = ?,
-            hide_end_time = ?, advertise = ?, status = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(
-        title, venue_id, date_time, city, synopsis, email, phone, 
-        ticket_link, music_genre, crowd_type, poster_url, landscape_url, 
-        typeof media_gallery === 'string' ? media_gallery : JSON.stringify(media_gallery || []),
-        hide_end_time ? 1 : 0, advertise ? 1 : 0, status || 'UPCOMING',
-        id
-      );
-      
-      logActivity(req.user.id, 'UPDATE', `EVENT: ${title}`);
-      res.json({ id, ...req.body });
-    } catch (err) {
-      console.error('Error updating event:', err);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  // Clubs
   app.get('/api/clubs', authenticateToken, (req, res) => {
-    const clubs = db.prepare('SELECT id, name, city as location, city, address, contact_info, media, status, created_at FROM clubs ORDER BY created_at DESC').all();
-    res.json(clubs);
+    res.json(db.prepare('SELECT id, name, city as location, city, address, contact_info, media, status, created_at FROM clubs ORDER BY created_at DESC').all());
   });
-
   app.post('/api/clubs', authenticateToken, (req: any, res) => {
     const id = uuidv4();
     const { name, city, address, contact_info } = req.body;
     try {
-      db.prepare('INSERT INTO clubs (id, name, city, address, contact_info) VALUES (?, ?, ?, ?, ?)').run(
-        id, name, city, address, contact_info
-      );
+      db.prepare('INSERT INTO clubs (id, name, city, address, contact_info) VALUES (?, ?, ?, ?, ?)').run(id, name, city, address, contact_info);
       logActivity(req.user.id, 'CREATE', `CLUB: ${name}`);
       res.status(201).json({ id, ...req.body });
-    } catch (err) {
-      res.status(500).json({ error: 'Internal server error' });
-    }
+    } catch { res.status(500).json({ error: 'Internal server error' }); }
   });
 
-  // Ads
+  // ─── Ads (SQLite) ─────────────────────────────────────────────────────────
+
   app.get('/api/ads', authenticateToken, (req, res) => {
-    const ads = db.prepare('SELECT * FROM ads ORDER BY created_at DESC').all();
-    res.json(ads);
+    res.json(db.prepare('SELECT * FROM ads ORDER BY created_at DESC').all());
   });
-
   app.post('/api/ads', authenticateToken, (req: any, res) => {
     const id = uuidv4();
     const { title, amount } = req.body;
     try {
-      db.prepare('INSERT INTO ads (id, manager_id, title, amount) VALUES (?, ?, ?, ?)').run(
-        id, req.user.id, title, amount
-      );
+      db.prepare('INSERT INTO ads (id, manager_id, title, amount) VALUES (?, ?, ?, ?)').run(id, req.user.id, title, amount);
       logActivity(req.user.id, 'CREATE', `AD: ${title}`);
       res.status(201).json({ id, ...req.body });
-    } catch (err) {
-      res.status(500).json({ error: 'Internal server error' });
-    }
+    } catch { res.status(500).json({ error: 'Internal server error' }); }
   });
 
-  // Broadcasts
+  // ─── Broadcasts (SQLite) ──────────────────────────────────────────────────
+
   app.post('/api/broadcasts', authenticateToken, (req: any, res) => {
     const id = uuidv4();
     const { type, message, audience } = req.body;
     try {
-      db.prepare('INSERT INTO broadcasts (id, type, message, audience) VALUES (?, ?, ?, ?)').run(
-        id, type, message, JSON.stringify(audience)
-      );
+      db.prepare('INSERT INTO broadcasts (id, type, message, audience) VALUES (?, ?, ?, ?)').run(id, type, message, JSON.stringify(audience));
       logActivity(req.user.id, 'SEND', `BROADCAST: ${type}`);
       res.status(201).json({ id, ...req.body });
-    } catch (err) {
-      res.status(500).json({ error: 'Internal server error' });
-    }
+    } catch { res.status(500).json({ error: 'Internal server error' }); }
   });
 
-  // Polls & Contests
+  // ─── Polls (SQLite) ───────────────────────────────────────────────────────
+
   app.get('/api/polls', authenticateToken, (req, res) => {
-    const polls = db.prepare('SELECT * FROM polls ORDER BY created_at DESC').all();
-    res.json(polls);
+    res.json(db.prepare('SELECT * FROM polls ORDER BY created_at DESC').all());
   });
-
   app.post('/api/polls', authenticateToken, (req: any, res) => {
     const id = uuidv4();
     const { title, city, options, endDate } = req.body;
@@ -612,27 +729,22 @@ async function startServer() {
       );
       logActivity(req.user.id, 'CREATE', `POLL: ${title}`);
       res.status(201).json({ id, ...req.body });
-    } catch (err) {
-      res.status(500).json({ error: 'Internal server error' });
-    }
+    } catch { res.status(500).json({ error: 'Internal server error' }); }
   });
-
   app.patch('/api/polls/:id/status', authenticateToken, (req: any, res) => {
     const { status } = req.body;
     try {
       db.prepare('UPDATE polls SET status = ? WHERE id = ?').run(status, req.params.id);
       logActivity(req.user.id, 'UPDATE', `POLL STATUS: ${req.params.id} -> ${status}`);
       res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ error: 'Internal server error' });
-    }
+    } catch { res.status(500).json({ error: 'Internal server error' }); }
   });
+
+  // ─── Contests (SQLite) ────────────────────────────────────────────────────
 
   app.get('/api/contests', authenticateToken, (req, res) => {
-    const contests = db.prepare('SELECT * FROM contests ORDER BY created_at DESC').all();
-    res.json(contests);
+    res.json(db.prepare('SELECT * FROM contests ORDER BY created_at DESC').all());
   });
-
   app.post('/api/contests', authenticateToken, (req: any, res) => {
     const id = uuidv4();
     const { title, city, rules, reward, deadline } = req.body;
@@ -642,142 +754,111 @@ async function startServer() {
       );
       logActivity(req.user.id, 'CREATE', `CONTEST: ${title}`);
       res.status(201).json({ id, ...req.body });
-    } catch (err) {
-      res.status(500).json({ error: 'Internal server error' });
-    }
+    } catch { res.status(500).json({ error: 'Internal server error' }); }
   });
-
   app.patch('/api/contests/:id/status', authenticateToken, (req: any, res) => {
     const { status } = req.body;
     try {
       db.prepare('UPDATE contests SET status = ? WHERE id = ?').run(status, req.params.id);
       logActivity(req.user.id, 'UPDATE', `CONTEST STATUS: ${req.params.id} -> ${status}`);
       res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ error: 'Internal server error' });
-    }
+    } catch { res.status(500).json({ error: 'Internal server error' }); }
   });
-
   app.get('/api/contests/:id/participants', authenticateToken, (req, res) => {
     try {
-      const participants = db.prepare(`
-        SELECT cp.*, u.name, u.email, u.mobile
-        FROM contest_participants cp
-        JOIN users u ON cp.user_id = u.id
-        WHERE cp.contest_id = ?
-        ORDER BY cp.created_at DESC
-      `).all(req.params.id);
-      res.json(participants);
-    } catch (err) {
-      res.status(500).json({ error: 'Internal server error' });
-    }
+      res.json(db.prepare(`
+        SELECT cp.*, u.name, u.email, u.mobile FROM contest_participants cp
+        JOIN users u ON cp.user_id = u.id WHERE cp.contest_id = ? ORDER BY cp.created_at DESC
+      `).all(req.params.id));
+    } catch { res.status(500).json({ error: 'Internal server error' }); }
   });
 
-  // Complaints
+  // ─── Complaints (SQLite) ──────────────────────────────────────────────────
+
   app.get('/api/complaints', authenticateToken, (req, res) => {
-    const complaints = db.prepare('SELECT * FROM complaints ORDER BY created_at DESC').all();
-    res.json(complaints);
+    res.json(db.prepare('SELECT * FROM complaints ORDER BY created_at DESC').all());
   });
-
   app.patch('/api/complaints/:id', authenticateToken, (req: any, res) => {
     const { status } = req.body;
     try {
       db.prepare('UPDATE complaints SET status = ? WHERE id = ?').run(status, req.params.id);
       logActivity(req.user.id, 'UPDATE', `COMPLAINT: ${req.params.id} to ${status}`);
       res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ error: 'Internal server error' });
-    }
+    } catch { res.status(500).json({ error: 'Internal server error' }); }
   });
 
-  // Requests
+  // ─── Requests (SQLite) ────────────────────────────────────────────────────
+
   app.get('/api/requests', authenticateToken, (req, res) => {
-    const requests = db.prepare('SELECT * FROM requests ORDER BY created_at DESC').all();
-    res.json(requests);
+    res.json(db.prepare('SELECT * FROM requests ORDER BY created_at DESC').all());
   });
-
   app.patch('/api/requests/:id', authenticateToken, (req: any, res) => {
     const { status } = req.body;
     try {
       db.prepare('UPDATE requests SET status = ? WHERE id = ?').run(status, req.params.id);
       logActivity(req.user.id, 'UPDATE', `REQUEST: ${req.params.id} to ${status}`);
       res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ error: 'Internal server error' });
-    }
+    } catch { res.status(500).json({ error: 'Internal server error' }); }
   });
 
-  // Activity Logs
+  // ─── Activity Logs (SQLite) ───────────────────────────────────────────────
+
   app.get('/api/activity-logs', authenticateToken, (req, res) => {
     try {
-      const logs = db.prepare(`
-        SELECT l.*, a.name as admin_name 
-        FROM activity_logs l 
-        JOIN admins a ON l.admin_id = a.id 
-        ORDER BY l.created_at DESC
-      `).all();
-      res.json(logs);
-    } catch (err) {
-      res.status(500).json({ error: 'Internal server error' });
-    }
+      res.json(db.prepare(`
+        SELECT l.*, a.name as admin_name FROM activity_logs l
+        JOIN admins a ON l.admin_id = a.id ORDER BY l.created_at DESC
+      `).all());
+    } catch { res.status(500).json({ error: 'Internal server error' }); }
   });
 
-  // Admins
+  // ─── Admins (SQLite) ──────────────────────────────────────────────────────
+
   app.get('/api/admins', authenticateToken, authorizeRoles('SUPER_ADMIN'), (req, res) => {
-    const admins = db.prepare('SELECT id, name, email, role, status, created_at FROM admins').all();
-    res.json(admins);
+    res.json(db.prepare('SELECT id, name, email, role, status, created_at FROM admins').all());
   });
-
   app.post('/api/admins', authenticateToken, authorizeRoles('SUPER_ADMIN'), (req: any, res) => {
     const id = uuidv4();
     const { name, email, password, role } = req.body;
     try {
-      const salt = bcrypt.genSaltSync(10);
-      const hash = bcrypt.hashSync(password, salt);
-      db.prepare('INSERT INTO admins (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)').run(
-        id, name, email, hash, role
-      );
+      const hash = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
+      db.prepare('INSERT INTO admins (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)').run(id, name, email, hash, role);
       logActivity(req.user.id, 'CREATE', `ADMIN: ${name}`);
       res.status(201).json({ id, name, email, role });
-    } catch (err) {
-      res.status(500).json({ error: 'Internal server error' });
-    }
+    } catch { res.status(500).json({ error: 'Internal server error' }); }
   });
 
-  // Search
-  app.get('/api/search', authenticateToken, (req, res) => {
+  // ─── Search ───────────────────────────────────────────────────────────────
+
+  app.get('/api/search', authenticateToken, async (req, res) => {
     const { q } = req.query;
     if (!q) return res.json([]);
     const query = `%${q}%`;
     try {
-      const users = db.prepare('SELECT id, name as title, "User" as type, "/users" as link FROM users WHERE name LIKE ? LIMIT 3').all(query);
-      const events = db.prepare('SELECT id, title, "Event" as type, "/events" as link FROM events WHERE title LIKE ? LIMIT 3').all(query);
-      const clubs = db.prepare('SELECT id, name as title, "Club" as type, "/clubs" as link FROM clubs WHERE name LIKE ? LIMIT 3').all(query);
-      res.json([...users, ...events, ...clubs]);
-    } catch (err) {
-      res.status(500).json({ error: 'Internal server error' });
-    }
+      const users  = db.prepare('SELECT id, name as title, "User" as type, "/users" as link FROM users WHERE name LIKE ? LIMIT 3').all(query);
+      const clubs  = db.prepare('SELECT id, name as title, "Club" as type, "/clubs" as link FROM clubs WHERE name LIKE ? LIMIT 3').all(query);
+      const events = await EventModel.find({
+        is_deleted: false,
+        venue_name: { $regex: q as string, $options: 'i' }
+      }).select('_id venue_name').limit(3).lean();
+      const eventResults = events.map((e: any) => ({ id: e._id, title: e.venue_name, type: 'Event', link: '/events' }));
+      res.json([...users, ...eventResults, ...clubs]);
+    } catch { res.status(500).json({ error: 'Internal server error' }); }
   });
 
-  // --- Vite Middleware ---
+  // ─── Vite ─────────────────────────────────────────────────────────────────
+
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
+    const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'build');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+    app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  app.listen(PORT, '0.0.0.0', () => console.log(`Server running on http://localhost:${PORT}`));
 }
 
 startServer();

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '../context/AuthContext';
 import { 
   Building2, 
   MapPin, 
@@ -9,6 +11,7 @@ import {
   User, 
   Users2,
   ChevronLeft,
+  ChevronDown,
   CheckCircle2,
   Zap,
   Sparkles,
@@ -41,6 +44,7 @@ const CLUB_DATA: Record<string, any> = {
 export default function ClaimClubForm() {
   const navigate = useNavigate();
   const { clubId } = useParams();
+  const { token } = useAuth();
   const club = clubId ? CLUB_DATA[clubId] : null;
   const [isSuccess, setIsSuccess] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -84,6 +88,20 @@ export default function ClaimClubForm() {
     capacity: '',
     description: ''
   });
+
+  const { data: venueTypes } = useQuery({
+    queryKey: ['venueTypes'],
+    queryFn: async () => {
+      const res = await fetch('/api/venueTypes', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return res.json();
+    },
+    enabled: Boolean(token)
+  });
+
+  const venueTypeOptions = Array.isArray(venueTypes) ? venueTypes : [];
+  const selectedVenueTypeExists = venueTypeOptions.some((type: any) => type.name === formData.venueType);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     if (!isEditing) return;
@@ -294,15 +312,30 @@ export default function ClaimClubForm() {
 
             <FormSection title="Venue Details" icon={<Layers className="w-4 h-4" />}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                <RefinedField 
-                  label="Venue Type" 
-                  name="venueType"
-                  value={formData.venueType}
-                  onChange={handleChange}
-                  readOnly={!isEditing}
-                  placeholder="e.g. Nightclub, Lounge"
-                  icon={<Building2 className="w-4 h-4" />}
-                />
+                <div className="space-y-4 group/field">
+                  <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Venue Type</label>
+                  <div className="relative">
+                    <select
+                      name="venueType"
+                      value={formData.venueType}
+                      onChange={handleChange}
+                      disabled={!isEditing}
+                      className={cn(
+                        "w-full bg-[#09090B] border rounded-[24px] px-8 py-5 text-sm text-white focus:outline-none transition-all appearance-none font-medium",
+                        !isEditing ? "border-white/5 text-white/20 cursor-not-allowed" : "border-white/10 hover:border-white/20 focus:border-primary/50"
+                      )}
+                    >
+                      <option value="">Select venue type...</option>
+                      {formData.venueType && !selectedVenueTypeExists && (
+                        <option value={formData.venueType}>{formData.venueType}</option>
+                      )}
+                      {venueTypeOptions.map((type: any) => (
+                        <option key={type.id} value={type.name}>{type.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 pointer-events-none" />
+                  </div>
+                </div>
                 <RefinedField 
                   label="Capacity" 
                   name="capacity"
@@ -444,4 +477,3 @@ export default function ClaimClubForm() {
     </div>
   );
 }
-

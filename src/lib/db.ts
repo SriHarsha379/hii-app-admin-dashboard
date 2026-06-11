@@ -186,36 +186,12 @@ db.exec(`
   );
 `);
 
-// Seed initial cities and genres if empty
+// Seed initial local fallback data for legacy SQLite-backed admin screens.
 const cityCount = db.prepare('SELECT COUNT(*) as count FROM cities').get() as { count: number };
 if (cityCount.count === 0) {
   const insertCity = db.prepare('INSERT INTO cities (id, name) VALUES (?, ?)');
   ['Mumbai', 'Delhi', 'Bangalore', 'Goa', 'Pune', 'Hyderabad'].forEach(city => {
     insertCity.run(crypto.randomUUID(), city);
-  });
-}
-
-const genreCount = db.prepare('SELECT COUNT(*) as count FROM genres').get() as { count: number };
-if (genreCount.count === 0) {
-  const insertGenre = db.prepare('INSERT INTO genres (id, name) VALUES (?, ?)');
-  ['Techno', 'Bollywood', 'Hip Hop', 'Commercial', 'Trance', 'House'].forEach(genre => {
-    insertGenre.run(crypto.randomUUID(), genre);
-  });
-}
-
-const eventTypeCount = db.prepare('SELECT COUNT(*) as count FROM event_types').get() as { count: number };
-if (eventTypeCount.count === 0) {
-  const insertEventType = db.prepare('INSERT INTO event_types (id, name) VALUES (?, ?)');
-  ['Live Music', 'DJ Set', 'Comedy', 'Festival', 'Networking'].forEach(type => {
-    insertEventType.run(crypto.randomUUID(), type);
-  });
-}
-
-const venueTypeCount = db.prepare('SELECT COUNT(*) as count FROM venue_types').get() as { count: number };
-if (venueTypeCount.count === 0) {
-  const insertVenueType = db.prepare('INSERT INTO venue_types (id, name) VALUES (?, ?)');
-  ['Nightclub', 'Lounge', 'Beach Club', 'Bar', 'Pub'].forEach(type => {
-    insertVenueType.run(crypto.randomUUID(), type);
   });
 }
 

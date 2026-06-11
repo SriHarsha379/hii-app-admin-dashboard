@@ -69,6 +69,7 @@ import { cn } from '../lib/utils';
 import { FilterDropdown } from '../components/FilterDropdown';
 import { FilterPanel } from '../components/FilterPanel';
 import { FormSection, RefinedField } from '../components/RefinedForm';
+import { MultiSelectDropdown } from '../components/MultiSelectDropdown';
 import { motion, AnimatePresence } from 'motion/react';
 import ClubProfilePreview from '../components/ClubProfilePreview';
 import EventProfilePreview from '../components/EventProfilePreview';
@@ -181,6 +182,8 @@ export default function Clubs() {
       title: 'Neon Nights Vol. 4',
       date: new Date(Date.now() + 86400000 * 2).toISOString(), // 2 days from now
       category: 'Techno',
+      genre: ['Techno'],
+      event_type: ['DJ Night'],
       status: 'ACTIVE',
       attendees: 156,
       venue_id: clubData?.id,
@@ -192,6 +195,8 @@ export default function Clubs() {
       title: 'Summer Solstice',
       date: new Date(Date.now() + 86400000 * 5).toISOString(), // 5 days from now
       category: 'House',
+      genre: ['House'],
+      event_type: ['Sundowner'],
       status: 'ACTIVE',
       attendees: 89,
       venue_id: clubData?.id,
@@ -202,7 +207,9 @@ export default function Clubs() {
       id: 'dummy-3',
       title: 'Past Groove Night',
       date: new Date(Date.now() - 86400000 * 10).toISOString(), // 10 days ago
-      category: 'Disco',
+      category: 'Commercial',
+      genre: ['Commercial'],
+      event_type: ['Theme Party'],
       status: 'PAST',
       attendees: 210,
       venue_id: clubData?.id,
@@ -247,6 +254,26 @@ export default function Clubs() {
     queryKey: ['venueTypes'],
     queryFn: async () => {
       const res = await fetch('/api/venueTypes', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return res.json();
+    }
+  });
+
+  const { data: genres } = useQuery({
+    queryKey: ['genres'],
+    queryFn: async () => {
+      const res = await fetch('/api/genres', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return res.json();
+    }
+  });
+
+  const { data: eventTypes } = useQuery({
+    queryKey: ['eventTypes'],
+    queryFn: async () => {
+      const res = await fetch('/api/eventTypes', {
         headers: { Authorization: `Bearer ${token}` }
       });
       return res.json();
@@ -539,16 +566,21 @@ export default function Clubs() {
                             </div>
                             <div className="space-y-4 group/field">
                               <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Music Genre</label>
-                              <select 
-                                value={eventFormData.genre[0] || 'Techno'}
-                                onChange={(e) => setEventFormData({ ...eventFormData, genre: [e.target.value] })}
-                                className="w-full bg-[#09090B] border border-white/5 rounded-[24px] px-8 py-5 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 appearance-none font-medium"
-                              >
-                                <option>Techno</option>
-                                <option>House</option>
-                                <option>Commercial</option>
-                                <option>Live Music</option>
-                              </select>
+                              <MultiSelectDropdown
+                                options={genres?.map((genre: any) => ({ label: genre.name, value: genre.name })) || []}
+                                value={eventFormData.genre}
+                                onChange={(value) => setEventFormData({ ...eventFormData, genre: value })}
+                                placeholder="Select genres"
+                              />
+                            </div>
+                            <div className="space-y-4 group/field">
+                              <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Event Type</label>
+                              <MultiSelectDropdown
+                                options={eventTypes?.map((type: any) => ({ label: type.name, value: type.name })) || []}
+                                value={eventFormData.event_type}
+                                onChange={(value) => setEventFormData({ ...eventFormData, event_type: value })}
+                                placeholder="Select event types"
+                              />
                             </div>
                             <RefinedField 
                               label="Event Date" 

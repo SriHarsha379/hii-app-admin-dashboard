@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import { useQuery } from '@tanstack/react-query';
 import { 
   X, 
   Send, 
@@ -36,20 +37,30 @@ const INITIAL_FORM_DATA = {
   email: 'club@admin.com',
   phone: '+971 50 123 4567',
   contactPerson: 'Club Manager',
-  venueType: 'Night Club',
+  venueType: 'Nightclub',
   capacity: '1200',
   description: 'A premium nightlife destination with state-of-the-art sound and lighting.'
 };
 
 export default function AccountSettings() {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, token } = useAuth();
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
+
+  const { data: venueTypes } = useQuery({
+    queryKey: ['venueTypes'],
+    queryFn: async () => {
+      const res = await fetch('/api/venueTypes', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return res.json();
+    }
+  });
 
   // Check for changes in Box 1 (Venue Details)
   const hasBox1Changes = 
@@ -183,10 +194,10 @@ export default function AccountSettings() {
                           onChange={handleChange}
                           className="w-full bg-[#09090B] border border-white/10 rounded-[24px] px-8 py-5 text-white hover:border-white/20 focus:border-primary/50 focus:outline-none transition-all appearance-none text-sm font-medium"
                         >
-                          <option value="Night Club">Night Club</option>
-                          <option value="Lounge">Lounge</option>
-                          <option value="Rooftop Bar">Rooftop Bar</option>
-                          <option value="Beach Club">Beach Club</option>
+                          <option value="">Select venue type...</option>
+                          {venueTypes?.map((type: any) => (
+                            <option key={type.id} value={type.name}>{type.name}</option>
+                          ))}
                         </select>
                         <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 pointer-events-none group-focus-within/field:rotate-180 transition-transform" />
                       </div>
