@@ -30,58 +30,70 @@ import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/utils';
 
 const INITIAL_DATA = {
-  fullName: 'Alex Rivera',
-  email: 'alex@eventpro.com',
-  phone: '+91 98765 43210',
-  companyName: 'Elite Event Solutions',
-  companyType: 'Artist Management',
-  description: 'Specializing in high-end nightlife events and international artist touring.',
-  yearEstablished: '2018',
-  businessEmail: 'contact@eliteevents.com',
-  businessPhone: '+91 11 4567 8900',
-  website: 'www.eliteevents.pro',
-  address: 'Mumbai, Maharashtra, India',
-  categories: ['Nightlife', 'Concerts', 'Festivals'],
+  fullName: '',
+  email: '',
+  phone: '',
+  companyName: '',
+  companyType: '',
+  description: '',
+  yearEstablished: '',
+  businessEmail: '',
+  businessPhone: '',
+  website: '',
+  address: '',
+  categories: [] as string[],
   socialLinks: {
-    instagram: '@elite_events',
-    linkedin: 'elite-events-pro',
-    facebook: 'EliteEventsPro',
-    youtube: 'EliteEventsTV'
+    instagram: '',
+    linkedin: '',
+    facebook: '',
+    youtube: ''
   },
-  registrationNumber: 'REG-2018-9921',
-  taxId: 'GST-IN-22-ELITE'
+  registrationNumber: '',
+  taxId: ''
 };
 
 export default function EventAccountSettings() {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
   // Form State
+  const [initialData, setInitialData] = useState(INITIAL_DATA);
   const [formData, setFormData] = useState(INITIAL_DATA);
+
+  useEffect(() => {
+    const next = {
+      ...INITIAL_DATA,
+      fullName: user?.name || '',
+      email: user?.email || '',
+      companyName: user?.organisation || ''
+    };
+    setInitialData(next);
+    setFormData(next);
+  }, [user]);
 
   // Box 1 Changes (Sensitive: Company, Contact, Verification)
   const hasBox1Changes = 
-    formData.companyName !== INITIAL_DATA.companyName ||
-    formData.companyType !== INITIAL_DATA.companyType ||
-    formData.yearEstablished !== INITIAL_DATA.yearEstablished ||
-    formData.businessEmail !== INITIAL_DATA.businessEmail ||
-    formData.businessPhone !== INITIAL_DATA.businessPhone ||
-    formData.website !== INITIAL_DATA.website ||
-    formData.address !== INITIAL_DATA.address ||
-    formData.registrationNumber !== INITIAL_DATA.registrationNumber ||
-    formData.taxId !== INITIAL_DATA.taxId;
+    formData.companyName !== initialData.companyName ||
+    formData.companyType !== initialData.companyType ||
+    formData.yearEstablished !== initialData.yearEstablished ||
+    formData.businessEmail !== initialData.businessEmail ||
+    formData.businessPhone !== initialData.businessPhone ||
+    formData.website !== initialData.website ||
+    formData.address !== initialData.address ||
+    formData.registrationNumber !== initialData.registrationNumber ||
+    formData.taxId !== initialData.taxId;
 
   // Box 2 Changes (Non-sensitive: Bio, Contact, Socials)
   const hasBox2Changes = 
-    formData.fullName !== INITIAL_DATA.fullName ||
-    formData.email !== INITIAL_DATA.email ||
-    formData.phone !== INITIAL_DATA.phone ||
-    formData.description !== INITIAL_DATA.description ||
-    JSON.stringify(formData.categories) !== JSON.stringify(INITIAL_DATA.categories) ||
-    JSON.stringify(formData.socialLinks) !== JSON.stringify(INITIAL_DATA.socialLinks);
+    formData.fullName !== initialData.fullName ||
+    formData.email !== initialData.email ||
+    formData.phone !== initialData.phone ||
+    formData.description !== initialData.description ||
+    JSON.stringify(formData.categories) !== JSON.stringify(initialData.categories) ||
+    JSON.stringify(formData.socialLinks) !== JSON.stringify(initialData.socialLinks);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -276,7 +288,7 @@ export default function EventAccountSettings() {
           </div>
           <div className="flex items-center gap-4 shrink-0">
             <button 
-              onClick={() => setFormData(INITIAL_DATA)}
+              onClick={() => setFormData(initialData)}
               disabled={!hasBox2Changes}
               className={cn(
                 "px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 group justify-center min-w-[110px]",

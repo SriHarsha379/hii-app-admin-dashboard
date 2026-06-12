@@ -18,53 +18,23 @@ interface UserProfilePreviewProps {
 }
 
 export default function UserProfilePreview({ user, onClose }: UserProfilePreviewProps) {
-  // Normalize data and provide safe defaults with rich visual content
   const data = React.useMemo(() => {
     const base = user || {};
-    const sig = base.id || Math.random().toString(36).substring(7);
-    
-    // Final product quality mockup pools
-    const avatars = [
-      `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=1200&q=80&sig=${sig}`,
-      `https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=1200&q=80&sig=${sig}`,
-      `https://images.unsplash.com/photo-1527980965255-d3f416303d12?w=1200&q=80&sig=${sig}`,
-      `https://images.unsplash.com/photo-1580489944761-15a19d654956?w=1200&q=80&sig=${sig}`
-    ];
-
-    const roles = ['Ambassador', 'verified Guest', 'Elite Member', 'Pro Curator'];
-    const bios = [
-      'Digital nomad and electronic music enthusiast. Always looking for the next underground warehouse party that pushes the boundaries of sound.',
-      'Passionate about the intersection of art and nightlife. Curating the best experiences across the city and beyond.',
-      'Nightlife is my religion. I seek the deepest bass and the purest rhythms in every corner of the urban landscape.',
-      'Sound architectural enthusiast. Exploring the spatial dynamics of sound in industrial spaces and brutalist environments.'
-    ];
-
-    const index = typeof base.id === 'string' ? base.id.length % roles.length : Math.floor(Math.random() * roles.length);
-
     return {
-      name: base.name || 'Alex Rivers',
-      role: base.role || roles[index],
-      avatar: base.avatar || base.image || avatars[index % avatars.length],
-      tags: base.tags || ['Techno', 'Travel', 'Art'],
-      joinedDate: base.joined_date || 'Joined Dec 2024',
-      location: base.city || base.location || 'Mumbai, MH',
+      name: base.name || 'Unnamed user',
+      role: base.role || 'User',
+      avatar: base.avatar || base.image || '',
+      tags: Array.isArray(base.tags) ? base.tags : [],
+      joinedDate: base.joined_date || 'Join date unavailable',
+      location: base.city || base.location || 'Location unavailable',
       stats: {
-        eventsAttended: base.events_count || (index * 12 + 24),
-        followers: (index * 0.8 + 1.2).toFixed(1) + 'k',
-        engagement: (index * 5 + 85) + '%'
+        eventsAttended: base.events_count || 0,
+        followers: base.followers || 0,
+        engagement: base.engagement || '—'
       },
-      about: base.bio || bios[index],
-      gallery: [
-        `https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&q=80&sig=${sig}_u1`,
-        `https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=800&q=80&sig=${sig}_u2`,
-        `https://images.unsplash.com/photo-1514525253344-f81bcd3ce942?w=800&q=80&sig=${sig}_u3`,
-        `https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&q=80&sig=${sig}_u4`
-      ],
-      recentActivity: [
-        { name: 'Underground Velocity', type: 'Attended', date: '2 Nights ago', image: `https://images.unsplash.com/photo-1545128485-c400e7702796?w=300&q=80&sig=${sig}_r1` },
-        { name: 'Neon Industrial', type: 'Liked', date: 'Last Friday', image: `https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&q=80&sig=${sig}_r2` },
-        { name: 'Warehouse 7', type: 'Booked', date: '3rd March', image: `https://images.unsplash.com/photo-1514525253344-f81bcd3ce942?w=300&q=80&sig=${sig}_r3` }
-      ]
+      about: base.bio || 'No bio available.',
+      gallery: Array.isArray(base.gallery) ? base.gallery : [],
+      recentActivity: Array.isArray(base.recentActivity) ? base.recentActivity : []
     };
   }, [user]);
 
@@ -89,12 +59,13 @@ export default function UserProfilePreview({ user, onClose }: UserProfilePreview
       <div className="flex-1 overflow-y-auto scrollbar-hide">
         {/* Cover Image Section (User Profile) */}
         <div className="relative h-[480px] shrink-0 overflow-hidden">
-          <img 
-            src={data.avatar} 
-            alt={data.name}
-            className="w-full h-full object-cover scale-105"
-            referrerPolicy="no-referrer"
-          />
+          {data.avatar ? (
+            <img src={data.avatar} alt={data.name} className="w-full h-full object-cover scale-105" referrerPolicy="no-referrer" />
+          ) : (
+            <div className="w-full h-full bg-white/5 flex items-center justify-center">
+              <Users className="w-16 h-16 text-white/15" />
+            </div>
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
           
           {/* User Identity */}

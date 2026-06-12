@@ -23,55 +23,21 @@ interface ClubProfilePreviewProps {
 export default function ClubProfilePreview({ club, onClose }: ClubProfilePreviewProps) {
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
 
-  // Normalize data and provide safe defaults with rich visual content
   const data = React.useMemo(() => {
     const base = club || {};
-    const sig = base.id || Math.random().toString(36).substring(7);
-    
-    // Final product quality mockup pools for clubs
-    const names = [
-      'The Vault: Premiere', 
-      'Concrete Pulse: Warehouse 7',
-      'Solaris Club Mumbai',
-      'Neon Industrial Void',
-      'Underground Velocity',
-      'Metropolis: Premium'
-    ];
-
-    const descriptions = [
-      'A brutalist masterpiece dedicated to the art of the dance. Concrete walls meet state-of-the-art sound for an uncompromising nightlife experience. Experience the essence of curated sound.',
-      'Hidden deep within the urban core, The Vault opens its doors for those who seek the deepest levels of subterranean culture and sound. Only the purest frequencies belong here.',
-      'Transforming raw energy into pure emotion. Solaris is a sanctuary for electronic transcendence, featuring world-class acoustics and a minimalist aesthetic.',
-      'Step into a world where light meets shadow. The Industrial Void offers a curated journey through melodic techno and experimental soundscapes in a unique warehouse setting.',
-      'Raw, powerful, and uncompromising. Underground Velocity is the heart of the city\'s bass culture, designed to push the boundaries of modern electronic music.',
-      'Sophistication meets the pulse of the night. Metropolis returns with a premium space for those who demand the finest in global nightlife and production.'
-    ];
-
-    const index = typeof base.id === 'string' ? base.id.length % names.length : Math.floor(Math.random() * names.length);
-
     return {
-      name: base.name || names[index],
-      portrait_url: base.portrait_url || base.poster_url || `https://images.unsplash.com/photo-1545128485-c400e7702796?w=1200&q=80&sig=${sig}`,
-      tags: Array.isArray(base.tags) ? base.tags : ['Techno', 'Exclusive', 'Underground'],
-      date: base.date || 'Tue – Sun, Weekly',
-      time: base.time || '10:00 PM – 05:00 AM',
-      location: base.city || base.location || 'Mumbai, MH',
-      venue: base.venue || base.name || names[index],
-      distance: base.distance || '1.8 km from your location',
-      followers: (base.likes || (index * 2.5 + 12.0)).toFixed(1) + 'k',
-      capacity: base.capacity || (index % 2 === 0 ? 'Member Access' : 'Exclusive Entry'),
-      about: base.about || base.description || descriptions[index],
-      gallery: Array.isArray(base.gallery) && base.gallery.length > 0 ? base.gallery : (Array.isArray(base.landscape_urls) && base.landscape_urls.length > 0 ? base.landscape_urls : [
-        `https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80&sig=${sig}_1`,
-        `https://images.unsplash.com/photo-1514525253344-f81bcd3ce942?w=800&q=80&sig=${sig}_2`,
-        `https://images.unsplash.com/photo-1571266028243-e4733b0f0bb1?w=800&q=80&sig=${sig}_3`,
-        `https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=800&q=80&sig=${sig}_4`,
-      ]),
-      pastEvents: Array.isArray(base.lineup) && base.lineup.length > 0 ? base.lineup : [
-        { id: '1', name: 'Techno Night: Phase One', role: 'Sold Out / 24th Oct', image: `https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=300&h=300&fit=crop&sig=${sig}_a1` },
-        { id: '2', name: 'Underground Pulse', role: 'Sold Out / 10th Oct', image: `https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=300&h=300&fit=crop&sig=${sig}_a2` },
-        { id: '3', name: 'Cyberpunk Afterhours', role: 'Sold Out / 28th Sep', image: `https://images.unsplash.com/photo-1520127875765-265950572b4b?w=300&h=300&fit=crop&sig=${sig}_a3` },
-      ]
+      name: base.name || 'Unnamed club',
+      portrait_url: base.portrait_url || base.poster_url || '',
+      tags: Array.isArray(base.tags) ? base.tags : [],
+      date: base.date || 'Schedule not set',
+      time: base.time || 'Hours not set',
+      location: base.city || base.location || 'Location not set',
+      venue: base.venue || base.name || 'Venue not set',
+      followers: String(base.likes || 0),
+      capacity: base.capacity || 'Not set',
+      about: base.about || base.description || 'No description available.',
+      gallery: Array.isArray(base.gallery) ? base.gallery : (Array.isArray(base.landscape_urls) ? base.landscape_urls.filter(Boolean) : []),
+      pastEvents: Array.isArray(base.pastEvents) ? base.pastEvents : (Array.isArray(base.lineup) ? base.lineup : [])
     };
   }, [club]);
 
@@ -96,12 +62,13 @@ export default function ClubProfilePreview({ club, onClose }: ClubProfilePreview
       <div className="flex-1 overflow-y-auto scrollbar-hide">
         {/* Cover Image Section */}
         <div className="relative h-[480px] shrink-0 overflow-hidden">
-          <img 
-            src={data.portrait_url} 
-            alt={data.name}
-            className="w-full h-full object-cover scale-105"
-            referrerPolicy="no-referrer"
-          />
+          {data.portrait_url ? (
+            <img src={data.portrait_url} alt={data.name} className="w-full h-full object-cover scale-105" referrerPolicy="no-referrer" />
+          ) : (
+            <div className="w-full h-full bg-white/5 flex items-center justify-center">
+              <MapPin className="w-16 h-16 text-white/15" />
+            </div>
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
           
           {/* Featured Badge */}
@@ -221,7 +188,11 @@ export default function ClubProfilePreview({ club, onClose }: ClubProfilePreview
                 >
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 rounded-2xl overflow-hidden border border-white/10 bg-black/40">
-                      <img src={event.image || `https://images.unsplash.com/photo-1545128485-c400e7702796?w=300&q=80&sig=past_${i}`} alt={event.name} className="w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
+                      {event.image ? (
+                        <img src={event.image} alt={event.name} className="w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
+                      ) : (
+                        <CalendarDays className="w-5 h-5 text-white/20 m-auto mt-4" />
+                      )}
                     </div>
                     <div>
                       <p className="text-[11px] font-black text-white uppercase tracking-tight">{event.name}</p>

@@ -176,56 +176,15 @@ export default function Clubs() {
   // For Club Admin: Find their own club
   const clubData = Array.isArray(clubs) ? clubs.find((c: any) => c.name === user?.organisation) : null;
 
-  const DUMMY_EVENTS = [
-    {
-      id: 'dummy-1',
-      title: 'Neon Nights Vol. 4',
-      date: new Date(Date.now() + 86400000 * 2).toISOString(), // 2 days from now
-      category: 'Techno',
-      genre: ['Techno'],
-      event_type: ['DJ Night'],
-      status: 'ACTIVE',
-      attendees: 156,
-      venue_id: clubData?.id,
-      venue: clubData?.name,
-      imageUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80'
-    },
-    {
-      id: 'dummy-2',
-      title: 'Summer Solstice',
-      date: new Date(Date.now() + 86400000 * 5).toISOString(), // 5 days from now
-      category: 'House',
-      genre: ['House'],
-      event_type: ['Sundowner'],
-      status: 'ACTIVE',
-      attendees: 89,
-      venue_id: clubData?.id,
-      venue: clubData?.name,
-      imageUrl: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80'
-    },
-    {
-      id: 'dummy-3',
-      title: 'Past Groove Night',
-      date: new Date(Date.now() - 86400000 * 10).toISOString(), // 10 days ago
-      category: 'Commercial',
-      genre: ['Commercial'],
-      event_type: ['Theme Party'],
-      status: 'PAST',
-      attendees: 210,
-      venue_id: clubData?.id,
-      venue: clubData?.name,
-      imageUrl: 'https://images.unsplash.com/photo-1545128485-c400e7702796?w=400&q=80'
-    }
-  ];
-
   const { data: events } = useQuery({
     queryKey: ['events-admin'],
     queryFn: async () => {
       const res = await fetch('/api/events', {
         headers: { Authorization: `Bearer ${token}` }
       });
+      if (!res.ok) throw new Error('Failed to load events');
       const data = await res.json();
-      return Array.isArray(data) ? [...data, ...DUMMY_EVENTS] : DUMMY_EVENTS;
+      return Array.isArray(data) ? data : [];
     }
   });
 
@@ -396,8 +355,12 @@ export default function Clubs() {
                         className="p-4 rounded-2xl hover:bg-white/[0.03] transition-all flex items-center justify-between group cursor-pointer"
                       >
                         <div className="flex items-center gap-4">
-                          <div className="w-16 h-20 rounded-xl overflow-hidden border border-white/10 shrink-0">
-                            <img src={event.imageUrl || `https://picsum.photos/seed/${event.id}/300/400`} alt="" className="w-full h-full object-cover" />
+                          <div className="w-16 h-20 rounded-xl overflow-hidden border border-white/10 shrink-0 bg-white/5 flex items-center justify-center">
+                            {event.poster_url || event.imageUrl ? (
+                              <img src={event.poster_url || event.imageUrl} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <Image className="w-5 h-5 text-white/20" />
+                            )}
                           </div>
                           <div>
                             <h4 className="text-base font-bold text-white group-hover:text-primary transition-colors">{event.title}</h4>
@@ -830,7 +793,10 @@ export default function Clubs() {
                           </div>
                           <div>
                             <p className="text-[10px] text-white/30 uppercase font-black tracking-widest mb-1">Time</p>
-                            <p className="text-lg font-bold text-white leading-none">10:00 PM – 04:00 AM</p>
+                            <p className="text-lg font-bold text-white leading-none">
+                              {selectedEvent.start_time || 'Time not set'}
+                              {selectedEvent.end_time ? ` – ${selectedEvent.end_time}` : ''}
+                            </p>
                           </div>
                         </div>
 
@@ -842,7 +808,7 @@ export default function Clubs() {
                           <div>
                             <p className="text-[10px] text-white/30 uppercase font-black tracking-widest mb-1">Venue</p>
                             <p className="text-lg font-bold text-white leading-none truncate max-w-[180px]">
-                              {selectedEvent.venue || clubData?.name || 'Underground Beats'}
+                              {selectedEvent.venue || clubData?.name || 'Venue not set'}
                             </p>
                           </div>
                         </div>
@@ -1044,12 +1010,9 @@ export default function Clubs() {
                 }}
               >
                 <div className="aspect-video relative overflow-hidden">
-                  <img 
-                    src={`https://picsum.photos/seed/${club.id}/800/450`} 
-                    alt={club.name} 
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                    referrerPolicy="no-referrer"
-                  />
+                  <div className="w-full h-full bg-white/5 flex items-center justify-center">
+                    <Building2 className="w-12 h-12 text-white/15" />
+                  </div>
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
                   <div className="absolute top-4 right-4">
                     <span className={cn("text-[10px] px-2 py-1 rounded-full font-bold border backdrop-blur-md", statusColors[club.status] || statusColors.ACTIVE)}>
@@ -1060,7 +1023,7 @@ export default function Clubs() {
                     <h4 className="text-lg font-bold text-white truncate group-hover:text-primary transition-colors">{club.name}</h4>
                     <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-1">
                       <MapPin className="w-3 h-3" />
-                      {club.address || club.city || 'Mumbai, India'}
+                      {club.address || club.city || 'Location not set'}
                     </div>
                   </div>
                 </div>
@@ -1068,8 +1031,8 @@ export default function Clubs() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1 text-amber-400">
                       <Star className="w-3 h-3 fill-amber-400" />
-                      <span className="text-xs font-bold">4.8</span>
-                      <span className="text-[10px] text-muted-foreground font-medium">(1.2k reviews)</span>
+                      <span className="text-xs font-bold">—</span>
+                      <span className="text-[10px] text-muted-foreground font-medium">No ratings</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
@@ -1077,14 +1040,13 @@ export default function Clubs() {
                       </div>
                       <div>
                         <p className="text-[10px] text-muted-foreground uppercase font-bold">Followers</p>
-                        <p className="text-xs font-bold text-white">24.8k</p>
+                        <p className="text-xs font-bold text-white">—</p>
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center justify-between pt-4 border-t border-white/5">
                     <div className="flex gap-2">
-                      <span className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-[10px] font-bold text-muted-foreground uppercase">Nightclub</span>
-                      <span className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-[10px] font-bold text-muted-foreground uppercase">Lounge</span>
+                      <span className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-[10px] font-bold text-muted-foreground uppercase">{club.type || club.venue_type || 'Type not set'}</span>
                     </div>
                     <button className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-white transition-all">
                       <MoreHorizontal className="w-4 h-4" />
@@ -1123,28 +1085,28 @@ export default function Clubs() {
                     }}>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10">
-                            <img src={`https://picsum.photos/seed/${club.id}/100/100`} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center">
+                            <Building2 className="w-4 h-4 text-white/20" />
                           </div>
                           <div>
                             <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{club.name}</p>
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Nightclub</p>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{club.type || club.venue_type || 'Type not set'}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-xs font-bold text-white">{club.city || 'Mumbai'}</p>
-                        <p className="text-[10px] text-muted-foreground truncate max-w-[150px]">{club.address || 'India'}</p>
+                        <p className="text-xs font-bold text-white">{club.city || '—'}</p>
+                        <p className="text-[10px] text-muted-foreground truncate max-w-[150px]">{club.address || 'Address not set'}</p>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-4">
                           <div>
                             <p className="text-[10px] text-muted-foreground uppercase font-bold">Rating</p>
-                            <p className="text-xs font-bold text-white">4.8</p>
+                            <p className="text-xs font-bold text-white">—</p>
                           </div>
                           <div>
                             <p className="text-[10px] text-muted-foreground uppercase font-bold">Followers</p>
-                            <p className="text-xs font-bold text-white">24.8k</p>
+                            <p className="text-xs font-bold text-white">—</p>
                           </div>
                         </div>
                       </td>

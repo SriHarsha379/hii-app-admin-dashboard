@@ -65,18 +65,8 @@ function RightSidebar({ isOpen, toggle, currentPage }: { isOpen: boolean, toggle
   const { token, user } = useAuth();
   const navigate = useNavigate();
   
-  const notifications = [
-    { id: 1, icon: UserPlus, text: 'New user registered.', time: 'Just now', color: 'text-purple-400' },
-    { id: 2, icon: Calendar, text: 'Event "Neon Nights" created.', time: '59 minutes ago', color: 'text-blue-400' },
-    { id: 3, icon: Bug, text: 'Bug fixed in payment gateway.', time: '12 hours ago', color: 'text-emerald-400' },
-  ];
-
-  const team = [
-    { name: 'Natali Craig', role: 'SUPER ADMIN', color: 'bg-purple-500/20 text-purple-400', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop' },
-    { name: 'Drew Cano', role: 'EVENT ADMIN', color: 'bg-blue-500/20 text-blue-400', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop' },
-    { name: 'Andi Lane', role: 'CITY ADMIN', color: 'bg-emerald-500/20 text-emerald-400', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop' },
-    { name: 'Koray Okumus', role: 'CLUB ADMIN', color: 'bg-orange-500/20 text-orange-400', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop' },
-  ];
+  const notifications: any[] = [];
+  const team: any[] = [];
 
   const { data: clubs } = useQuery({
     queryKey: ['clubs-sidebar'],
@@ -163,6 +153,11 @@ function RightSidebar({ isOpen, toggle, currentPage }: { isOpen: boolean, toggle
                   </div>
                 </div>
               ))}
+              {notifications.length === 0 && (
+                <p className="py-6 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  No notifications
+                </p>
+              )}
             </div>
 
             {currentPage !== 'events' && currentPage !== 'clubs' && user?.role !== 'EVENT_ADMIN' && user?.role !== 'CLUB_ADMIN' && user?.role !== 'NORMAL_ADMIN' && (
@@ -183,6 +178,11 @@ function RightSidebar({ isOpen, toggle, currentPage }: { isOpen: boolean, toggle
                       </div>
                     </div>
                   ))}
+                  {team.length === 0 && (
+                    <p className="py-6 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      No team members available
+                    </p>
+                  )}
                 </div>
               </div>
             )}

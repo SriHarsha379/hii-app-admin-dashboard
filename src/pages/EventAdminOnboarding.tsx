@@ -32,27 +32,27 @@ import { useAuth } from '../context/AuthContext';
 import { FormSection, RefinedField } from '../components/RefinedForm';
 
 const INITIAL_DATA = {
-  fullName: 'Alex Rivera',
-  email: 'alex@eventpro.com',
-  phone: '+91 98765 43210',
-  companyName: 'Elite Event Solutions',
-  companyType: 'Artist Management',
-  description: 'Specializing in high-end nightlife events and international artist touring.',
-  yearEstablished: '2018',
-  city: 'Mumbai',
-  website: 'www.eliteevents.pro',
-  address: 'Mumbai, Maharashtra, India',
-  categories: ['Nightlife', 'Concerts', 'Festivals'],
+  fullName: '',
+  email: '',
+  phone: '',
+  companyName: '',
+  companyType: '',
+  description: '',
+  yearEstablished: '',
+  city: '',
+  website: '',
+  address: '',
+  categories: [] as string[],
   socialLinks: {
-    instagram: '@elite_events',
-    linkedin: 'elite-events-pro',
-    facebook: 'EliteEventsPro',
-    youtube: 'EliteEventsTV'
+    instagram: '',
+    linkedin: '',
+    facebook: '',
+    youtube: ''
   },
-  registrationNumber: 'REG-2018-9921',
-  taxId: 'GST-IN-22-ELITE',
-  termsAccepted: true,
-  privacyAccepted: true
+  registrationNumber: '',
+  taxId: '',
+  termsAccepted: false,
+  privacyAccepted: false
 };
 
 export default function EventAdminOnboarding() {
@@ -61,7 +61,12 @@ export default function EventAdminOnboarding() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [formData, setFormData] = useState(INITIAL_DATA);
+  const [formData, setFormData] = useState(() => ({
+    ...INITIAL_DATA,
+    fullName: user?.name || '',
+    email: user?.email || '',
+    companyName: user?.organisation || ''
+  }));
   const [isSticky, setIsSticky] = React.useState(false);
 
   React.useEffect(() => {
@@ -98,8 +103,6 @@ export default function EventAdminOnboarding() {
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
     updateUser({ organisation: formData.companyName });
     setIsSubmitting(false);
     setIsSuccess(true);
@@ -507,5 +510,4 @@ function NicheInput({ onAdd, isEditingMode }: { onAdd: (niches: string[]) => voi
     </button>
   );
 }
-
 

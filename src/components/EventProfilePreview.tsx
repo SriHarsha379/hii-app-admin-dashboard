@@ -20,55 +20,21 @@ interface EventProfilePreviewProps {
 }
 
 export default function EventProfilePreview({ onClose, eventData, hideCloseButton }: EventProfilePreviewProps) {
-  // Normalize data and provide safe defaults with rich visual content
   const data = React.useMemo(() => {
     const base = eventData || {};
-    const sig = base.id || Math.random().toString(36).substring(7);
-    
-    // Final product quality mockup pools
-    const names = [
-      'Neon Midnight: Tokyo Drift',
-      'The Vault: Underground Series',
-      'Solaris Music Festival',
-      'Concrete Pulse: Warehouse 7',
-      'Industrial Alchemy: Nightlife',
-      'Metropolis: Bass Culture'
-    ];
-
-    const descriptions = [
-      'Experience the fusion of high-octane energy and neon aesthetics. A curated journey through melodic techno and industrial soundscapes that will redefine your perception of the night.',
-      'Hidden deep within the urban core, The Vault opens its doors for a night of uncompromising beats. Only the purest sounds for those who seek the deepest rhythms.',
-      'Join us under the open sky for a celebration of light and sound. Solaris is more than an event; it is a collective experience of electronic transcendence.',
-      'Raw, brutalist, and powerful. Warehouse 7 hosts the next chapter of the Concrete Pulse series. A space where the music is the only thing that matters.',
-      'Transforming raw energy into pure emotion. Industrial Alchemy brings together the legends and the rising stars of the global underground scene.',
-      'The heart of the city beats to our rhythm. Metropolis returns with a lineup designed to push the boundaries of bass and frequency.'
-    ];
-
-    const index = typeof base.id === 'string' ? base.id.length % names.length : Math.floor(Math.random() * names.length);
-
     return {
-      name: base.title || base.name || names[index],
-      portrait_url: base.portrait_url || base.poster_url || `https://images.unsplash.com/photo-1514525253344-f81bcd3ce942?w=1200&q=80&sig=${sig}`,
-      tags: Array.isArray(base.genre) ? base.genre : (base.genre ? [base.genre] : ['Techno', 'Exclusive', 'Underground']),
-      date: base.date ? (isNaN(new Date(base.date).getTime()) ? base.date : new Date(base.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })) : 'Fri, 24th Oct 2025',
-      time: base.start_time ? `${base.start_time} – ${base.end_time || 'Late'}` : '10:00 PM – 04:00 AM',
-      location: base.city || 'Mumbai, MH',
-      venue: base.venue_name || base.venue || 'The Vault: Premiere',
-      distance: base.distance || '1.8 km from your location',
-      followers: (base.likes || (index * 1.5 + 4.2)).toFixed(1) + 'k',
-      capacity: base.capacity || (index % 2 === 0 ? 'Limited Entry' : 'Member Access'),
-      about: base.description || base.about || descriptions[index],
-      gallery: Array.isArray(base.gallery) && base.gallery.length > 0 ? base.gallery : (Array.isArray(base.landscape_urls) && base.landscape_urls.length > 0 ? base.landscape_urls : [
-        `https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80&sig=${sig}_1`,
-        `https://images.unsplash.com/photo-1514525253344-f81bcd3ce942?w=800&q=80&sig=${sig}_2`,
-        `https://images.unsplash.com/photo-1571266028243-e4733b0f0bb1?w=800&q=80&sig=${sig}_3`,
-        `https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=800&q=80&sig=${sig}_4`,
-      ]),
-      lineup: Array.isArray(base.lineup) && base.lineup.length > 0 ? base.lineup : [
-        { id: '1', name: 'Ben Böhmer', role: 'Main Act', image: `https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&h=300&fit=crop&sig=${sig}_a1` },
-        { id: '2', name: 'Nora En Pure', role: 'Middle Set', image: `https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=300&h=300&fit=crop&sig=${sig}_a2` },
-        { id: '3', name: 'Anyma', role: 'Opening', image: `https://images.unsplash.com/photo-1520127875765-265950572b4b?w=300&h=300&fit=crop&sig=${sig}_a3` },
-      ]
+      name: base.title || base.name || 'Untitled event',
+      portrait_url: base.portrait_url || base.poster_url || '',
+      tags: Array.isArray(base.genre) ? base.genre : (base.genre ? [base.genre] : []),
+      date: base.date ? (isNaN(new Date(base.date).getTime()) ? base.date : new Date(base.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })) : 'Date not set',
+      time: base.start_time ? `${base.start_time}${base.end_time ? ` – ${base.end_time}` : ''}` : 'Time not set',
+      location: base.city || 'Location not set',
+      venue: base.venue_name || base.venue || 'Venue not set',
+      followers: String(base.likes || 0),
+      capacity: base.capacity || 'Not set',
+      about: base.description || base.about || 'No description available.',
+      gallery: Array.isArray(base.gallery) ? base.gallery : (Array.isArray(base.landscape_urls) ? base.landscape_urls.filter(Boolean) : []),
+      lineup: Array.isArray(base.lineup) ? base.lineup : []
     };
   }, [eventData]);
 
@@ -95,12 +61,13 @@ export default function EventProfilePreview({ onClose, eventData, hideCloseButto
       <div className="flex-1 overflow-y-auto scrollbar-hide">
         {/* Cover Image Section */}
         <div className="relative h-[480px] shrink-0 overflow-hidden">
-          <img 
-            src={data.portrait_url} 
-            alt={data.name}
-            className="w-full h-full object-cover scale-105"
-            referrerPolicy="no-referrer"
-          />
+          {data.portrait_url ? (
+            <img src={data.portrait_url} alt={data.name} className="w-full h-full object-cover scale-105" referrerPolicy="no-referrer" />
+          ) : (
+            <div className="w-full h-full bg-white/5 flex items-center justify-center">
+              <CalendarIcon className="w-16 h-16 text-white/15" />
+            </div>
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
           
           {/* Featured Badge */}

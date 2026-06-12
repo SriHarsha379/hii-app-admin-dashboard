@@ -30,27 +30,64 @@ import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/utils';
 import { FormSection, RefinedField } from '../components/RefinedForm';
 
-const INITIAL_FORM_DATA = {
-  venueName: 'The Hii Lounge',
-  city: 'Dubai',
-  address: 'Sheikh Zayed Road, Downtown Dubai',
-  email: 'club@admin.com',
-  phone: '+971 50 123 4567',
-  contactPerson: 'Club Manager',
-  venueType: 'Nightclub',
-  capacity: '1200',
-  description: 'A premium nightlife destination with state-of-the-art sound and lighting.'
+const EMPTY_FORM_DATA = {
+  venueName: '',
+  city: '',
+  address: '',
+  email: '',
+  phone: '',
+  contactPerson: '',
+  venueType: '',
+  capacity: '',
+  description: ''
 };
 
 export default function AccountSettings() {
   const navigate = useNavigate();
-  const { logout, token } = useAuth();
+  const { logout, token, user } = useAuth();
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
   // Form State
-  const [formData, setFormData] = useState(INITIAL_FORM_DATA);
+  const [initialFormData, setInitialFormData] = useState(EMPTY_FORM_DATA);
+  const [formData, setFormData] = useState(EMPTY_FORM_DATA);
+
+  const { data: clubs } = useQuery({
+    queryKey: ['clubs-account-settings'],
+    queryFn: async () => {
+      const res = await fetch('/api/clubs', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to load club');
+      return res.json();
+    },
+    enabled: Boolean(token)
+  });
+
+  useEffect(() => {
+    const club = Array.isArray(clubs) ? clubs.find((item: any) => item.name === user?.organisation) : null;
+    if (!club) return;
+    let contactInfo: any = {};
+    try {
+      contactInfo = typeof club.contact_info === 'string' ? JSON.parse(club.contact_info) : club.contact_info || {};
+    } catch {
+      contactInfo = {};
+    }
+    const next = {
+      venueName: club.name || '',
+      city: club.city || '',
+      address: club.address || '',
+      email: contactInfo.email || user?.email || '',
+      phone: contactInfo.phone || '',
+      contactPerson: contactInfo.contactName || user?.name || '',
+      venueType: club.type || club.venue_type || '',
+      capacity: club.capacity ? String(club.capacity) : '',
+      description: club.description || ''
+    };
+    setInitialFormData(next);
+    setFormData(next);
+  }, [clubs, user]);
 
   const { data: venueTypes } = useQuery({
     queryKey: ['venueTypes'],
@@ -64,18 +101,18 @@ export default function AccountSettings() {
 
   // Check for changes in Box 1 (Venue Details)
   const hasBox1Changes = 
-    formData.venueName !== INITIAL_FORM_DATA.venueName ||
-    formData.venueType !== INITIAL_FORM_DATA.venueType ||
-    formData.phone !== INITIAL_FORM_DATA.phone ||
-    formData.email !== INITIAL_FORM_DATA.email ||
-    formData.city !== INITIAL_FORM_DATA.city ||
-    formData.address !== INITIAL_FORM_DATA.address;
+    formData.venueName !== initialFormData.venueName ||
+    formData.venueType !== initialFormData.venueType ||
+    formData.phone !== initialFormData.phone ||
+    formData.email !== initialFormData.email ||
+    formData.city !== initialFormData.city ||
+    formData.address !== initialFormData.address;
 
   // Check for changes in Box 2 (Specifications)
   const hasBox2Changes = 
-    formData.contactPerson !== INITIAL_FORM_DATA.contactPerson ||
-    formData.capacity !== INITIAL_FORM_DATA.capacity ||
-    formData.description !== INITIAL_FORM_DATA.description;
+    formData.contactPerson !== initialFormData.contactPerson ||
+    formData.capacity !== initialFormData.capacity ||
+    formData.description !== initialFormData.description;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));

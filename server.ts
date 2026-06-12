@@ -286,7 +286,9 @@ const seedAdmin = () => {
   }
 };
 
-seedAdmin();
+if (process.env.SEED_DEMO_DATA === 'true') {
+  seedAdmin();
+}
 
 async function startServer() {
   // ─── Connect MongoDB ─────────────────────────────────────────────────────
@@ -686,6 +688,11 @@ async function startServer() {
 
   app.get('/api/clubs', authenticateToken, (req, res) => {
     res.json(db.prepare('SELECT id, name, city as location, city, address, contact_info, media, status, created_at FROM clubs ORDER BY created_at DESC').all());
+  });
+  app.get('/api/clubs/:id', authenticateToken, (req, res) => {
+    const club = db.prepare('SELECT id, name, city as location, city, address, contact_info, media, status, created_at FROM clubs WHERE id = ?').get(req.params.id);
+    if (!club) return res.status(404).json({ error: 'Club not found' });
+    res.json(club);
   });
   app.post('/api/clubs', authenticateToken, (req: any, res) => {
     const id = uuidv4();

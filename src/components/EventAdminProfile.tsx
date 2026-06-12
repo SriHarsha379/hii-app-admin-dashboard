@@ -55,11 +55,7 @@ export default function EventAdminProfile() {
   const eventList = Array.isArray(events) ? events.filter((e: any) => e && typeof e === 'object') : [];
   const liveEvents = eventList.filter(e => e.status === 'LIVE');
   const upcomingEvents = eventList.filter(e => e.status === 'UPCOMING').slice(0, 4);
-  const pastEvents = [
-    { id: 'past-1', title: 'Summer Solstice 2025', date: '2025-06-21', engagement: '+33%', fact: 'Highest engagement in category', status: 'COMPLETED', attendees: '1.2k', poster_url: 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=800&q=80' },
-    { id: 'past-2', title: 'Neon Night 2025', date: '2025-05-15', engagement: '+42%', fact: 'Sold out in 2 hours', status: 'COMPLETED', attendees: '2.4k', poster_url: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80' },
-    { id: 'past-3', title: 'Urban Beats Vol 4', date: '2025-04-10', engagement: '+28%', fact: 'Social reach peak', status: 'COMPLETED', attendees: '850', poster_url: 'https://images.unsplash.com/photo-1545128485-c400e7702796?w=800&q=80' }
-  ];
+  const pastEvents = eventList.filter(e => e.status === 'COMPLETED');
 
   const associatedClubs = (Array.isArray(clubs) ? clubs : []).slice(0, 4);
 
@@ -73,12 +69,8 @@ export default function EventAdminProfile() {
         
         <div className="flex flex-col md:flex-row gap-10 items-start relative z-10">
           <div className="relative">
-            <div className="w-40 h-40 rounded-[40px] overflow-hidden border-2 border-primary/20 group-hover:border-primary transition-all duration-700 shadow-2xl">
-              <img 
-                src={user?.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=EliteEvents`} 
-                alt="Elite Events" 
-                className="w-full h-full object-cover"
-              />
+            <div className="w-40 h-40 rounded-[40px] overflow-hidden border-2 border-primary/20 group-hover:border-primary transition-all duration-700 shadow-2xl bg-primary/10 flex items-center justify-center">
+              <Building2 className="w-16 h-16 text-primary/60" />
             </div>
             <div className="absolute -bottom-3 -right-3 p-3 rounded-2xl bg-primary text-white shadow-xl border border-white/20">
               <Zap className="w-5 h-5 fill-current" />
@@ -88,33 +80,24 @@ export default function EventAdminProfile() {
           <div className="space-y-6 flex-1">
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <h1 className="text-4xl font-black text-white tracking-tighter uppercase leading-none">Elite Events Pro</h1>
-                <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[9px] font-black tracking-widest uppercase">Verified Company</span>
+                <h1 className="text-4xl font-black text-white tracking-tighter uppercase leading-none">
+                  {user?.organisation || user?.name || 'Event Admin'}
+                </h1>
               </div>
               <p className="text-muted-foreground text-sm font-medium leading-relaxed max-w-xl">
-                Premier event management company specializing in high-octane nightlife experiences and artist tours.
+                Event management profile
               </p>
               <div className="flex flex-wrap gap-4 pt-2">
                 <div className="flex items-center gap-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest bg-white/5 px-3 py-1.5 rounded-xl border border-white/5">
-                  <MapPin className="w-3.5 h-3.5 text-primary" />
-                  Mumbai, India
-                </div>
-                <div className="flex items-center gap-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest bg-white/5 px-3 py-1.5 rounded-xl border border-white/5">
-                  <Star className="w-3.5 h-3.5 text-amber-400" />
-                  Top Rated Company
-                </div>
-                <div className="flex items-center gap-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest bg-white/5 px-3 py-1.5 rounded-xl border border-white/5">
-                  <Calendar className="w-3.5 h-3.5 text-primary" />
-                  Est. 2018
+                  <Mail className="w-3.5 h-3.5 text-primary" />
+                  {user?.email}
                 </div>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-4">
-              <StatBlock label="Successful Events" value="124" />
-              <StatBlock label="Clubs Partnered" value="12" />
-              <StatBlock label="Total Reach" value="452k" />
-              <StatBlock label="Avg. Rating" value="4.9" />
+              <StatBlock label="Successful Events" value={String(pastEvents.length)} />
+              <StatBlock label="Clubs Available" value={String(associatedClubs.length)} />
             </div>
           </div>
         </div>
@@ -178,15 +161,15 @@ export default function EventAdminProfile() {
                       </div>
 
                       <div className="grid grid-cols-3 gap-6">
-                        <LiveMetric icon={<Users2 className="w-4 h-4" />} label="Reach" value="2.4k" />
-                        <LiveMetric icon={<Activity className="w-4 h-4 text-emerald-400" />} label="Engagement" value="82%" />
-                        <LiveMetric icon={<Star className="w-4 h-4 text-amber-400" />} label="Scans" value="124" />
+                        <LiveMetric icon={<Users2 className="w-4 h-4" />} label="Attendees" value={String(event.attendees || 0)} />
+                        <LiveMetric icon={<Activity className="w-4 h-4 text-emerald-400" />} label="Engagement" value="—" />
+                        <LiveMetric icon={<Star className="w-4 h-4 text-amber-400" />} label="Scans" value="—" />
                       </div>
 
                       <div className="flex items-center justify-between pt-4 border-t border-white/5">
                         <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest flex items-center gap-2">
                           <MapPin className="w-3.5 h-3.5" />
-                          {event.venue_name || 'Main Venue'}
+                          {event.venue_name || event.venue || 'Venue not set'}
                         </p>
                         <div className="flex -space-x-2">
                           {[1, 2, 3].map(i => (
@@ -258,7 +241,7 @@ export default function EventAdminProfile() {
                           <h4 className="text-lg font-bold text-white group-hover:text-primary transition-colors">{event.title}</h4>
                           <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest flex items-center gap-2">
                             <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                            {event.fact}
+                            Completed
                           </p>
                         </div>
                       </div>
@@ -268,7 +251,7 @@ export default function EventAdminProfile() {
                           <p className="text-[8px] text-muted-foreground font-black uppercase tracking-widest">Participants</p>
                         </div>
                         <div className="text-right">
-                          <span className="text-xl font-black text-emerald-400 tracking-tighter">{event.engagement}</span>
+                          <span className="text-xl font-black text-emerald-400 tracking-tighter">—</span>
                           <p className="text-[8px] text-muted-foreground font-black uppercase tracking-widest">Growth</p>
                         </div>
                         <button className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-primary hover:border-primary transition-all">
@@ -328,12 +311,12 @@ export default function EventAdminProfile() {
 
                 <div className="w-full pt-6 border-t border-white/5 flex items-center justify-center gap-6">
                   <div className="text-center">
-                    <span className="text-xs font-black text-white">{Math.floor(Math.random() * 20) + 5}</span>
+                    <span className="text-xs font-black text-white">—</span>
                     <p className="text-[8px] text-muted-foreground uppercase font-black tracking-tighter">Events Done</p>
                   </div>
                   <div className="w-[1px] h-6 bg-white/10" />
                   <div className="text-center">
-                    <span className="text-xs font-black text-emerald-400">4.9</span>
+                    <span className="text-xs font-black text-emerald-400">—</span>
                     <p className="text-[8px] text-muted-foreground uppercase font-black tracking-tighter">Avg Score</p>
                   </div>
                 </div>

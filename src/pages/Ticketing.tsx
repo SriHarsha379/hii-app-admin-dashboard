@@ -38,35 +38,10 @@ import {
 import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
 
-const salesData = [
-  { time: '10:00', sales: 120, capacity: 500 },
-  { time: '11:00', sales: 180, capacity: 500 },
-  { time: '12:00', sales: 250, capacity: 500 },
-  { time: '13:00', sales: 310, capacity: 500 },
-  { time: '14:00', sales: 380, capacity: 500 },
-  { time: '15:00', sales: 420, capacity: 500 },
-  { time: '16:00', sales: 480, capacity: 500 },
-];
-
-const genderData = [
-  { name: 'Male', value: 60, color: '#4F46E5' },
-  { name: 'Female', value: 35, color: '#EC4899' },
-  { name: 'Other', value: 5, color: '#10B981' },
-];
-
-const ticketTiers = [
-  { id: 1, name: 'Early Bird', capacity: 100, sold: 100, status: 'sold_out' },
-  { id: 2, name: 'General Admission', capacity: 300, sold: 245, status: 'active' },
-  { id: 3, name: 'VIP Pass', capacity: 50, sold: 32, status: 'active' },
-  { id: 4, name: 'Backstage Access', capacity: 10, sold: 2, status: 'active' },
-];
-
-const guestList = [
-  { id: 1, name: 'Alex Rivera', type: 'Influencer', email: 'alex@example.com', status: 'Confirmed' },
-  { id: 2, name: 'Sarah Chen', type: 'VIP', email: 'sarah@example.com', status: 'Pending' },
-  { id: 3, name: 'Mike Johnson', type: 'Complimentary', email: 'mike@example.com', status: 'Confirmed' },
-  { id: 4, name: 'Emma Davis', type: 'Influencer', email: 'emma@example.com', status: 'Confirmed' },
-];
+const salesData: Array<{ time: string; sales: number; capacity: number }> = [];
+const genderData: Array<{ name: string; value: number; color: string }> = [];
+const ticketTiers: Array<{ id: number; name: string; capacity: number; sold: number; status: string }> = [];
+const guestList: Array<{ id: number; name: string; type: string; email: string; status: string }> = [];
 
 export default function Ticketing() {
   const { token } = useAuth();
@@ -205,7 +180,7 @@ export default function Ticketing() {
                   </div>
                 </div>
                 <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none">Total Tickets Sold</h3>
-                <div className="text-2xl font-black text-white tracking-tight mt-1 leading-none">12,450</div>
+                <div className="text-2xl font-black text-white tracking-tight mt-1 leading-none">0</div>
               </div>
               <div className="glass-card p-5 rounded-2xl">
                 <div className="flex items-center justify-between mb-4">
@@ -218,7 +193,7 @@ export default function Ticketing() {
                   </div>
                 </div>
                 <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none">Conversion Rate</h3>
-                <div className="text-2xl font-black text-white tracking-tight mt-1 leading-none">8.4%</div>
+                <div className="text-2xl font-black text-white tracking-tight mt-1 leading-none">—</div>
               </div>
             </div>
           </div>
@@ -250,8 +225,7 @@ export default function Ticketing() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex items-center justify-center flex-col">
-                  <span className="text-2xl font-bold text-white">60%</span>
-                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Male</span>
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">No data</span>
                 </div>
               </div>
               <div className="mt-4 space-y-3">
@@ -270,20 +244,9 @@ export default function Ticketing() {
             <div className="glass-card p-6 rounded-2xl">
               <h3 className="text-sm font-black text-white uppercase tracking-wider mb-4">Recent Sales</h3>
               <div className="space-y-4">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
-                        <CreditCard className="w-4 h-4 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-white">VIP Pass</p>
-                        <p className="text-xs text-muted-foreground">2 mins ago</p>
-                      </div>
-                    </div>
-                    <span className="text-sm font-bold text-emerald-400">Purchased</span>
-                  </div>
-                ))}
+                <p className="py-8 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  No ticket sales yet
+                </p>
               </div>
             </div>
           </div>
@@ -333,6 +296,12 @@ export default function Ticketing() {
               </div>
             </motion.div>
           ))}
+          {ticketTiers.length === 0 && (
+            <div className="md:col-span-2 xl:col-span-4 py-20 text-center glass-card rounded-2xl border border-dashed border-white/10">
+              <CreditCard className="w-10 h-10 text-white/20 mx-auto mb-4" />
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">No ticket types configured</p>
+            </div>
+          )}
         </div>
       )}
 

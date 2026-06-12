@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { useQuery } from '@tanstack/react-query';
@@ -26,26 +26,10 @@ import {
 import { cn } from '../lib/utils';
 import { FormSection, RefinedField } from '../components/RefinedForm';
 
-const CLUB_DATA: Record<string, any> = {
-  'dummy-2': {
-    id: 'dummy-2',
-    name: 'Royal Club',
-    city: 'Delhi',
-    address: '45 Palace Rd, Delhi',
-    email: 'royal@example.com',
-    phone: '+91 11 2345 6789',
-    contactPerson: 'Aditya Singh',
-    venueType: 'Nightclub',
-    capacity: '800',
-    description: 'A luxurious nightlife experience in the heart of Delhi.'
-  }
-};
-
 export default function ClaimClubForm() {
   const navigate = useNavigate();
   const { clubId } = useParams();
   const { token } = useAuth();
-  const club = clubId ? CLUB_DATA[clubId] : null;
   const [isSuccess, setIsSuccess] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSticky, setIsSticky] = useState(false);
@@ -59,6 +43,18 @@ export default function ClaimClubForm() {
   }, []);
   const [portraitImage, setPortraitImage] = useState<string | null>(null);
   const [landscapeImage, setLandscapeImage] = useState<string | null>(null);
+
+  const { data: club, isLoading: isLoadingClub } = useQuery({
+    queryKey: ['club', clubId],
+    queryFn: async () => {
+      const res = await fetch(`/api/clubs/${clubId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Club not found');
+      return res.json();
+    },
+    enabled: Boolean(token && clubId)
+  });
 
   // References for hidden file inputs
   const portraitInputRef = React.useRef<HTMLInputElement>(null);
@@ -77,7 +73,7 @@ export default function ClaimClubForm() {
   };
 
   // Form State
-  const [formData, setFormData] = useState(club || {
+  const [formData, setFormData] = useState({
     name: '',
     city: '',
     address: '',
@@ -88,6 +84,29 @@ export default function ClaimClubForm() {
     capacity: '',
     description: ''
   });
+
+  useEffect(() => {
+    if (!club) return;
+    let contactInfo: any = {};
+    try {
+      contactInfo = typeof club.contact_info === 'string'
+        ? JSON.parse(club.contact_info)
+        : club.contact_info || {};
+    } catch {
+      contactInfo = {};
+    }
+    setFormData({
+      name: club.name || '',
+      city: club.city || '',
+      address: club.address || '',
+      email: contactInfo.email || '',
+      phone: contactInfo.phone || '',
+      contactPerson: contactInfo.contactName || '',
+      venueType: club.type || club.venue_type || '',
+      capacity: club.capacity || '',
+      description: club.description || ''
+    });
+  }, [club]);
 
   const { data: venueTypes } = useQuery({
     queryKey: ['venueTypes'],
@@ -111,6 +130,14 @@ export default function ClaimClubForm() {
   const handleClaim = () => {
     setIsSuccess(true);
   };
+
+  if (isLoadingClub) {
+    return (
+      <div className="min-h-screen bg-[#0B0B0F] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   if (!club) {
     return (

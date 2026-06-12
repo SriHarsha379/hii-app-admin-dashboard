@@ -78,6 +78,19 @@ export default function ClubOnboarding() {
     }
   });
 
+  const { data: claimableClubs, isLoading: isLoadingClubs } = useQuery({
+    queryKey: ['claimable-clubs'],
+    queryFn: async () => {
+      const res = await fetch('/api/clubs', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to load clubs');
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: Boolean(token) && step === 'claim'
+  });
+
   // Registration state
   const [venueFormData, setVenueFormData] = useState<any>({
     name: '',
@@ -108,10 +121,12 @@ export default function ClubOnboarding() {
 
   // Claiming state
   const [claimSearch, setClaimSearch] = useState('');
-  const [dummyClubs] = useState([
-    { id: 'dummy-1', name: 'The Hii Lounge', city: 'Mumbai', address: '123 Night St, Mumbai', email: 'club@admin' },
-    { id: 'dummy-2', name: 'Royal Club', city: 'Delhi', address: '45 Palace Rd, Delhi', email: 'royal@example.com' },
-  ]);
+  const filteredClaimableClubs = (Array.isArray(claimableClubs) ? claimableClubs : []).filter((club: any) => {
+    const query = claimSearch.trim().toLowerCase();
+    return !query
+      || club.name?.toLowerCase().includes(query)
+      || club.city?.toLowerCase().includes(query);
+  });
 
   const toggleDay = (index: number) => {
     const newHours = [...workingHours];
@@ -160,22 +175,7 @@ export default function ClubOnboarding() {
   };
 
   const handleClaim = async (club: any) => {
-    if (club.name === 'Royal Club') {
-      navigate(`/claim-club/${club.id}`);
-      return;
-    }
-
-    setSubmittingId(club.id);
-    try {
-      // In a real app, this would be a PATCH to update the admin's organisation
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      updateUser({ organisation: club.name });
-      setIsSuccess(true);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSubmittingId(null);
-    }
+    navigate(`/claim-club/${club.id}`);
   };
 
   if (isSuccess) {
@@ -355,9 +355,7 @@ export default function ClubOnboarding() {
           </div>
 
           <div className="grid gap-4">
-            {dummyClubs
-              .filter(c => c.name.toLowerCase().includes(claimSearch.toLowerCase()) || c.city.toLowerCase().includes(claimSearch.toLowerCase()))
-              .map((club) => (
+            {filteredClaimableClubs.map((club: any) => (
               <motion.div
                 key={club.id}
                 layout
@@ -375,12 +373,6 @@ export default function ClubOnboarding() {
                       <MapPin className="w-3 h-3" />
                       City: {club.city} // Address: {club.address}
                     </p>
-                    {club.email === user?.email && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[8px] font-black uppercase mt-2 border border-emerald-500/20 tracking-widest">
-                        <Check className="w-2 h-2" />
-                        Already Managed by You
-                      </span>
-                    )}
                   </div>
                 </div>
                 <button
@@ -392,12 +384,19 @@ export default function ClubOnboarding() {
                 </button>
               </motion.div>
             ))}
-            {claimSearch && dummyClubs.filter(c => c.name.toLowerCase().includes(claimSearch.toLowerCase())).length === 0 && (
+            {isLoadingClubs && (
+              <div className="flex items-center justify-center py-12 text-muted-foreground">
+                <Loader2 className="w-6 h-6 animate-spin" />
+              </div>
+            )}
+            {!isLoadingClubs && filteredClaimableClubs.length === 0 && (
               <div className="text-center py-12 space-y-4">
                 <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto text-muted-foreground">
                   <SearchIcon className="w-8 h-8" />
                 </div>
-                <p className="text-muted-foreground">No clubs found matching "{claimSearch}"</p>
+                <p className="text-muted-foreground">
+                  {claimSearch ? `No clubs found matching "${claimSearch}"` : 'No clubs are available to claim.'}
+                </p>
                 <button onClick={() => setStep('register')} className="text-primary font-bold hover:underline">Register a new club instead</button>
               </div>
             )}
