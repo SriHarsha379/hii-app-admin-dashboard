@@ -25,9 +25,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // We intentionally don't load from localStorage here to satisfy the requirement
-    // "everytime it starts from the log in page"
-    setIsLoading(false);
+    // Restore session from localStorage on mount so a page refresh doesn't
+    // force the user back to the login page.
+    try {
+      const savedToken = localStorage.getItem('hii_admin_token');
+      const savedUser  = localStorage.getItem('hii_admin_user');
+      if (savedToken && savedUser) {
+        setToken(savedToken);
+        setUser(JSON.parse(savedUser));
+      }
+    } catch {
+      // Corrupt localStorage value — clear it and fall through to login
+      localStorage.removeItem('hii_admin_token');
+      localStorage.removeItem('hii_admin_user');
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   const login = (newToken: string, newUser: User) => {

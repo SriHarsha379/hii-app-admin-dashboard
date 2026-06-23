@@ -58,13 +58,12 @@ import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import ClubProfilePreview from './ClubProfilePreview';
 import EventProfilePreview from './EventProfilePreview';
-
 import RightClubProfile from './RightClubProfile';
 
 function RightSidebar({ isOpen, toggle, currentPage }: { isOpen: boolean, toggle: () => void, currentPage: string }) {
   const { token, user } = useAuth();
   const navigate = useNavigate();
-  
+
   const notifications: any[] = [];
   const team: any[] = [];
 
@@ -82,7 +81,7 @@ function RightSidebar({ isOpen, toggle, currentPage }: { isOpen: boolean, toggle
   const clubData = Array.isArray(clubs) ? clubs.find((c: any) => c.name === user?.organisation) : null;
 
   return (
-    <motion.aside 
+    <motion.aside
       initial={false}
       animate={{ width: isOpen ? 320 : 0, opacity: isOpen ? 1 : 0 }}
       className={cn(
@@ -100,7 +99,7 @@ function RightSidebar({ isOpen, toggle, currentPage }: { isOpen: boolean, toggle
                 </button>
              </div>
              <div className="space-y-4">
-                <button 
+                <button
                   onClick={() => navigate('/club-profile')}
                   className="w-full flex items-center justify-between p-4 rounded-[2rem] bg-white/[0.03] border border-white/5 hover:border-primary/50 transition-all group"
                 >
@@ -116,7 +115,7 @@ function RightSidebar({ isOpen, toggle, currentPage }: { isOpen: boolean, toggle
                   <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-all" />
                 </button>
 
-                <button 
+                <button
                   onClick={() => navigate('/account-settings')}
                   className="w-full flex items-center justify-between p-4 rounded-[2rem] bg-white/[0.03] border border-white/5 hover:border-emerald-500/50 transition-all group"
                 >
@@ -170,9 +169,9 @@ function RightSidebar({ isOpen, toggle, currentPage }: { isOpen: boolean, toggle
                       <div className="min-w-0">
                         <p className="text-xs text-white font-medium truncate">{t.name}</p>
                         <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-bold", t.color)}>
-                          {t.role === 'SUPER ADMIN' ? 'Main Admin' : 
-                           t.role === 'EVENT_ADMIN' ? 'Event Manager' : 
-                           t.role === 'CITY_ADMIN' ? 'City Manager' : 
+                          {t.role === 'SUPER ADMIN' ? 'Main Admin' :
+                           t.role === 'EVENT_ADMIN' ? 'Event Manager' :
+                           t.role === 'CITY_ADMIN' ? 'City Manager' :
                            t.role === 'CLUB_ADMIN' ? 'Club Manager' : t.role}
                         </span>
                       </div>
@@ -202,6 +201,11 @@ export default function Layout() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
+  // ── New: refresh + notification state ──────────────────────────────────────
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
   // Persistence
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(() => {
     const saved = localStorage.getItem('leftSidebarOpen');
@@ -220,6 +224,7 @@ export default function Layout() {
     localStorage.setItem('rightSidebarOpen', JSON.stringify(isRightSidebarOpen));
   }, [isRightSidebarOpen]);
 
+  // ── Search results query ───────────────────────────────────────────────────
   const { data: searchResults, isLoading: isSearching } = useQuery({
     queryKey: ['search', searchQuery],
     queryFn: async () => {
@@ -232,6 +237,23 @@ export default function Layout() {
     },
     enabled: searchQuery.length > 0,
   });
+
+  // ── Notifications query (wire to real endpoint when ready) ─────────────────
+  const { data: notifications } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: async () => {
+      const res = await fetch('/api/notifications', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!token,
+    refetchInterval: 30_000, // poll every 30s
+  });
+
+  const notifList = Array.isArray(notifications) ? notifications : [];
+  const unreadCount = notifList.filter((n: any) => !n.read).length;
 
   const [isClubProfileOpen, setIsClubProfileOpen] = useState(false);
   const [isEventProfileOpen, setIsEventProfileOpen] = useState(false);
@@ -250,6 +272,7 @@ export default function Layout() {
 
   const clubData = Array.isArray(clubs) ? clubs.find((c: any) => c.name === user?.organisation) : null;
 
+  // ── Keyboard shortcut for search ───────────────────────────────────────────
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -263,6 +286,7 @@ export default function Layout() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // ── Click-outside: search ──────────────────────────────────────────────────
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -272,6 +296,24 @@ export default function Layout() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // ── Click-outside: notifications ───────────────────────────────────────────
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setIsNotifOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // ── Refresh handler ────────────────────────────────────────────────────────
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await queryClient.invalidateQueries();
+    setTimeout(() => setIsRefreshing(false), 600);
+  };
 
   const currentPage = location.pathname.split('/')[1] || 'overview';
 
@@ -288,7 +330,7 @@ export default function Layout() {
         )}
         <div className={cn("flex items-center relative z-10", isLeftSidebarOpen ? "gap-3" : "justify-center")}>
           <div className="relative">
-            <Icon className={cn("w-4 h-4 transition-colors shrink-0", isActive ? "text-primary drop-shadow-[0_0_8px_rgba(255,45,154,0.8)]" : "text-muted-foreground group-hover:text-white")} /> 
+            <Icon className={cn("w-4 h-4 transition-colors shrink-0", isActive ? "text-primary drop-shadow-[0_0_8px_rgba(255,45,154,0.8)]" : "text-muted-foreground group-hover:text-white")} />
             {!isLeftSidebarOpen && badge && (
               <span className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center bg-primary text-white text-[8px] font-black rounded-full shadow-[0_0_10px_rgba(255,45,154,0.5)] border border-background z-20">
                 {badge}
@@ -309,12 +351,11 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-background flex text-white font-sans overflow-hidden">
       {/* Left Sidebar */}
-      <motion.aside 
+      <motion.aside
         initial={false}
         animate={{ width: isLeftSidebarOpen ? 260 : 80 }}
         className="border-r border-border bg-sidebar flex flex-col shrink-0 relative z-40"
       >
-        {/* Top Logo Section (Minimal) */}
         <div className={cn("p-6 flex items-center shrink-0 overflow-hidden", isLeftSidebarOpen ? "gap-3" : "justify-center")}>
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
             <Zap className="w-5 h-5 text-white fill-white" />
@@ -338,7 +379,7 @@ export default function Layout() {
         <div className="flex-1 overflow-y-auto py-2 custom-scrollbar overflow-x-hidden">
           <AnimatePresence initial={false}>
             {isLeftSidebarOpen && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, height: 0, marginTop: 0 }}
                 animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
                 exit={{ opacity: 0, height: 0, marginTop: 0 }}
@@ -358,7 +399,7 @@ export default function Layout() {
 
           <AnimatePresence initial={false}>
             {isLeftSidebarOpen && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, height: 0, marginTop: 0 }}
                 animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
                 exit={{ opacity: 0, height: 0, marginTop: 0 }}
@@ -385,7 +426,7 @@ export default function Layout() {
 
           <AnimatePresence initial={false}>
             {isLeftSidebarOpen && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, height: 0, marginTop: 0 }}
                 animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
                 exit={{ opacity: 0, height: 0, marginTop: 0 }}
@@ -404,7 +445,7 @@ export default function Layout() {
           </nav>
         </div>
 
-        {/* Profile Section with Dropdown at bottom */}
+        {/* Profile Section */}
         <div className="relative p-3 border-t border-border/20 bg-sidebar shrink-0 z-20">
           <AnimatePresence>
             {isProfileDropdownOpen && (
@@ -417,7 +458,6 @@ export default function Layout() {
                   !isLeftSidebarOpen && "left-4 w-48"
                 )}
               >
-                {/* Role-based options */}
                 <div className="space-y-0.5">
                   {user?.role === 'SUPER_ADMIN' && (
                     <>
@@ -439,14 +479,14 @@ export default function Layout() {
                       </Link>
                     </>
                   )}
-                  
+
                   {user?.role === 'NORMAL_ADMIN' && (
                     <Link to="/manage-filters" onClick={() => setIsProfileDropdownOpen(false)} className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] font-bold text-white/60 hover:text-white hover:bg-white/5 transition-all">
                       <Filter className="w-3.5 h-3.5" />
                       Manage Filters
                     </Link>
                   )}
-                  
+
                   {user?.role === 'CLUB_ADMIN' && (
                     <Link to="/account-settings" onClick={() => setIsProfileDropdownOpen(false)} className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] font-bold text-white/60 hover:text-white hover:bg-white/5 transition-all">
                       <Settings className="w-3.5 h-3.5" />
@@ -461,7 +501,7 @@ export default function Layout() {
                     </Link>
                   )}
 
-                  <button 
+                  <button
                     onClick={() => {
                       setIsProfileDropdownOpen(false);
                       logout();
@@ -487,7 +527,7 @@ export default function Layout() {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-xs font-black text-white shadow-lg shadow-primary/20 shrink-0 group-hover:scale-105 transition-transform">
               {user?.role === 'CLUB_ADMIN' ? user?.organisation?.charAt(0) : (user?.name?.charAt(0) || 'A')}
             </div>
-            
+
             {isLeftSidebarOpen && (
               <>
                 <div className="flex-1 min-w-0 text-left">
@@ -495,9 +535,9 @@ export default function Layout() {
                     {user?.role === 'CLUB_ADMIN' ? user?.organisation : (user?.name || 'Hii Admin')}
                   </p>
                   <p className="text-[9px] text-muted-foreground uppercase tracking-widest truncate">
-                    {user?.role === 'SUPER_ADMIN' ? 'Main Admin' : 
-                     user?.role === 'NORMAL_ADMIN' ? 'Admin' : 
-                     user?.role === 'EVENT_ADMIN' ? 'Event Manager' : 
+                    {user?.role === 'SUPER_ADMIN' ? 'Main Admin' :
+                     user?.role === 'NORMAL_ADMIN' ? 'Admin' :
+                     user?.role === 'EVENT_ADMIN' ? 'Event Manager' :
                      user?.role === 'CLUB_ADMIN' ? 'Club Manager' : user?.role?.replace('_', ' ')}
                   </p>
                 </div>
@@ -509,9 +549,9 @@ export default function Layout() {
             )}
           </button>
         </div>
-        
-        {/* Toggle Button */}
-        <button 
+
+        {/* Sidebar Toggle */}
+        <button
           onClick={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)}
           className="absolute -right-3 top-20 w-6 h-6 bg-card border border-border rounded-full flex items-center justify-center text-muted-foreground hover:text-white transition-colors z-50 shadow-xl"
         >
@@ -523,14 +563,15 @@ export default function Layout() {
       <main className="flex-1 flex flex-col h-screen overflow-hidden bg-background relative selection:bg-primary/20">
         {/* Top Header */}
         <header className="h-16 border-b border-border flex items-center justify-between px-4 sm:px-6 shrink-0 bg-background/50 backdrop-blur-xl z-30 gap-4">
-          <div className="flex-1 hidden sm:flex justify-start"></div>
-          
+          <div className="flex-1 hidden sm:flex justify-start" />
+
+          {/* Search */}
           <div className="flex-1 flex justify-start sm:justify-center">
             <div className="relative group w-full max-w-[240px] md:max-w-[320px] lg:max-w-[384px]" ref={searchRef}>
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
-              <input 
-                type="text" 
-                placeholder="Search anything..." 
+              <input
+                type="text"
+                placeholder="Search anything..."
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
@@ -542,11 +583,10 @@ export default function Layout() {
               <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 text-[10px] text-muted-foreground border border-white/10 rounded px-1.5 bg-white/5 font-mono">
                 <Command className="w-2.5 h-2.5" /> K
               </div>
-              
-              {/* Search Results Dropdown */}
+
               <AnimatePresence>
                 {isSearchOpen && searchQuery && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
@@ -589,37 +629,141 @@ export default function Layout() {
               </AnimatePresence>
             </div>
           </div>
-          
+
+          {/* Right actions */}
           <div className="flex-none sm:flex-1 flex items-center justify-end gap-2 sm:gap-4">
-            <button className="p-2 text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl transition-all">
-              <RefreshCw className="w-4 h-4" />
-            </button>
-            
-            <button className="p-2 text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl transition-all relative">
-              <Bell className="w-4 h-4" />
-              <div className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-primary rounded-full border border-background"></div>
+
+            {/* ── Refresh button ── */}
+            <button
+              onClick={handleRefresh}
+              title="Refresh all data"
+              className="p-2 text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl transition-all"
+            >
+              <RefreshCw className={cn("w-4 h-4 transition-all", isRefreshing && "animate-spin text-primary")} />
             </button>
 
-            <div className="w-px h-4 bg-border mx-1"></div>
-            
-            <div 
+            {/* ── Notification button + dropdown ── */}
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={() => setIsNotifOpen(!isNotifOpen)}
+                className="p-2 text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl transition-all relative"
+              >
+                <Bell className={cn("w-4 h-4 transition-colors", isNotifOpen && "text-primary")} />
+                {/* Dot: red if unread, grey if none */}
+                <div className={cn(
+                  "absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full border border-background transition-colors",
+                  unreadCount > 0 ? "bg-primary" : "bg-white/20"
+                )} />
+              </button>
+
+              <AnimatePresence>
+                {isNotifOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-full mt-2 w-80 bg-[#09090B] border border-white/10 rounded-2xl shadow-[0_40px_80px_rgba(0,0,0,0.8)] z-50 overflow-hidden"
+                  >
+                    {/* Dropdown header */}
+                    <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-black text-white uppercase tracking-widest">Notifications</h4>
+                        {unreadCount > 0 && (
+                          <span className="px-1.5 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-black">
+                            {unreadCount}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setIsNotifOpen(false)}
+                        className="p-1 hover:bg-white/5 rounded-lg transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5 text-muted-foreground hover:text-white" />
+                      </button>
+                    </div>
+
+                    {/* Dropdown body */}
+                    <div className="max-h-[360px] overflow-y-auto custom-scrollbar">
+                      {notifList.length > 0 ? (
+                        <div className="p-2">
+                          {notifList.map((n: any) => (
+                            <div
+                              key={n._id || n.id}
+                              className={cn(
+                                "flex items-start gap-3 px-3 py-3 rounded-xl transition-all cursor-pointer group",
+                                !n.read ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-white/5"
+                              )}
+                            >
+                              {/* Icon or avatar */}
+                              <div className={cn(
+                                "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5",
+                                !n.read ? "bg-primary/20 text-primary" : "bg-white/5 text-muted-foreground"
+                              )}>
+                                <Bell className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className={cn(
+                                  "text-xs leading-snug",
+                                  !n.read ? "text-white font-bold" : "text-white/60 font-medium"
+                                )}>
+                                  {n.message || n.text || 'New notification'}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground mt-1">
+                                  {n.time || n.createdAt
+                                    ? new Date(n.time || n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                    : ''}
+                                </p>
+                              </div>
+                              {!n.read && (
+                                <div className="w-1.5 h-1.5 rounded-full bg-primary shrink-0 mt-2" />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="py-12 text-center space-y-3">
+                          <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mx-auto">
+                            <Bell className="w-6 h-6 text-white/10" />
+                          </div>
+                          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                            No new notifications
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Footer — only show when there are notifications */}
+                    {notifList.length > 0 && (
+                      <div className="px-5 py-3 border-t border-white/5">
+                        <button className="text-[10px] font-black text-primary uppercase tracking-widest hover:text-white transition-colors w-full text-center">
+                          Mark all as read
+                        </button>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            <div className="w-px h-4 bg-border mx-1" />
+
+            {/* Profile avatar */}
+            <div
               onClick={() => {
-                if (user?.role === 'CLUB_ADMIN') {
-                  navigate('/club-profile');
-                } else if (user?.role === 'EVENT_ADMIN') {
-                  navigate('/event-profile');
-                }
+                if (user?.role === 'CLUB_ADMIN') navigate('/club-profile');
+                else if (user?.role === 'EVENT_ADMIN') navigate('/event-profile');
               }}
               className="flex items-center gap-3 pl-2 group cursor-pointer shrink-0"
             >
-              <div className="flex flex-col items-end hidden sm:flex whitespace-nowrap">
+              <div className="flex-col items-end hidden sm:flex whitespace-nowrap">
                 <span className="text-xs font-bold text-white leading-none group-hover:text-primary transition-colors">
                   {user?.role === 'CLUB_ADMIN' ? user?.organisation : (user?.name || 'Admin')}
                 </span>
                 <span className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider">
-                  {user?.role === 'SUPER_ADMIN' ? 'Main Admin' : 
-                   user?.role === 'NORMAL_ADMIN' ? 'Admin' : 
-                   user?.role === 'EVENT_ADMIN' ? 'Event Manager' : 
+                  {user?.role === 'SUPER_ADMIN' ? 'Main Admin' :
+                   user?.role === 'NORMAL_ADMIN' ? 'Admin' :
+                   user?.role === 'EVENT_ADMIN' ? 'Event Manager' :
                    user?.role === 'CLUB_ADMIN' ? 'Club Manager' : user?.role?.replace('_', ' ') || 'Manager'}
                 </span>
               </div>
@@ -629,7 +773,7 @@ export default function Layout() {
             </div>
 
             {hasRightSidebar && !isRightSidebarOpen && (
-              <button 
+              <button
                 onClick={() => setIsRightSidebarOpen(true)}
                 className="p-2 text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl transition-all"
               >
@@ -649,9 +793,9 @@ export default function Layout() {
 
       {/* Right Sidebar */}
       {hasRightSidebar && (
-        <RightSidebar 
-          isOpen={isRightSidebarOpen} 
-          toggle={() => setIsRightSidebarOpen(!isRightSidebarOpen)} 
+        <RightSidebar
+          isOpen={isRightSidebarOpen}
+          toggle={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
           currentPage={currentPage}
         />
       )}
@@ -661,48 +805,36 @@ export default function Layout() {
         {isClubProfileOpen && user?.role === 'CLUB_ADMIN' && (
           <>
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setIsClubProfileOpen(false)}
               className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110]"
             />
             <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
+              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
               className="fixed inset-y-0 right-0 w-full max-w-[420px] bg-black z-[111] shadow-[0_0_100px_rgba(0,0,0,0.8)] overflow-hidden border-l border-white/5"
             >
-              <ClubProfilePreview 
-                club={clubData} 
-                onClose={() => setIsClubProfileOpen(false)}
-              />
+              <ClubProfilePreview club={clubData} onClose={() => setIsClubProfileOpen(false)} />
             </motion.div>
           </>
         )}
       </AnimatePresence>
+
       {/* Event Profile Panel */}
       <AnimatePresence>
         {isEventProfileOpen && user?.role === 'EVENT_ADMIN' && (
           <>
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setIsEventProfileOpen(false)}
               className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110]"
             />
             <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
+              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
               className="fixed inset-y-0 right-0 w-full max-w-[420px] bg-black z-[111] shadow-[0_0_100px_rgba(0,0,0,0.8)] overflow-hidden border-l border-white/5"
             >
-              <EventProfilePreview 
-                onClose={() => setIsEventProfileOpen(false)}
-              />
+              <EventProfilePreview onClose={() => setIsEventProfileOpen(false)} />
             </motion.div>
           </>
         )}

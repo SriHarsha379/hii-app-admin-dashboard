@@ -71,17 +71,20 @@ export function FeatureEventModal({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filteredEvents = useMemo(() => {
-    return events.filter(event => {
-      const matchesCity = selectedCity === 'ALL' || event.city === selectedCity;
-      const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesCity && matchesSearch;
-    });
-  }, [events, selectedCity, searchTerm]);
+const filteredEvents = useMemo(() => {
+  if (!Array.isArray(events)) return [];
+  return events.filter(event => {
+    if (!event) return false;
+    const matchesCity = selectedCity === 'ALL' || (event.city ?? '') === selectedCity;
+    const matchesSearch = (event.title ?? '').toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesCity && matchesSearch;
+  });
+}, [events, selectedCity, searchTerm]);
 
-  const selectedEvent = useMemo(() => {
-    return events.find(e => e.id === selectedEventId);
-  }, [events, selectedEventId]);
+const selectedEvent = useMemo(() => {
+  if (!Array.isArray(events)) return undefined;
+  return events.find(e => (e._id || e.id) === selectedEventId);
+}, [events, selectedEventId]);
 
   const handleConfirm = async () => {
     if (!selectedEventId || duration < 1) return;
@@ -203,11 +206,11 @@ export function FeatureEventModal({
                       {filteredEvents.map((event) => (
                         <button
                           key={event.id}
-                          onClick={() => {
-                            setSelectedEventId(event.id);
-                            setSearchTerm(event.title);
-                            setIsSearchFocused(false);
-                          }}
+onClick={() => {
+  setSelectedEventId(event._id || event.id);  // ← was just event.id
+  setSearchTerm(event.title);
+  setIsSearchFocused(false);
+}}
                           className={cn(
                             "w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left",
                             selectedEventId === event.id && "bg-primary/5"
