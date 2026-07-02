@@ -919,8 +919,10 @@ async function startServer() {
   app.get('/api/recommendations', authenticateToken, async (req, res) => {
     try {
       const filter: any = { is_deleted: false };
-      if (req.query.type)   filter.type   = req.query.type;
-      if (req.query.city)   filter.target_city = req.query.city;
+      const allowedTypes = ['event', 'club'];
+      const typeParam = String(req.query.type || '');
+      if (typeParam && allowedTypes.includes(typeParam)) filter.type = typeParam;
+      if (req.query.city) filter.target_city = String(req.query.city).slice(0, 100);
       if (req.query.active) filter.active = req.query.active === 'true';
       const recs = await RecommendationModel.find(filter)
         .populate('resource_id')
