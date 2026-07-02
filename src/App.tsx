@@ -17,6 +17,7 @@ import SupportActivity from './pages/SupportActivity';
 import ActivityLogs from './pages/ActivityLogs';
 import Settings from './pages/Settings';
 import ManageFilters from './pages/ManageFilters';
+import Recommendations from './pages/Recommendations';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -90,6 +91,7 @@ export default function App() {
               <Route path="analytics" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CLUB_ADMIN', 'EVENT_ADMIN']}><Analytics /></ProtectedRoute>} />
               <Route path="settings" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><Settings /></ProtectedRoute>} />
               <Route path="manage-filters" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'NORMAL_ADMIN']}><ManageFilters /></ProtectedRoute>} />
+              <Route path="recommendations" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'NORMAL_ADMIN']}><Recommendations /></ProtectedRoute>} />
               <Route path="admins" element={<ProtectedRoute requireSuperAdmin><Admins /></ProtectedRoute>} />
               <Route path="account-settings" element={<ProtectedRoute allowedRoles={['CLUB_ADMIN']}><AccountSettings /></ProtectedRoute>} />
               <Route path="event-account-settings" element={<ProtectedRoute allowedRoles={['EVENT_ADMIN']}><EventAccountSettings /></ProtectedRoute>} />

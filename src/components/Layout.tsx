@@ -52,7 +52,8 @@ import {
   Calendar as CalendarIcon,
   ChevronDown,
   Users as Users2,
-  X
+  X,
+  Sparkles
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -422,6 +423,7 @@ export default function Layout() {
               </NavLink>
             )}
             {(user?.role === 'SUPER_ADMIN' || user?.role === 'NORMAL_ADMIN') && <NavLink to="/polls-contests" icon={Vote}>Polls & Contests</NavLink>}
+            {(user?.role === 'SUPER_ADMIN' || user?.role === 'NORMAL_ADMIN') && <NavLink to="/recommendations" icon={Sparkles}>Recommendations</NavLink>}
           </nav>
 
           <AnimatePresence initial={false}>

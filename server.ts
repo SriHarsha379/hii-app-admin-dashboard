@@ -213,6 +213,24 @@ const NotificationSchema = new mongoose.Schema({
 }, { timestamps: true });
 const NotificationModel: any = mongoose.models.Notification || mongoose.model('Notification', NotificationSchema);
 
+// ── Recommendation ────────────────────────────────────────────────────────────
+const RecommendationSchema = new mongoose.Schema({
+  type:             { type: String, enum: ['event', 'club'], required: true },
+  resource_id:      { type: mongoose.Schema.Types.ObjectId, required: true, refPath: 'resource_model' },
+  resource_model:   { type: String, enum: ['Event', 'Vendor'], required: true },
+  title:            { type: String, default: '' },       // optional display override
+  priority:         { type: Number, default: 0 },
+  target_city:      { type: String, default: null },
+  target_gender:    { type: String, default: null },
+  target_crowd_type: { type: String, default: null },
+  active:           { type: Boolean, default: true },
+  starts_at:        { type: Date, default: null },
+  ends_at:          { type: Date, default: null },
+  created_by:       { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+  is_deleted:       { type: Boolean, default: false },
+}, { timestamps: true });
+const RecommendationModel: any = mongoose.models.Recommendation || mongoose.model('Recommendation', RecommendationSchema);
+
 // ════════════════════════════════════════════════════════════════════════════
 // SEED
 // ════════════════════════════════════════════════════════════════════════════
@@ -893,6 +911,111 @@ async function startServer() {
         ...events.map((e: any)  => ({ id: e._id, title: e.title, type: 'Event', link: '/events' })),
       ]);
     } catch { res.status(500).json({ error: 'Internal server error' }); }
+  });
+
+  // ── Recommendations ───────────────────────────────────────────────────────
+
+  // GET /api/recommendations — list (filterable by type, city, active)
+  app.get('/api/recommendations', authenticateToken, async (req, res) => {
+    try {
+      const filter: any = { is_deleted: false };
+      if (req.query.type)   filter.type   = req.query.type;
+      if (req.query.city)   filter.target_city = req.query.city;
+      if (req.query.active) filter.active = req.query.active === 'true';
+      const recs = await RecommendationModel.find(filter)
+        .populate('resource_id')
+        .populate('created_by', 'name')
+        .sort({ priority: 1, createdAt: -1 })
+        .lean();
+      res.json(recs);
+    } catch { res.status(500).json({ error: 'Failed to fetch recommendations' }); }
+  });
+
+  // GET /api/recommendations/preview — ordered active list as mobile app sees it
+  app.get('/api/recommendations/preview', authenticateToken, async (_req, res) => {
+    try {
+      const now = new Date();
+      const recs = await RecommendationModel.find({
+        is_deleted: false,
+        active: true,
+        $or: [
+          { starts_at: null, ends_at: null },
+          { starts_at: { $lte: now }, ends_at: { $gte: now } },
+          { starts_at: null, ends_at: { $gte: now } },
+          { starts_at: { $lte: now }, ends_at: null },
+        ],
+      })
+        .populate('resource_id')
+        .populate('created_by', 'name')
+        .sort({ priority: 1, createdAt: -1 })
+        .lean();
+      res.json(recs);
+    } catch { res.status(500).json({ error: 'Failed to fetch preview' }); }
+  });
+
+  // POST /api/recommendations — create (SUPER_ADMIN only)
+  app.post('/api/recommendations', authenticateToken, authorizeRoles('SUPER_ADMIN'), async (req: any, res) => {
+    try {
+      const {
+        type, resource_id, title, priority,
+        target_city, target_gender, target_crowd_type,
+        active, starts_at, ends_at,
+      } = req.body;
+      if (!type || !resource_id) return res.status(400).json({ error: 'type and resource_id are required' });
+      const resource_model = type === 'event' ? 'Event' : 'Vendor';
+      const rec = await RecommendationModel.create({
+        type, resource_id, resource_model,
+        title: title || '',
+        priority: priority ?? 0,
+        target_city: target_city || null,
+        target_gender: target_gender || null,
+        target_crowd_type: target_crowd_type || null,
+        active: active !== undefined ? active : true,
+        starts_at: starts_at || null,
+        ends_at: ends_at || null,
+        created_by: req.user.id,
+        is_deleted: false,
+      });
+      await logActivity(req.user.id, 'CREATE', `RECOMMENDATION: ${type}/${resource_id}`);
+      const populated = await RecommendationModel.findById(rec._id)
+        .populate('resource_id')
+        .populate('created_by', 'name')
+        .lean();
+      res.status(201).json(populated);
+    } catch (err) { res.status(500).json({ error: 'Failed to create recommendation', details: String(err) }); }
+  });
+
+  // PATCH /api/recommendations/:id — update priority / active / targeting
+  app.patch('/api/recommendations/:id', authenticateToken, authorizeRoles('SUPER_ADMIN'), async (req: any, res) => {
+    try {
+      const allowed = ['title', 'priority', 'active', 'target_city', 'target_gender', 'target_crowd_type', 'starts_at', 'ends_at'];
+      const update: any = {};
+      for (const key of allowed) {
+        if (req.body[key] !== undefined) update[key] = req.body[key];
+      }
+      const rec = await RecommendationModel.findOneAndUpdate(
+        { _id: req.params.id, is_deleted: false },
+        { $set: update },
+        { new: true }
+      ).populate('resource_id').populate('created_by', 'name').lean();
+      if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
+      await logActivity(req.user.id, 'UPDATE', `RECOMMENDATION: ${req.params.id}`);
+      res.json(rec);
+    } catch { res.status(500).json({ error: 'Failed to update recommendation' }); }
+  });
+
+  // DELETE /api/recommendations/:id — soft delete
+  app.delete('/api/recommendations/:id', authenticateToken, authorizeRoles('SUPER_ADMIN'), async (req: any, res) => {
+    try {
+      const rec = await RecommendationModel.findOneAndUpdate(
+        { _id: req.params.id },
+        { is_deleted: true, active: false },
+        { new: true }
+      );
+      if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
+      await logActivity(req.user.id, 'DELETE', `RECOMMENDATION: ${req.params.id}`);
+      res.json({ success: true });
+    } catch { res.status(500).json({ error: 'Failed to delete recommendation' }); }
   });
 
   // ── Vite / Static ─────────────────────────────────────────────────────────
