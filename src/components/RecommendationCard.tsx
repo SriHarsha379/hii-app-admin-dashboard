@@ -6,6 +6,7 @@ import {
   Trash2,
   GripVertical,
   Clock,
+  Edit2,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
@@ -15,6 +16,7 @@ interface RecommendationCardProps {
   isSuperAdmin: boolean;
   onToggleActive: (id: string, active: boolean) => void;
   onDelete: (id: string) => void;
+  onEdit?: (rec: any) => void;
   isDragging?: boolean;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
 }
@@ -24,6 +26,7 @@ export default function RecommendationCard({
   isSuperAdmin,
   onToggleActive,
   onDelete,
+  onEdit,
   isDragging = false,
   dragHandleProps = {},
 }: RecommendationCardProps) {
@@ -52,7 +55,13 @@ export default function RecommendationCard({
       )}
 
       {/* Poster */}
-      <div className="w-14 h-14 rounded-2xl bg-white/5 overflow-hidden shrink-0 border border-white/10">
+      <div
+        className={cn(
+          'w-14 h-14 rounded-2xl bg-white/5 overflow-hidden shrink-0 border border-white/10',
+          isSuperAdmin && onEdit && 'cursor-pointer'
+        )}
+        onClick={() => isSuperAdmin && onEdit?.(rec)}
+      >
         {poster ? (
           <img src={poster} alt={overrideTitle} className="w-full h-full object-cover" />
         ) : (
@@ -67,7 +76,10 @@ export default function RecommendationCard({
       </div>
 
       {/* Info */}
-      <div className="flex-1 min-w-0">
+      <div
+        className={cn('flex-1 min-w-0', isSuperAdmin && onEdit && 'cursor-pointer')}
+        onClick={() => isSuperAdmin && onEdit?.(rec)}
+      >
         <div className="flex items-center gap-2 mb-1">
           <span
             className={cn(
@@ -108,6 +120,9 @@ export default function RecommendationCard({
       <button
         onClick={() => onToggleActive(rec._id, !rec.active)}
         disabled={!isSuperAdmin}
+        role="switch"
+        aria-checked={!!rec.active}
+        aria-label="Toggle active"
         className={cn(
           'w-10 h-6 rounded-full flex items-center transition-all shrink-0',
           rec.active ? 'bg-emerald-500 justify-end' : 'bg-white/10 justify-start',
@@ -116,6 +131,16 @@ export default function RecommendationCard({
       >
         <div className="w-4 h-4 rounded-full bg-white shadow-md mx-1" />
       </button>
+
+      {/* Edit */}
+      {isSuperAdmin && onEdit && (
+        <button
+          onClick={() => onEdit(rec)}
+          className="p-2 rounded-xl text-muted-foreground hover:text-white hover:bg-white/10 transition-all shrink-0"
+        >
+          <Edit2 className="w-4 h-4" />
+        </button>
+      )}
 
       {/* Delete */}
       {isSuperAdmin && (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -15,12 +15,14 @@ import {
   Check,
   ChevronDown,
   Phone,
+  AlertTriangle,
+  Trash2,
+  Lock,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { FormSection, RefinedField } from '../components/RefinedForm';
 import { FilterDropdown } from '../components/FilterDropdown';
-import { MultiSelectDropdown } from '../components/MultiSelectDropdown';
 import RecommendationCard from '../components/RecommendationCard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -58,6 +60,15 @@ const CROWD_TYPES = [
 ];
 
 const GENDERS = ['All', 'Male', 'Female', 'Non-Binary'];
+
+// Format an ISO date string for a <input type="datetime-local"> value
+const toLocalInput = (iso: string | null | undefined) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
 
 // ─── Phone Preview Card ───────────────────────────────────────────────────────
 
@@ -107,6 +118,54 @@ function PhonePreviewCard({ rec }: { rec: any }) {
   );
 }
 
+// ─── Delete Confirm Dialog ──────────────────────────────────────────────────
+
+function DeleteConfirmDialog({ rec, onConfirm, onCancel, isDeleting }: { rec: any; onConfirm: () => void; onCancel: () => void; isDeleting: boolean }) {
+  const resource = rec.resource_id || {};
+  const name = rec.type === 'event' ? resource.title : resource.name;
+  const label = rec.title || name || 'this recommendation';
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="glass-card w-full max-w-md rounded-3xl border border-red-500/20 overflow-hidden shadow-2xl p-8 space-y-6"
+      >
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 shrink-0">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-base font-black text-white uppercase tracking-tight">Delete Recommendation</h3>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">This action cannot be undone</p>
+          </div>
+        </div>
+        <p className="text-sm text-white/60 leading-relaxed">
+          Are you sure you want to delete <span className="text-white font-bold">"{label}"</span>? It will be removed from the app feed immediately.
+        </p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-[11px] font-black uppercase tracking-widest text-white/60 hover:text-white hover:bg-white/10 transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isDeleting}
+            className="flex-1 py-3.5 rounded-2xl bg-red-500/20 border border-red-500/30 text-[11px] font-black uppercase tracking-widest text-red-400 hover:bg-red-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            {isDeleting ? 'Deleting…' : 'Delete'}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Recommendations() {
@@ -115,13 +174,15 @@ export default function Recommendations() {
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
   const [activeTab, setActiveTab] = useState<'active' | 'add' | 'preview'>('active');
-  const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [form, setForm] = useState<RecForm>(emptyForm());
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [filterType, setFilterType] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [formError, setFormError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // ── Queries ────────────────────────────────────────────────────────────────
 
@@ -165,17 +226,21 @@ export default function Recommendations() {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || 'Failed to create recommendation');
+      }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recommendations'] });
       queryClient.invalidateQueries({ queryKey: ['recommendations-preview'] });
-      setIsPanelOpen(false);
       setForm(emptyForm());
       setEditingId(null);
+      setFormError('');
       setActiveTab('active');
     },
+    onError: (err: any) => setFormError(err.message || 'Failed to create recommendation'),
   });
 
   const updateMutation = useMutation({
@@ -185,13 +250,25 @@ export default function Recommendations() {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || 'Failed to update recommendation');
+      }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['recommendations'] });
       queryClient.invalidateQueries({ queryKey: ['recommendations-preview'] });
+      // Only reset/close the form if this update came from the edit form
+      // (not from a quick inline toggle-active click on the Active tab).
+      if (editingId && variables.id === editingId) {
+        setForm(emptyForm());
+        setEditingId(null);
+        setFormError('');
+        setActiveTab('active');
+      }
     },
+    onError: (err: any) => setFormError(err.message || 'Failed to update recommendation'),
   });
 
   const deleteMutation = useMutation({
@@ -200,35 +277,75 @@ export default function Recommendations() {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}`},
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw new Error('Failed to delete recommendation');
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recommendations'] });
       queryClient.invalidateQueries({ queryKey: ['recommendations-preview'] });
+      setDeleteTarget(null);
     },
   });
 
   // ── Resource search ────────────────────────────────────────────────────────
+  // Fetched once per content-type and cached; the dropdown then just filters
+  // that list in memory, so opening the field (even with an empty query)
+  // can show every available event/club instead of requiring 2+ typed chars.
 
-  const handleResourceSearch = async (q: string) => {
-    setSearchQuery(q);
-    if (!q || q.length < 2) { setSearchResults([]); return; }
+  const [allResources, setAllResources] = useState<any[]>([]);
+  const [resourcesLoadedFor, setResourcesLoadedFor] = useState<'event' | 'club' | null>(null);
+  const [isResourceDropdownOpen, setIsResourceDropdownOpen] = useState(false);
+  const resourceDropdownRef = useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (resourceDropdownRef.current && !resourceDropdownRef.current.contains(e.target as Node)) {
+        setIsResourceDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const loadResourcesForType = async (type: 'event' | 'club') => {
     setIsSearching(true);
     try {
-      const endpoint = form.type === 'event' ? '/api/events' : '/api/clubs';
+      const endpoint = type === 'event' ? '/api/events' : '/api/clubs';
       const res = await fetch(endpoint, { headers: { Authorization: `Bearer ${token}`} });
       const data = await res.json();
-      const filtered = Array.isArray(data)
-        ? data.filter((item: any) => {
-            const label = form.type === 'event' ? item.title : item.name;
-            return label?.toLowerCase().includes(q.toLowerCase());
-          }).slice(0, 8)
-        : [];
-      setSearchResults(filtered);
+      setAllResources(Array.isArray(data) ? data : []);
+      setResourcesLoadedFor(type);
+    } catch {
+      setAllResources([]);
     } finally {
       setIsSearching(false);
     }
+  };
+
+  const filterResources = (q: string) => {
+    const label = (item: any) => (form.type === 'event' ? item.title : item.name);
+    // Some documents (e.g. inserted directly into MongoDB, bypassing schema
+    // validation) may be missing a title/name. Exclude them from the picker
+    // rather than rendering an unlabeled, effectively unusable row.
+    const withLabel = allResources.filter((item: any) => !!label(item)?.trim());
+    const list = q
+      ? withLabel.filter((item: any) => label(item)!.toLowerCase().includes(q.toLowerCase()))
+      : withLabel;
+    setSearchResults(list.slice(0, 20));
+  };
+
+  const handleResourceFocus = async () => {
+    setIsResourceDropdownOpen(true);
+    if (resourcesLoadedFor !== form.type) {
+      await loadResourcesForType(form.type);
+    }
+    filterResources(searchQuery);
+  };
+
+  const handleResourceSearch = (q: string) => {
+    setSearchQuery(q);
+    if (resourcesLoadedFor !== form.type) return; // still loading, filter runs after load completes
+    filterResources(q);
   };
 
   const selectResource = (item: any) => {
@@ -236,28 +353,50 @@ export default function Recommendations() {
     setForm((f) => ({ ...f, resource_id: item._id, resource_label: label }));
     setSearchQuery(label);
     setSearchResults([]);
+    setIsResourceDropdownOpen(false);
   };
+
+  // Re-filter (and re-fetch if the type changed) whenever the query or type updates
+  React.useEffect(() => {
+    if (resourcesLoadedFor === form.type) {
+      filterResources(searchQuery);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, form.type, allResources]);
 
   // ── Submit ─────────────────────────────────────────────────────────────────
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError('');
     if (!form.resource_id) return;
-    const payload = {
-      type: form.type,
-      resource_id: form.resource_id,
-      title: form.title,
-      priority: Number(form.priority),
-      target_city: form.target_city || null,
-      target_gender: form.target_gender || null,
-      target_crowd_type: form.target_crowd_type || null,
-      active: form.active,
-      starts_at: form.starts_at || null,
-      ends_at: form.ends_at || null,
-    };
+
     if (editingId) {
+      // PATCH only accepts these fields — type/resource_id can't be changed once created.
+      const payload = {
+        title: form.title,
+        priority: Number.isFinite(Number(form.priority)) ? Number(form.priority) : 0,
+        target_city: form.target_city || null,
+        target_gender: form.target_gender || null,
+        target_crowd_type: form.target_crowd_type || null,
+        active: form.active,
+        starts_at: form.starts_at || null,
+        ends_at: form.ends_at || null,
+      };
       updateMutation.mutate({ id: editingId, data: payload });
     } else {
+      const payload = {
+        type: form.type,
+        resource_id: form.resource_id,
+        title: form.title,
+        priority: Number.isFinite(Number(form.priority)) ? Number(form.priority) : 0,
+        target_city: form.target_city || null,
+        target_gender: form.target_gender || null,
+        target_crowd_type: form.target_crowd_type || null,
+        active: form.active,
+        starts_at: form.starts_at || null,
+        ends_at: form.ends_at || null,
+      };
       createMutation.mutate(payload);
     }
   };
@@ -267,8 +406,50 @@ export default function Recommendations() {
     setEditingId(null);
     setSearchQuery('');
     setSearchResults([]);
-    setIsPanelOpen(true);
+    setFormError('');
     setActiveTab('add');
+  };
+
+  const openEdit = (rec: any) => {
+    const resource = rec.resource_id || {};
+    const label = rec.type === 'event' ? resource.title : resource.name;
+    setForm({
+      type: rec.type,
+      resource_id: resource._id || (typeof rec.resource_id === 'string' ? rec.resource_id : ''),
+      resource_label: label || '',
+      title: rec.title || '',
+      priority: rec.priority ?? 0,
+      target_city: rec.target_city || '',
+      target_gender: rec.target_gender || '',
+      target_crowd_type: rec.target_crowd_type || '',
+      active: rec.active ?? true,
+      starts_at: toLocalInput(rec.starts_at),
+      ends_at: toLocalInput(rec.ends_at),
+    });
+    setEditingId(rec._id);
+    setSearchQuery(label || '');
+    setSearchResults([]);
+    setFormError('');
+    setActiveTab('add');
+  };
+
+  const cancelForm = () => {
+    setForm(emptyForm());
+    setEditingId(null);
+    setFormError('');
+    setActiveTab('active');
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      await deleteMutation.mutateAsync(deleteTarget._id);
+    } catch {
+      // error state could be surfaced here if desired; dialog stays open on failure
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const recList = Array.isArray(recommendations) ? recommendations : [];
@@ -279,7 +460,7 @@ export default function Recommendations() {
 
   const tabs = [
     { id: 'active', label: 'Active', icon: LayoutList },
-    { id: 'add',    label: isSuperAdmin ? 'Add New' : 'Details', icon: Plus },
+    { id: 'add',    label: isSuperAdmin ? (editingId ? 'Edit' : 'Add New') : 'Details', icon: Plus },
     { id: 'preview', label: 'Preview', icon: Eye },
   ] as const;
 
@@ -311,7 +492,13 @@ export default function Recommendations() {
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
-            onClick={() => setActiveTab(id)}
+            onClick={() => {
+              if (id === 'active' || id === 'preview') {
+                // leaving the edit form without saving — reset it
+                if (activeTab === 'add') { setEditingId(null); setForm(emptyForm()); setFormError(''); }
+              }
+              setActiveTab(id);
+            }}
             className={cn(
               'flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all',
               activeTab === id
@@ -374,7 +561,8 @@ export default function Recommendations() {
                     rec={rec}
                     isSuperAdmin={isSuperAdmin}
                     onToggleActive={(id, active) => updateMutation.mutate({ id, data: { active } })}
-                    onDelete={(id) => deleteMutation.mutate(id)}
+                    onDelete={() => setDeleteTarget(rec)}
+                    onEdit={openEdit}
                   />
                 ))}
               </div>
@@ -406,93 +594,124 @@ export default function Recommendations() {
                   title="Content Type"
                   icon={<Sparkles className="w-4 h-4" />}
                 >
-                  <div className="grid grid-cols-2 gap-4">
-                    {(['event', 'club'] as const).map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => {
-                          setForm((f) => ({ ...f, type: t, resource_id: '', resource_label: '' }));
-                          setSearchQuery('');
-                          setSearchResults([]);
-                        }}
-                        className={cn(
-                          'flex items-center gap-3 p-4 rounded-2xl border transition-all',
-                          form.type === t
-                            ? 'border-primary/50 bg-primary/10 text-white'
-                            : 'border-white/10 bg-white/[0.02] text-muted-foreground hover:text-white'
-                        )}
-                      >
-                        {t === 'event' ? (
-                          <Calendar className="w-5 h-5" />
-                        ) : (
-                          <Building2 className="w-5 h-5" />
-                        )}
-                        <span className="text-[11px] font-black uppercase tracking-widest capitalize">
-                          {t}
-                        </span>
-                        {form.type === t && <Check className="w-3.5 h-3.5 ml-auto text-primary" />}
-                      </button>
-                    ))}
-                  </div>
+                  {editingId ? (
+                    <div className="flex items-center gap-3 p-4 rounded-2xl border border-white/10 bg-white/[0.02] text-white/60">
+                      <Lock className="w-4 h-4 shrink-0" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest">
+                        Type and linked {form.type} can't be changed after creation. Delete and re-add to point at a different {form.type}.
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                      {(['event', 'club'] as const).map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => {
+                            setForm((f) => ({ ...f, type: t, resource_id: '', resource_label: '' }));
+                            setSearchQuery('');
+                            setSearchResults([]);
+                          }}
+                          className={cn(
+                            'flex items-center gap-3 p-4 rounded-2xl border transition-all',
+                            form.type === t
+                              ? 'border-primary/50 bg-primary/10 text-white'
+                              : 'border-white/10 bg-white/[0.02] text-muted-foreground hover:text-white'
+                          )}
+                        >
+                          {t === 'event' ? (
+                            <Calendar className="w-5 h-5" />
+                          ) : (
+                            <Building2 className="w-5 h-5" />
+                          )}
+                          <span className="text-[11px] font-black uppercase tracking-widest capitalize">
+                            {t}
+                          </span>
+                          {form.type === t && <Check className="w-3.5 h-3.5 ml-auto text-primary" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </FormSection>
 
                 <FormSection
                   title="Select Resource"
                   icon={<Search className="w-4 h-4" />}
                 >
-                  <div className="relative">
-                    <div className="relative">
-                      <Search className="w-4 h-4 absolute left-6 top-1/2 -translate-y-1/2 text-white/20" />
-                      <input
-                        type="text"
-                        placeholder={`Search ${form.type}s…`}
-                        value={searchQuery}
-                        onChange={(e) => handleResourceSearch(e.target.value)}
-                        className="w-full bg-[#09090B] border border-white/5 rounded-[24px] py-6 pl-14 pr-8 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 placeholder:text-white/10"
-                      />
-                      {isSearching && (
-                        <Loader2 className="w-4 h-4 animate-spin absolute right-6 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  {editingId ? (
+                    <div className="flex items-center gap-3 px-6 py-5 bg-[#09090B] border border-white/5 rounded-[24px] text-white/70">
+                      {form.type === 'event' ? (
+                        <Calendar className="w-4 h-4 text-purple-400 shrink-0" />
+                      ) : (
+                        <Building2 className="w-4 h-4 text-amber-400 shrink-0" />
                       )}
+                      <span className="text-sm font-bold truncate">{form.resource_label || 'Unknown resource'}</span>
                     </div>
-                    <AnimatePresence>
-                      {searchResults.length > 0 && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 8 }}
-                          className="absolute top-full mt-2 w-full bg-card border border-border rounded-2xl shadow-2xl overflow-hidden z-50"
-                        >
-                          {searchResults.map((item: any) => {
-                            const label = form.type === 'event' ? item.title : item.name;
-                            return (
-                              <button
-                                key={item._id}
-                                type="button"
-                                onClick={() => selectResource(item)}
-                                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
-                              >
-                                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
-                                  {form.type === 'event' ? (
-                                    <Calendar className="w-3.5 h-3.5 text-purple-400" />
-                                  ) : (
-                                    <Building2 className="w-3.5 h-3.5 text-amber-400" />
-                                  )}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-xs font-bold text-white truncate">{label}</p>
-                                  {item.city && (
-                                    <p className="text-[9px] text-muted-foreground">{item.city}</p>
-                                  )}
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                  {form.resource_id && (
+                  ) : (
+                    <div className="relative" ref={resourceDropdownRef}>
+                      <div className="relative">
+                        <Search className="w-4 h-4 absolute left-6 top-1/2 -translate-y-1/2 text-white/20" />
+                        <input
+                          type="text"
+                          placeholder={`Search ${form.type}s… or click to browse all`}
+                          value={searchQuery}
+                          onFocus={handleResourceFocus}
+                          onChange={(e) => handleResourceSearch(e.target.value)}
+                          className="w-full bg-[#09090B] border border-white/5 rounded-[24px] py-6 pl-14 pr-8 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 placeholder:text-white/10"
+                        />
+                        {isSearching && (
+                          <Loader2 className="w-4 h-4 animate-spin absolute right-6 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        )}
+                      </div>
+                      <AnimatePresence>
+                        {isResourceDropdownOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 8 }}
+                            className="absolute top-full mt-2 w-full bg-card border border-border rounded-2xl shadow-2xl overflow-hidden z-50 max-h-80 overflow-y-auto custom-scrollbar"
+                          >
+                            {isSearching ? (
+                              <div className="px-4 py-6 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center justify-center gap-2">
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading {form.type}s…
+                              </div>
+                            ) : searchResults.length === 0 ? (
+                              <div className="px-4 py-6 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                {searchQuery ? `No ${form.type}s match "${searchQuery}"` : `No ${form.type}s found`}
+                              </div>
+                            ) : (
+                              searchResults.map((item: any) => {
+                                const label = form.type === 'event' ? item.title : item.name;
+                                return (
+                                  <button
+                                    key={item._id}
+                                    type="button"
+                                    onClick={() => selectResource(item)}
+                                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+                                  >
+                                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+                                      {form.type === 'event' ? (
+                                        <Calendar className="w-3.5 h-3.5 text-purple-400" />
+                                      ) : (
+                                        <Building2 className="w-3.5 h-3.5 text-amber-400" />
+                                      )}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-bold text-white truncate">{label}</p>
+                                      {item.city && (
+                                        <p className="text-[9px] text-muted-foreground">{item.city}</p>
+                                      )}
+                                    </div>
+                                  </button>
+                                );
+                              })
+                            )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
+                  {!editingId && form.resource_id && (
                     <div className="mt-4 flex items-center gap-2 text-[10px] text-emerald-400 font-bold uppercase tracking-widest">
                       <Check className="w-3 h-3" /> Selected: {form.resource_label}
                     </div>
@@ -517,7 +736,10 @@ export default function Recommendations() {
                       type="number"
                       placeholder="0"
                       value={form.priority}
-                      onChange={(e: any) => setForm((f) => ({ ...f, priority: Number(e.target.value) }))}
+                      onChange={(e: any) => {
+                        const v = e.target.value;
+                        setForm((f) => ({ ...f, priority: v === '' ? 0 : Number(v) }));
+                      }}
                     />
                     {/* Active toggle */}
                     <div className="flex items-center justify-between px-8 py-6 bg-[#09090B] border border-white/5 rounded-[24px]">
@@ -526,6 +748,8 @@ export default function Recommendations() {
                       </span>
                       <button
                         type="button"
+                        role="switch"
+                        aria-checked={form.active}
                         onClick={() => setForm((f) => ({ ...f, active: !f.active }))}
                         className={cn(
                           'w-12 h-7 rounded-full flex items-center transition-all',
@@ -610,6 +834,12 @@ export default function Recommendations() {
                   </div>
                 </FormSection>
 
+                {formError && (
+                  <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold flex items-center gap-3">
+                    <AlertTriangle className="w-4 h-4 shrink-0" /> {formError}
+                  </div>
+                )}
+
                 <div className="flex items-center gap-4 pb-8">
                   <button
                     type="submit"
@@ -625,7 +855,7 @@ export default function Recommendations() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setForm(emptyForm()); setEditingId(null); setActiveTab('active'); }}
+                    onClick={cancelForm}
                     className="px-6 py-4 rounded-2xl border border-white/10 text-muted-foreground text-[11px] font-black uppercase tracking-widest hover:text-white hover:border-white/20 transition-all"
                   >
                     Cancel
@@ -729,6 +959,18 @@ export default function Recommendations() {
               </div>
             )}
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete confirmation */}
+      <AnimatePresence>
+        {deleteTarget && (
+          <DeleteConfirmDialog
+            rec={deleteTarget}
+            onConfirm={handleDelete}
+            onCancel={() => setDeleteTarget(null)}
+            isDeleting={isDeleting}
+          />
         )}
       </AnimatePresence>
     </div>
