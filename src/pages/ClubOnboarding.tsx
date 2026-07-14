@@ -33,6 +33,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { FilterDropdown } from '../components/FilterDropdown';
 import { useQuery } from '@tanstack/react-query';
 
+import { API_BASE } from '../lib/apiConfig';
 // ── Image upload helper ───────────────────────────────────────────────────────
 // Sends a file to /api/upload (multer endpoint) and returns the server-side URL.
 // Using base64 strings directly would make the payload enormous and break image
@@ -40,7 +41,7 @@ import { useQuery } from '@tanstack/react-query';
 async function uploadImage(file: File, token: string): Promise<string> {
   const body = new FormData();
   body.append('file', file);
-  const res = await fetch('/api/upload', {
+  const res = await fetch(`${API_BASE}/upload`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body,
@@ -93,7 +94,7 @@ export default function ClubOnboarding() {
   const { data: cities, isLoading: loadingCities } = useQuery({
     queryKey: ['cities'],
     queryFn: async () => {
-      const res = await fetch('/api/cities', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/cities`, { headers: { Authorization: `Bearer ${token}` } });
       return res.json();
     },
   });
@@ -101,7 +102,7 @@ export default function ClubOnboarding() {
   const { data: venueTypes, isLoading: loadingVenueTypes } = useQuery({
     queryKey: ['venueTypes'],
     queryFn: async () => {
-      const res = await fetch('/api/venueTypes', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/venueTypes`, { headers: { Authorization: `Bearer ${token}` } });
       return res.json();
     },
   });
@@ -109,7 +110,7 @@ export default function ClubOnboarding() {
   const { data: claimableClubs, isLoading: isLoadingClubs } = useQuery({
     queryKey: ['claimable-clubs'],
     queryFn: async () => {
-      const res = await fetch('/api/clubs', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error('Failed to load clubs');
       const data = await res.json();
       return Array.isArray(data) ? data : [];
@@ -202,7 +203,7 @@ export default function ClubOnboarding() {
       // landscape_urls, portraits, portrait_url, working_hours) are sent here
       // so they're ready once the backend route is extended to store them — but
       // they will be silently ignored by the current handler.
-      const res = await fetch('/api/clubs', {
+      const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -16,6 +16,7 @@ import { motion } from 'motion/react';
 import { GlowCard } from '../components/ui/spotlight-card';
 import NormalAdminProfile from '../components/NormalAdminProfile';
 
+import { API_BASE } from '../lib/apiConfig';
 function MetricCard({ title, value, change, trend, icon: Icon, updateText }: any) {
   return (
     <motion.div whileHover={{ y: -5 }} className="h-full">
@@ -63,46 +64,53 @@ export default function Dashboard() {
   const { data: events } = useQuery({
     queryKey: ['events'],
     queryFn: async () => {
-      const res = await fetch('/api/events', { headers: { Authorization: `Bearer ${token}` } });
-      return res.json();
+      const res = await fetch(`${API_BASE}/events/list`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return json.data ?? [];
     },
   });
 
   const { data: clubs } = useQuery({
     queryKey: ['clubs'],
     queryFn: async () => {
-      const res = await fetch('/api/clubs', { headers: { Authorization: `Bearer ${token}` } });
-      return res.json();
+      const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return json.data ?? [];
     },
   });
 
+  // TODO: userRoute.js is disabled on the backend (userController.js missing exports:
+  // getAllUsers, getUserById, updateUserStatus, getDeletedUsers, getUserDetails,
+  // imageUpload, getUserBookings, getUserReports, updateUserReportStatus).
+  // Re-enable this query once those routes are restored on the backend.
   const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
-      const res = await fetch('/api/users', { headers: { Authorization: `Bearer ${token}` } });
-      return res.json();
+      const res = await fetch(`${API_BASE}/user/getAllUsers`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return json.data ?? [];
     },
-    enabled: user?.role === 'SUPER_ADMIN',
+    enabled: false, // flip to `user?.role === 'SUPER_ADMIN'` once backend is ready
   });
 
   // ── Scaffolded queries — disabled until real endpoints are wired in ──────────
-  // TODO: replace '/api/TODO_CLUB_OPS' with the real endpoint(s) for staff count,
+  // TODO: replace `${API_BASE}/TODO_CLUB_OPS` with the real endpoint(s) for staff count,
   // daily entries, guestlists, and VIP bookings. Shape assumed below is a guess —
   // adjust the field names once the response shape is known.
   const { data: clubOps } = useQuery({
     queryKey: ['clubOps'],
     queryFn: async () => {
-      const res = await fetch('/api/TODO_CLUB_OPS', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/TODO_CLUB_OPS`, { headers: { Authorization: `Bearer ${token}` } });
       return res.json();
     },
     enabled: false, // flip to `user?.role === 'CLUB_ADMIN'` once the endpoint exists
   });
 
-  // TODO: replace '/api/TODO_CONVERSION_RATE' with the real conversion-rate endpoint.
+  // TODO: replace `${API_BASE}/TODO_CONVERSION_RATE` with the real conversion-rate endpoint.
   const { data: conversion } = useQuery({
     queryKey: ['conversionRate'],
     queryFn: async () => {
-      const res = await fetch('/api/TODO_CONVERSION_RATE', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/TODO_CONVERSION_RATE`, { headers: { Authorization: `Bearer ${token}` } });
       return res.json();
     },
     enabled: false, // flip on once the endpoint exists

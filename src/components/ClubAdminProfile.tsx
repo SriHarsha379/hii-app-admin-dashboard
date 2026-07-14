@@ -26,6 +26,7 @@ import { GlowCard } from './ui/spotlight-card';
 import ClubProfilePreview from './ClubProfilePreview';
 import EventProfilePreview from './EventProfilePreview';
 
+import { API_BASE } from '../lib/apiConfig';
 export default function ClubAdminProfile() {
   const { user, token } = useAuth();
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
@@ -34,7 +35,7 @@ export default function ClubAdminProfile() {
   const { data: clubs } = useQuery({
     queryKey: ['clubs-admin'],
     queryFn: async () => {
-      const res = await fetch('/api/clubs', {
+      const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return res.json();
@@ -46,7 +47,7 @@ export default function ClubAdminProfile() {
   const { data: events } = useQuery({
     queryKey: ['events-club-admin'],
     queryFn: async () => {
-      const res = await fetch('/api/events', {
+      const res = await fetch(`${API_BASE}/events/list`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return res.json();

@@ -26,43 +26,53 @@ import { GlowCard } from './ui/spotlight-card';
 import EventProfilePreview from './EventProfilePreview';
 import ClubProfilePreview from './ClubProfilePreview';
 
+import { API_BASE } from '../lib/apiConfig';
 export default function NormalAdminProfile() {
   const { user, token } = useAuth();
   const navigate = useNavigate();
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [selectedClub, setSelectedClub]   = useState<any>(null);
 
-  // ── Data queries ────────────────────────────────────────────────────────────
+  // ── Data queries (FIXED: correct paths + response unwrapping) ────────────────
   const { data: events } = useQuery({
     queryKey: ['events'],
     queryFn: async () => {
-      const res = await fetch('/api/events', { headers: { Authorization: `Bearer ${token}` } });
-      return res.json();
+      const res = await fetch(`${API_BASE}/events/list`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return json.data ?? [];
     },
   });
 
   const { data: clubs } = useQuery({
     queryKey: ['clubs'],
     queryFn: async () => {
-      const res = await fetch('/api/clubs', { headers: { Authorization: `Bearer ${token}` } });
-      return res.json();
+      const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return json.data ?? [];
     },
   });
 
+  // TODO: no pollRoute.js exists on the backend yet - disabled until a real
+  // endpoint is added. "Polls & Contests" section will show its empty state
+  // until then.
   const { data: polls } = useQuery({
     queryKey: ['polls'],
     queryFn: async () => {
-      const res = await fetch('/api/polls', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/polls`, { headers: { Authorization: `Bearer ${token}` } });
       return res.json();
     },
+    enabled: false,
   });
 
+  // TODO: no contestRoute.js exists on the backend yet - disabled until a
+  // real endpoint is added.
   const { data: contests } = useQuery({
     queryKey: ['contests'],
     queryFn: async () => {
-      const res = await fetch('/api/contests', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/contests`, { headers: { Authorization: `Bearer ${token}` } });
       return res.json();
     },
+    enabled: false,
   });
 
   // ── Derived values (all from real data, no hardcoding) ─────────────────────

@@ -25,6 +25,7 @@ import { FormSection, RefinedField } from '../components/RefinedForm';
 import { FilterDropdown } from '../components/FilterDropdown';
 import RecommendationCard from '../components/RecommendationCard';
 
+import { API_BASE } from '../lib/apiConfig';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface RecForm {
@@ -191,7 +192,7 @@ export default function Recommendations() {
     queryFn: async () => {
       const params = new URLSearchParams();
       if (filterType) params.set('type', filterType);
-      const res = await fetch(`/api/recommendations?${params}`, {
+      const res = await fetch(`${API_BASE}/recommendations?${params}`, {
         headers: { Authorization: `Bearer ${token}`},
       });
       return res.json();
@@ -201,7 +202,7 @@ export default function Recommendations() {
   const { data: preview, isLoading: isPreviewLoading } = useQuery({
     queryKey: ['recommendations-preview'],
     queryFn: async () => {
-      const res = await fetch('/api/recommendations/preview', {
+      const res = await fetch(`${API_BASE}/recommendations/preview`, {
         headers: { Authorization: `Bearer ${token}`},
       });
       return res.json();
@@ -212,7 +213,7 @@ export default function Recommendations() {
   const { data: cities } = useQuery({
     queryKey: ['cities'],
     queryFn: async () => {
-      const res = await fetch('/api/cities', { headers: { Authorization: `Bearer ${token}`} });
+      const res = await fetch(`${API_BASE}/cities`, { headers: { Authorization: `Bearer ${token}`} });
       return res.json();
     },
   });
@@ -221,7 +222,7 @@ export default function Recommendations() {
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await fetch('/api/recommendations', {
+      const res = await fetch(`${API_BASE}/recommendations`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -245,7 +246,7 @@ export default function Recommendations() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      const res = await fetch(`/api/recommendations/${id}`, {
+      const res = await fetch(`${API_BASE}/recommendations/${id}`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -273,7 +274,7 @@ export default function Recommendations() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/recommendations/${id}`, {
+      const res = await fetch(`${API_BASE}/recommendations/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}`},
       });
@@ -310,10 +311,10 @@ export default function Recommendations() {
   const loadResourcesForType = async (type: 'event' | 'club') => {
     setIsSearching(true);
     try {
-      const endpoint = type === 'event' ? '/api/events' : '/api/clubs';
+      const endpoint = type === 'event' ? `${API_BASE}/events/list` : `${API_BASE}/vendor/get_all_vendors`;
       const res = await fetch(endpoint, { headers: { Authorization: `Bearer ${token}`} });
       const data = await res.json();
-      setAllResources(Array.isArray(data) ? data : []);
+      setAllResources(Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []));
       setResourcesLoadedFor(type);
     } catch {
       setAllResources([]);

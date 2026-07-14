@@ -26,6 +26,7 @@ import {
 import { cn } from '../lib/utils';
 import { FormSection, RefinedField } from '../components/RefinedForm';
 
+import { API_BASE } from '../lib/apiConfig';
 export default function ClaimClubForm() {
   const navigate = useNavigate();
   const { clubId } = useParams();
@@ -47,7 +48,7 @@ export default function ClaimClubForm() {
   const { data: club, isLoading: isLoadingClub } = useQuery({
     queryKey: ['club', clubId],
     queryFn: async () => {
-      const res = await fetch(`/api/clubs/${clubId}`, {
+      const res = await fetch(`${API_BASE}/clubs/${clubId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Club not found');
@@ -111,7 +112,7 @@ export default function ClaimClubForm() {
   const { data: venueTypes } = useQuery({
     queryKey: ['venueTypes'],
     queryFn: async () => {
-      const res = await fetch('/api/venueTypes', {
+      const res = await fetch(`${API_BASE}/venueTypes`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return res.json();

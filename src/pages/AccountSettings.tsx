@@ -30,6 +30,7 @@ import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/utils';
 import { FormSection, RefinedField } from '../components/RefinedForm';
 
+import { API_BASE } from '../lib/apiConfig';
 const EMPTY_FORM_DATA = {
   venueName: '',
   city: '',
@@ -56,7 +57,7 @@ export default function AccountSettings() {
   const { data: clubs } = useQuery({
     queryKey: ['clubs-account-settings'],
     queryFn: async () => {
-      const res = await fetch('/api/clubs', {
+      const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Failed to load club');
@@ -92,7 +93,7 @@ export default function AccountSettings() {
   const { data: venueTypes } = useQuery({
     queryKey: ['venueTypes'],
     queryFn: async () => {
-      const res = await fetch('/api/venueTypes', {
+      const res = await fetch(`${API_BASE}/venueTypes`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return res.json();

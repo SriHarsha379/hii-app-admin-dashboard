@@ -67,6 +67,7 @@ import { FilterPanel } from '../components/FilterPanel';
 import UserProfilePreview from '../components/UserProfilePreview';
 import { AnimatePresence, motion } from 'framer-motion';
 
+import { API_BASE } from '../lib/apiConfig';
 const roleColors: any = {
   'SUPER_ADMIN': 'bg-purple-500/10 text-purple-400 border-purple-500/20',
   'ADMIN': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
@@ -93,7 +94,7 @@ export default function Admins() {
   const { data: admins, isLoading } = useQuery({
     queryKey: ['admins'],
     queryFn: async () => {
-      const res = await fetch('/api/admins', {
+      const res = await fetch(`${API_BASE}/admins`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return res.json();
@@ -102,7 +103,7 @@ export default function Admins() {
 
   const addAdminMutation = useMutation({
     mutationFn: async (admin: any) => {
-      const res = await fetch('/api/admins', {
+      const res = await fetch(`${API_BASE}/admins`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

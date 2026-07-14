@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Lock, Mail, Zap, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { API_BASE } from '../lib/apiConfig';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -18,20 +19,21 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
+const result = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Login failed');
-      }
+if (!res.ok || !result.success) {
+  throw new Error(result.message || 'Login failed');
+}
 
-      login(data.token, data.user);
-      navigate('/');
+const { token, ...user } = result.data;
+login(token, user);
+navigate('/');
     } catch (err: any) {
       setError(err.message);
     } finally {

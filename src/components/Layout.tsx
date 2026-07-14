@@ -2,15 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { 
-  LayoutDashboard, 
-  Users, 
-  Calendar, 
-  MapPin, 
-  ShieldAlert, 
-  BarChart3, 
-  Radio, 
-  Shield, 
+import {
+  LayoutDashboard,
+  Users,
+  Calendar,
+  MapPin,
+  ShieldAlert,
+  BarChart3,
+  Radio,
+  Shield,
   LogOut,
   Search,
   Bell,
@@ -61,6 +61,7 @@ import ClubProfilePreview from './ClubProfilePreview';
 import EventProfilePreview from './EventProfilePreview';
 import RightClubProfile from './RightClubProfile';
 
+import { API_BASE } from '../lib/apiConfig';
 function RightSidebar({ isOpen, toggle, currentPage }: { isOpen: boolean, toggle: () => void, currentPage: string }) {
   const { token, user } = useAuth();
   const navigate = useNavigate();
@@ -68,13 +69,16 @@ function RightSidebar({ isOpen, toggle, currentPage }: { isOpen: boolean, toggle
   const notifications: any[] = [];
   const team: any[] = [];
 
+  // FIXED: real backend path is /vendor/get_all_vendors, response is
+  // wrapped as { success, message, data }, so unwrap .data.
   const { data: clubs } = useQuery({
     queryKey: ['clubs-sidebar'],
     queryFn: async () => {
-      const res = await fetch('/api/clubs', {
+      const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return res.json();
+      const json = await res.json();
+      return json.data ?? [];
     },
     enabled: !!token && user?.role === 'CLUB_ADMIN',
   });
@@ -225,12 +229,13 @@ export default function Layout() {
     localStorage.setItem('rightSidebarOpen', JSON.stringify(isRightSidebarOpen));
   }, [isRightSidebarOpen]);
 
-  // ── Search results query ───────────────────────────────────────────────────
+  // TODO: BROKEN - there is no /search route on the real backend. This query
+  // will always 404 until a searchRoute.js is added server-side.
   const { data: searchResults, isLoading: isSearching } = useQuery({
     queryKey: ['search', searchQuery],
     queryFn: async () => {
       if (!searchQuery) return null;
-      const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`, {
+      const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(searchQuery)}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Search failed');
@@ -239,15 +244,17 @@ export default function Layout() {
     enabled: searchQuery.length > 0,
   });
 
-  // ── Notifications query (wire to real endpoint when ready) ─────────────────
+  // FIXED: real backend path is /notification/all, response is wrapped as
+  // { success, message, data }, so unwrap .data.
   const { data: notifications } = useQuery({
     queryKey: ['notifications'],
     queryFn: async () => {
-      const res = await fetch('/api/notifications', {
+      const res = await fetch(`${API_BASE}/notification/all`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return [];
-      return res.json();
+      const json = await res.json();
+      return json.data ?? [];
     },
     enabled: !!token,
     refetchInterval: 30_000, // poll every 30s
@@ -260,13 +267,16 @@ export default function Layout() {
   const [isEventProfileOpen, setIsEventProfileOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
 
+  // FIXED: real backend path is /vendor/get_all_vendors, response is
+  // wrapped as { success, message, data }, so unwrap .data.
   const { data: clubs } = useQuery({
     queryKey: ['clubs-header'],
     queryFn: async () => {
-      const res = await fetch('/api/clubs', {
+      const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return res.json();
+      const json = await res.json();
+      return json.data ?? [];
     },
     enabled: !!token && user?.role === 'CLUB_ADMIN',
   });
@@ -358,8 +368,8 @@ export default function Layout() {
         className="border-r border-border bg-sidebar flex flex-col shrink-0 relative z-40"
       >
         <div className={cn("p-6 flex items-center shrink-0 overflow-hidden", isLeftSidebarOpen ? "gap-3" : "justify-center")}>
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
-            <Zap className="w-5 h-5 text-white fill-white" />
+          <div className="w-8 h-8 rounded-lg overflow-hidden shadow-lg shadow-primary/20 shrink-0 flex items-center justify-center bg-gradient-to-br from-primary to-purple-600">
+            <img src="./hii-logo.png" alt="Hii" className="w-full h-full object-cover" />
           </div>
           <AnimatePresence>
             {isLeftSidebarOpen && (

@@ -62,6 +62,7 @@ import { cn } from '../lib/utils';
 import { FilterDropdown } from '../components/FilterDropdown';
 import { FilterPanel } from '../components/FilterPanel';
 import { motion, AnimatePresence } from 'motion/react';
+import { API_BASE } from '../lib/apiConfig';
 import { 
   BarChart, 
   Bar, 
@@ -93,7 +94,7 @@ export default function PollsContests() {
   const { data: polls, isLoading: pollsLoading } = useQuery({
     queryKey: ['polls'],
     queryFn: async () => {
-      const res = await fetch('/api/polls', {
+      const res = await fetch(`${API_BASE}/polls`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return res.json();
@@ -103,7 +104,7 @@ export default function PollsContests() {
   const { data: contests, isLoading: contestsLoading } = useQuery({
     queryKey: ['contests'],
     queryFn: async () => {
-      const res = await fetch('/api/contests', {
+      const res = await fetch(`${API_BASE}/contests`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return res.json();
@@ -118,7 +119,7 @@ export default function PollsContests() {
     queryKey: ['contest_participants', selectedContest?.id],
     queryFn: async () => {
       if (!selectedContest?.id) return [];
-      const res = await fetch(`/api/contests/${selectedContest.id}/participants`, {
+      const res = await fetch(`${API_BASE}/contests/${selectedContest.id}/participants`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return res.json();
@@ -128,7 +129,7 @@ export default function PollsContests() {
 
   const addContestMutation = useMutation({
     mutationFn: async (contest: any) => {
-      const res = await fetch('/api/contests', {
+      const res = await fetch(`${API_BASE}/contests`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -147,7 +148,7 @@ export default function PollsContests() {
 
   const updateContestStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string, status: string }) => {
-      const res = await fetch(`/api/contests/${id}/status`, {
+      const res = await fetch(`${API_BASE}/contests/${id}/status`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
@@ -205,7 +206,7 @@ export default function PollsContests() {
 
   const addPollMutation = useMutation({
     mutationFn: async (poll: any) => {
-      const res = await fetch('/api/polls', {
+      const res = await fetch(`${API_BASE}/polls`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -224,7 +225,7 @@ export default function PollsContests() {
 
   const updatePollStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string, status: string }) => {
-      const res = await fetch(`/api/polls/${id}/status`, {
+      const res = await fetch(`${API_BASE}/polls/${id}/status`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',

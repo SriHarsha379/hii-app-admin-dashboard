@@ -73,6 +73,7 @@ import { FilterPanel } from '../components/FilterPanel';
 import { motion, AnimatePresence } from 'motion/react';
 import { FeatureEventModal } from '../components/FeatureEventModal';
 
+import { API_BASE } from '../lib/apiConfig';
 const channels = [
   { id: 'push', label: 'Push Notification', icon: Bell, color: 'text-blue-400', bg: 'bg-blue-400/10' },
   { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
@@ -114,7 +115,7 @@ export default function AdsBroadcast() {
   const { data: cities } = useQuery({
     queryKey: ['cities'],
     queryFn: async () => {
-      const res = await fetch('/api/cities', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/cities`, { headers: { Authorization: `Bearer ${token}` } });
       return res.json();
     }
   });
@@ -122,7 +123,7 @@ export default function AdsBroadcast() {
   const { data: ads, isLoading: adsLoading } = useQuery({
     queryKey: ['ads'],
     queryFn: async () => {
-      const res = await fetch('/api/ads', {
+      const res = await fetch(`${API_BASE}/ads/get_all`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return res.json();
@@ -132,7 +133,7 @@ export default function AdsBroadcast() {
   const { data: events } = useQuery({
     queryKey: ['events'],
     queryFn: async () => {
-      const res = await fetch('/api/events', {
+      const res = await fetch(`${API_BASE}/events/list`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return res.json();
@@ -141,7 +142,7 @@ export default function AdsBroadcast() {
 
   const featureEventMutation = useMutation({
     mutationFn: async (data: { city: string; eventId: string; duration: number }) => {
-      const res = await fetch('/api/events/feature', {
+      const res = await fetch(`${API_BASE}/events/feature`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -158,7 +159,7 @@ export default function AdsBroadcast() {
 
   const sendBroadcastMutation = useMutation({
     mutationFn: async (broadcast: any) => {
-      const res = await fetch('/api/broadcasts', {
+      const res = await fetch(`${API_BASE}/broadcasts`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

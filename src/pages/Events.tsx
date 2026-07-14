@@ -58,6 +58,7 @@ import { FeatureEventModal } from '../components/FeatureEventModal';
 import EventProfilePreview from '../components/EventProfilePreview';
 import { Layout as LayoutIcon } from 'lucide-react';
 
+import { API_BASE } from '../lib/apiConfig';
 const statusColors: any = {
   ACTIVE:    'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   PAST:      'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
@@ -74,10 +75,17 @@ const statusLabel = (e: any) => {
   return e.status || 'ACTIVE';
 };
 
+// TODO: BROKEN - there is no `/upload` route on the real backend (that endpoint
+// only existed in an old, unused Mongoose codebase). The real backend's
+// eventRoute.js expects multipart form-data directly on create/update
+// (`upload.fields([{ name: "venue_image" }, { name: "artist_images" }, ...])`),
+// not a separate upload step that returns a URL. This function will always
+// fail until image upload is rewired to attach files directly to the
+// create/update FormData instead of pre-uploading.
 async function uploadFile(file: File, token: string): Promise<string> {
   const form = new FormData();
   form.append('file', file);
-  const res = await fetch('/api/upload', {
+  const res = await fetch(`${API_BASE}/upload`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: form,
@@ -300,44 +308,51 @@ export default function Events() {
   };
   const [eventFormData, setEventFormData] = useState<any>(blankForm);
 
-  // ── Queries ────────────────────────────────────────────────────────────────
+  // ── Queries (FIXED: correct paths + response unwrapping) ─────────────────────
   const { data: events, isLoading } = useQuery({
     queryKey: ['events'],
     queryFn: async () => {
-      const res = await fetch('/api/events', { headers: { Authorization: `Bearer ${token}` } });
-      return res.json();
+      const res = await fetch(`${API_BASE}/events/list`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return json.data ?? [];
     },
   });
 
   const { data: cities } = useQuery({
     queryKey: ['cities'],
     queryFn: async () => {
-      const res = await fetch('/api/mongo/cities', { headers: { Authorization: `Bearer ${token}` } });
-      return res.json();
+      const res = await fetch(`${API_BASE}/city/get_all_cities`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return json.data ?? [];
     },
   });
 
   const { data: genres } = useQuery({
     queryKey: ['genres'],
     queryFn: async () => {
-      const res = await fetch('/api/genres', { headers: { Authorization: `Bearer ${token}` } });
-      return res.json();
+      const res = await fetch(`${API_BASE}/genre/get_all_genres`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return json.data ?? [];
     },
   });
 
+  // TODO: no eventTypeRoute.js exists on the backend yet - disabled until a
+  // real endpoint is added. Dropdown will show no options until then.
   const { data: eventTypes } = useQuery({
     queryKey: ['eventTypes'],
     queryFn: async () => {
-      const res = await fetch('/api/eventTypes', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/eventTypes`, { headers: { Authorization: `Bearer ${token}` } });
       return res.json();
     },
+    enabled: false,
   });
 
   const { data: vendors } = useQuery({
     queryKey: ['mongo-vendors'],
     queryFn: async () => {
-      const res = await fetch('/api/mongo/vendors', { headers: { Authorization: `Bearer ${token}` } });
-      return res.json();
+      const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return json.data ?? [];
     },
   });
 
@@ -346,9 +361,13 @@ export default function Events() {
   const getVendorName = (id: string) => vendorList.find((v: any) => (v._id || v.id) === id)?.name || '';
 
   // ── Mutations ──────────────────────────────────────────────────────────────
+  // TODO: BROKEN - real backend path is POST /events/create_event and it
+  // expects multipart form-data (fields: venue_image, artist_images,
+  // gallery_images, event_layout_images), not JSON at POST /events. This
+  // mutation needs a rewrite to build FormData before it will actually work.
   const createEventMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await fetch('/api/events', {
+      const res = await fetch(`${API_BASE}/events`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(data),
@@ -359,12 +378,14 @@ export default function Events() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['events'] }); setIsCreatingEvent(false); setEventFormData(blankForm); setCreationStep(1); },
   });
 
+  // TODO: BROKEN - real backend path is PUT /events/update_event/:id and it
+  // expects multipart form-data, not JSON at PUT /events/:id. Needs a rewrite
+  // to build FormData before it will actually work.
   const updateEventMutation = useMutation({
     mutationFn: async (data: any) => {
-      // data.id could be a Mongo ObjectId string (_id) or a uuid id
       const id = data._id || data.id;
-      const { _id, id: _removed, ...body } = data; // strip id fields from body
-      const res = await fetch(`/api/events/${id}`, {
+      const { _id, id: _removed, ...body } = data;
+      const res = await fetch(`${API_BASE}/events/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
@@ -379,10 +400,11 @@ export default function Events() {
     },
   });
 
-  // ✅ Real delete mutation — hits DELETE /api/events/:id (soft delete on backend)
+  // FIXED: real backend path is DELETE /events/delete_event/:id (this one
+  // doesn't require multipart, so it's a straightforward URL fix).
   const deleteEventMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/events/${id}`, {
+      const res = await fetch(`${API_BASE}/events/delete_event/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -395,9 +417,11 @@ export default function Events() {
     },
   });
 
+  // TODO: BROKEN - there is no `/events/feature` route on the real backend.
+  // Featuring events is not yet implemented server-side.
   const featureEventMutation = useMutation({
     mutationFn: async (data: { city: string; eventId: string; duration: number }) => {
-      const res = await fetch('/api/events/feature', {
+      const res = await fetch(`${API_BASE}/events/feature`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(data),

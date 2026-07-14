@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Plus, Trash2, Loader2, MapPin, Music, Calendar, Building2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
+import { API_BASE } from '../lib/apiConfig';
 export default function ManageFilters() {
   const { token } = useAuth();
   const queryClient = useQueryClient();
@@ -20,7 +21,7 @@ export default function ManageFilters() {
   const { data: items, isLoading } = useQuery({
     queryKey: [activeTab],
     queryFn: async () => {
-      const res = await fetch(`/api/${activeTab}`, {
+      const res = await fetch(`${API_BASE}/${activeTab}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return res.json();
@@ -29,7 +30,7 @@ export default function ManageFilters() {
 
   const addItemMutation = useMutation({
     mutationFn: async (name: string) => {
-      const res = await fetch(`/api/${activeTab}`, {
+      const res = await fetch(`${API_BASE}/${activeTab}`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -48,7 +49,7 @@ export default function ManageFilters() {
 
   const deleteItemMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/${activeTab}/${id}`, {
+      const res = await fetch(`${API_BASE}/${activeTab}/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });

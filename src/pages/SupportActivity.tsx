@@ -18,6 +18,7 @@ import {
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
+import { API_BASE } from '../lib/apiConfig';
 const priorityColors: any = {
   'HIGH': 'bg-red-500/10 text-red-400 border-red-500/20',
   'MEDIUM': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
@@ -41,7 +42,7 @@ export default function SupportActivity() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, type, status }: { id: string, type: 'requests' | 'complaints', status: string }) => {
-      const res = await fetch(`/api/${type}/${id}`, {
+      const res = await fetch(`${API_BASE}/${type}/${id}`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
@@ -62,7 +63,7 @@ export default function SupportActivity() {
   const { data: requests, isLoading: requestsLoading } = useQuery({
     queryKey: ['requests'],
     queryFn: async () => {
-      const res = await fetch('/api/requests', {
+      const res = await fetch(`${API_BASE}/requests`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return res.json();
@@ -72,7 +73,7 @@ export default function SupportActivity() {
   const { data: complaints, isLoading: complaintsLoading } = useQuery({
     queryKey: ['complaints'],
     queryFn: async () => {
-      const res = await fetch('/api/complaints', {
+      const res = await fetch(`${API_BASE}/complaints`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return res.json();

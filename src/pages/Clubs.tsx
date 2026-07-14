@@ -74,6 +74,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import ClubProfilePreview from '../components/ClubProfilePreview';
 import EventProfilePreview from '../components/EventProfilePreview';
 
+import { API_BASE } from '../lib/apiConfig';
 const statusColors: any = {
   'ACTIVE': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   'PENDING': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
@@ -82,19 +83,24 @@ const statusColors: any = {
 };
 
 // ─── Upload helper ────────────────────────────────────────────────────────────
-// Sends a file to /api/upload (multer / GridFS on your Express server)
-// and returns the public URL stored in MongoDB.
+// TODO: BROKEN - there is no `/upload` route on the real backend (that endpoint
+// only existed in an old, unused Mongoose codebase). The real backend's
+// vendorRoute.js / eventRoute.js expect multipart form-data directly on the
+// create/update calls (e.g. `upload.single("business_image")`,
+// `upload.fields([{ name: "venue_image" }, ...])`), not a separate upload step
+// that returns a URL. This function will always fail until the submit handlers
+// below are rewritten to build FormData with the exact field names the backend
+// controllers expect (see vendorController.js / eventController.js).
 async function uploadFile(file: File, token: string): Promise<string> {
   const form = new FormData();
   form.append('file', file);
-  const res = await fetch('/api/upload', {
+  const res = await fetch(`${API_BASE}/upload`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: form,
   });
   if (!res.ok) throw new Error('Upload failed');
   const data = await res.json();
-  // Your endpoint should return { url: '...' }
   return data.url as string;
 }
 
@@ -104,7 +110,6 @@ export default function Clubs() {
   const { setIsClubProfileOpen } = useOutletContext<{ setIsClubProfileOpen: (open: boolean) => void }>();
   const queryClient = useQueryClient();
 
-  // ── view state ──────────────────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
@@ -113,7 +118,6 @@ export default function Clubs() {
   const [isCreatingClub, setIsCreatingClub] = useState(false);
   const [isViewingVenue, setIsViewingVenue] = useState(false);
 
-  // ── venue form state ────────────────────────────────────────────────────────
   const [venueStep, setVenueStep] = useState(1);
   const [venueFormData, setVenueFormData] = useState<any>({
     name: '', type: '', email: '', capacity: '', contactName: '',
@@ -131,14 +135,12 @@ export default function Clubs() {
   ]);
   const [lastUsedTime, setLastUsedTime] = useState('10:00 PM - 04:00 AM');
 
-  // ── venue image upload state ────────────────────────────────────────────────
   const [venueLandscapePreviews, setVenueLandscapePreviews] = useState<string[]>(['']);
   const [venueLandscapeFiles, setVenueLandscapeFiles]       = useState<(File | null)[]>([null]);
   const [venuePortraitPreview, setVenuePortraitPreview]     = useState('');
   const [venuePortraitFile, setVenuePortraitFile]           = useState<File | null>(null);
   const venuePortraitRef = useRef<HTMLInputElement>(null);
 
-  // ── event state ─────────────────────────────────────────────────────────────
   const [activeEventsTab, setActiveEventsTab] = useState<'Upcoming' | 'Past' | 'Active'>('Upcoming');
   const [selectedEvent, setSelectedEvent]     = useState<any>(null);
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
@@ -153,7 +155,6 @@ export default function Clubs() {
     poster_url: '', landscape_urls: [''], ticketing_link: '',
   });
 
-  // ── event image upload state ────────────────────────────────────────────────
   const [posterFile, setPosterFile]           = useState<File | null>(null);
   const [posterPreview, setPosterPreview]     = useState('');
   const [bannerFile, setBannerFile]           = useState<File | null>(null);
@@ -161,7 +162,6 @@ export default function Clubs() {
   const posterInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
-  // ── handlers: event images ──────────────────────────────────────────────────
   const handlePosterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -176,7 +176,6 @@ export default function Clubs() {
     setBannerPreview(URL.createObjectURL(file));
   };
 
-  // ── handlers: venue images ──────────────────────────────────────────────────
   const handleVenueLandscapeChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -210,7 +209,6 @@ export default function Clubs() {
     }));
   };
 
-  // ── reset helpers ───────────────────────────────────────────────────────────
   const resetEventForm = () => {
     setEventFormData({
       title: '', city: '', venue_id: '', genre: [], event_type: [],
@@ -234,7 +232,6 @@ export default function Clubs() {
     setVenueStep(1);
   };
 
-  // ── edit event ──────────────────────────────────────────────────────────────
   const handleEditEvent = (event: any) => {
     setEventFormData({
       title:          event.title || '',
@@ -250,7 +247,6 @@ export default function Clubs() {
       landscape_urls: event.landscape_urls || [event.imageUrl || ''],
       ticketing_link: event.ticketing_link || '',
     });
-    // Show existing images as previews
     setPosterPreview(event.poster_url || event.imageUrl || '');
     setBannerPreview((event.landscape_urls?.[0]) || event.imageUrl || '');
     setPosterFile(null); setBannerFile(null);
@@ -260,18 +256,21 @@ export default function Clubs() {
     setSelectedEvent(null);
   };
 
-  // ── submit event (create / edit) ────────────────────────────────────────────
+  // TODO: BROKEN - see uploadFile() note above and eventRoute.js. The real
+  // backend expects POST /events/create_event (multipart, fields: venue_image,
+  // artist_images, gallery_images, event_layout_images) and
+  // PUT /events/update_event/:id, not POST/PUT /events or /events/:id with a
+  // JSON body of pre-uploaded URLs. This handler needs a rewrite to build
+  // FormData directly from posterFile/bannerFile before it will work.
   const handleSubmitEvent = async () => {
     try {
       setIsSubmitting(true);
       let poster_url     = eventFormData.poster_url;
       let landscape_urls = [...eventFormData.landscape_urls];
 
-      // Upload poster if a new file was chosen
       if (posterFile) {
         poster_url = await uploadFile(posterFile, token!);
       }
-      // Upload banner if a new file was chosen
       if (bannerFile) {
         landscape_urls[0] = await uploadFile(bannerFile, token!);
       }
@@ -284,7 +283,10 @@ export default function Clubs() {
         city:     eventFormData.city     || clubData?.city,
       };
 
-      const url    = isEditingEvent ? `/api/events/${selectedEvent?.id}` : '/api/events';
+      // TODO: real paths are `${API_BASE}/events/create_event` (POST) and
+      // `${API_BASE}/events/update_event/${selectedEvent?.id}` (PUT), and they
+      // expect multipart form-data, not JSON.
+      const url    = isEditingEvent ? `${API_BASE}/events/${selectedEvent?.id}` : `${API_BASE}/events`;
       const method = isEditingEvent ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -306,12 +308,15 @@ export default function Clubs() {
     }
   };
 
-  // ── submit venue (create / edit) ────────────────────────────────────────────
+  // TODO: BROKEN - see uploadFile() note above and vendorRoute.js. The real
+  // backend expects POST /vendor/add_vendor (multipart, field: business_image)
+  // and PUT /vendor/update_vendor/:id, not POST/PUT /mongo/vendors with a JSON
+  // body of pre-uploaded URLs. This handler needs a rewrite to build FormData
+  // directly from venuePortraitFile/venueLandscapeFiles before it will work.
   const handleSubmitVenue = async () => {
     try {
       setIsSubmitting(true);
 
-      // Upload landscape images
       const landscape_urls = await Promise.all(
         venueLandscapeFiles.map(async (file, i) => {
           if (file) return uploadFile(file, token!);
@@ -319,7 +324,6 @@ export default function Clubs() {
         })
       );
 
-      // Upload portrait
       let portrait_url = venueFormData.portrait_url;
       if (venuePortraitFile) {
         portrait_url = await uploadFile(venuePortraitFile, token!);
@@ -332,7 +336,10 @@ export default function Clubs() {
         working_hours: workingHours.filter(h => h.active),
       };
 
-      const url    = selectedClub ? `/api/mongo/vendors/${selectedClub._id}` : '/api/mongo/vendors';
+      // TODO: real paths are `${API_BASE}/vendor/add_vendor` (POST) and
+      // `${API_BASE}/vendor/update_vendor/${selectedClub._id}` (PUT), and they
+      // expect multipart form-data, not JSON.
+      const url    = selectedClub ? `${API_BASE}/mongo/vendors/${selectedClub._id}` : `${API_BASE}/mongo/vendors`;
       const method = selectedClub ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -354,14 +361,15 @@ export default function Clubs() {
     }
   };
 
-  // ── queries ─────────────────────────────────────────────────────────────────
+  // ── queries (FIXED: correct paths + response unwrapping) ─────────────────────
   const { data: clubs, isLoading } = useQuery({
     queryKey: ['clubs'],
     queryFn: async () => {
-      const res = await fetch('/api/mongo/vendors', {
+      const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      return res.json();
+      const json = await res.json();
+      return json.data ?? [];
     },
   });
 
@@ -370,56 +378,63 @@ export default function Clubs() {
   const { data: events } = useQuery({
     queryKey: ['events-admin'],
     queryFn: async () => {
-      const res = await fetch('/api/events', {
+      const res = await fetch(`${API_BASE}/events/list`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to load events');
       const data = await res.json();
-      return Array.isArray(data) ? data : [];
+      return Array.isArray(data.data) ? data.data : [];
     },
   });
 
   const { data: cities } = useQuery({
     queryKey: ['cities'],
     queryFn: async () => {
-      const res = await fetch('/api/mongo/cities', {
+      const res = await fetch(`${API_BASE}/city/get_all_cities`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      return res.json();
+      const json = await res.json();
+      return json.data ?? [];
     },
   });
 
   const { data: genres } = useQuery({
     queryKey: ['genres'],
     queryFn: async () => {
-      const res = await fetch('/api/genres', {
+      const res = await fetch(`${API_BASE}/genre/get_all_genres`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      return res.json();
+      const json = await res.json();
+      return json.data ?? [];
     },
   });
 
+  // TODO: no eventTypeRoute.js exists on the backend yet - disabled until a
+  // real endpoint is added. Dropdown will show no options until then.
   const { data: eventTypes } = useQuery({
     queryKey: ['eventTypes'],
     queryFn: async () => {
-      const res = await fetch('/api/eventTypes', {
+      const res = await fetch(`${API_BASE}/eventTypes`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       return res.json();
     },
+    enabled: false,
   });
 
+  // TODO: no venueTypeRoute.js exists on the backend yet - disabled until a
+  // real endpoint is added. Dropdown will show no options until then.
   const { data: venueTypes } = useQuery({
     queryKey: ['venueTypes'],
     queryFn: async () => {
-      const res = await fetch('/api/venueTypes', {
+      const res = await fetch(`${API_BASE}/venueTypes`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       return res.json();
     },
+    enabled: false,
   });
 
-  // ── derived ─────────────────────────────────────────────────────────────────
   const clubEvents = Array.isArray(events)
     ? events.filter((e: any) => e.club_id === clubData?.id || e.club_id === clubData?._id || e.venue === clubData?.name)
     : [];
@@ -457,13 +472,9 @@ export default function Clubs() {
 
   const exportData = () => console.log('Exporting data...', filteredClubs);
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // CLUB ADMIN VIEW
-  // ════════════════════════════════════════════════════════════════════════════
   if (user?.role === 'CLUB_ADMIN') {
     return (
       <div className="space-y-8 animate-in fade-in duration-700">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div className="space-y-1">
             <h2 className="text-3xl font-black text-white tracking-tight leading-none uppercase">
@@ -494,7 +505,6 @@ export default function Clubs() {
           </div>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
             { label: 'Upcoming Events', value: clubEvents.filter((e: any) => new Date(e.date) >= new Date()).length, icon: Calendar, color: 'text-blue-400', bg: 'bg-blue-400/10' },
@@ -511,7 +521,6 @@ export default function Clubs() {
           ))}
         </div>
 
-        {/* Event Management Table */}
         <div className="glass-card rounded-[32px] border border-white/5 overflow-hidden">
           <div className="p-8 border-b border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div className="space-y-1">
@@ -596,7 +605,8 @@ export default function Clubs() {
                           onClick={async (e) => {
                             e.stopPropagation();
                             if (!confirm('Delete this event?')) return;
-                            await fetch(`/api/events/${event._id || event.id}`, {
+                            // TODO: real path is `${API_BASE}/events/delete_event/${event._id || event.id}`
+                            await fetch(`${API_BASE}/events/${event._id || event.id}`, {
                               method: 'DELETE',
                               headers: { Authorization: `Bearer ${token}` },
                             });
@@ -618,7 +628,6 @@ export default function Clubs() {
                   <p className="text-muted-foreground font-black uppercase text-[10px] tracking-widest leading-none">
                     No {activeEventsTab.toLowerCase()} events found
                   </p>
-                  {/* ✅ FIX: "Create an event now" button wired up */}
                   <button
                     onClick={() => {
                       resetEventForm();
@@ -635,7 +644,6 @@ export default function Clubs() {
           </div>
         </div>
 
-        {/* ── Create / Edit Event Modal ──────────────────────────────────────── */}
         <AnimatePresence>
           {isCreatingEvent && (
             <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
@@ -645,7 +653,6 @@ export default function Clubs() {
                 exit={{ scale: 0.9, opacity: 0 }}
                 className="glass-card w-full max-w-3xl rounded-[40px] border border-white/10 overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
               >
-                {/* Modal header */}
                 <div className="p-8 lg:p-10 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-[0_0_20px_rgba(255,45,154,0.1)]">
@@ -666,9 +673,7 @@ export default function Clubs() {
                   </button>
                 </div>
 
-                {/* Scrollable body */}
                 <div className="flex-1 overflow-y-auto p-10 lg:p-12 scrollbar-hide">
-                  {/* Stepper */}
                   <div className="flex items-center justify-between mb-16 relative px-4">
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-white/5 rounded-full z-0" />
                     <div
@@ -697,7 +702,6 @@ export default function Clubs() {
 
                   <div className="mt-8">
                     <AnimatePresence mode="wait">
-                      {/* Step 1 – Details */}
                       {creationStep === 1 && (
                         <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-10">
                           <FormSection title="Event Details" icon={<Sparkles className="w-4 h-4" />}>
@@ -753,13 +757,10 @@ export default function Clubs() {
                         </motion.div>
                       )}
 
-                      {/* Step 2 – Visuals (✅ working image upload) */}
                       {creationStep === 2 && (
                         <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-12">
                           <FormSection title="Event Images" icon={<Camera className="w-4 h-4" />}>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-
-                              {/* Poster upload */}
                               <div className="space-y-4">
                                 <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Event Poster (4:5)</label>
                                 <label className="aspect-[4/5] rounded-[32px] bg-[#09090B] border-2 border-dashed border-white/5 flex flex-col items-center justify-center gap-4 transition-all hover:bg-white/[0.04] hover:border-primary/40 cursor-pointer group shadow-inner overflow-hidden relative block">
@@ -788,7 +789,6 @@ export default function Clubs() {
                                 </label>
                               </div>
 
-                              {/* Banner upload */}
                               <div className="space-y-4">
                                 <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Header Image (16:9)</label>
                                 <label className="aspect-video rounded-[32px] bg-[#09090B] border-2 border-dashed border-white/5 flex flex-col items-center justify-center gap-4 transition-all hover:bg-white/[0.04] hover:border-blue-400/40 cursor-pointer group shadow-inner overflow-hidden relative block">
@@ -821,7 +821,6 @@ export default function Clubs() {
                         </motion.div>
                       )}
 
-                      {/* Step 3 – Tickets */}
                       {creationStep === 3 && (
                         <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-10">
                           <FormSection title="Tickets" icon={<Shield className="w-4 h-4" />}>
@@ -853,7 +852,6 @@ export default function Clubs() {
                   </div>
                 </div>
 
-                {/* Modal footer */}
                 <div className="p-10 border-t border-white/5 flex items-center justify-between bg-white/[0.02]">
                   <button
                     onClick={() => setCreationStep((p) => Math.max(1, p - 1))}
@@ -887,7 +885,6 @@ export default function Clubs() {
           )}
         </AnimatePresence>
 
-        {/* Back button for event detail */}
         <AnimatePresence>
           {selectedEvent && !isCreatingEvent && isPreviewing && !selectedEvent.showAnalytics && (
             <motion.button
@@ -900,7 +897,6 @@ export default function Clubs() {
           )}
         </AnimatePresence>
 
-        {/* Event detail modal */}
         <AnimatePresence>
           {selectedEvent && !isCreatingEvent && isPreviewing && !selectedEvent.showAnalytics && (
             <>
@@ -991,12 +987,8 @@ export default function Clubs() {
     );
   }
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // SUPER ADMIN VIEW
-  // ════════════════════════════════════════════════════════════════════════════
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div className="space-y-1">
           <h2 className="text-3xl font-black text-white tracking-tight leading-none uppercase">
@@ -1019,7 +1011,6 @@ export default function Clubs() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
         {[
           { label: 'Total Clubs',    value: Array.isArray(clubs) ? clubs.length : 0, icon: Building2, color: 'text-blue-400',    bg: 'bg-blue-400/10' },
@@ -1042,7 +1033,6 @@ export default function Clubs() {
         ))}
       </div>
 
-      {/* Club list */}
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h3 className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Club List</h3>
@@ -1117,7 +1107,7 @@ export default function Clubs() {
                   <div className="absolute bottom-4 left-4 right-4">
                     <h4 className="text-lg font-bold text-white truncate group-hover:text-primary transition-colors">{club.name}</h4>
                     <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-1">
-                      <MapPin className="w-3 h-3" /> {club.address || club.city || 'Location not set'}
+                      <MapPin className="w-3 h-3" /> {club.address || (typeof club.city === 'object' ? club.city?.city_name : club.city) || 'Location not set'}
                     </div>
                   </div>
                 </div>
@@ -1177,7 +1167,7 @@ export default function Clubs() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-xs font-bold text-white">{club.city || '—'}</p>
+                        <p className="text-xs font-bold text-white">{(typeof club.city === 'object' ? club.city?.city_name : club.city) || '—'}</p>
                         <p className="text-[10px] text-muted-foreground truncate max-w-[150px]">{club.address || 'Address not set'}</p>
                       </td>
                       <td className="px-6 py-4">
@@ -1211,7 +1201,6 @@ export default function Clubs() {
         )}
       </div>
 
-      {/* Venue Preview Side Panel */}
       <AnimatePresence>
         {isViewingVenue && selectedClub && (
           <>
@@ -1227,7 +1216,6 @@ export default function Clubs() {
         )}
       </AnimatePresence>
 
-      {/* Create / Edit Club Modal */}
       <AnimatePresence>
         {isCreatingClub && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
@@ -1253,7 +1241,6 @@ export default function Clubs() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-10 lg:p-12 scrollbar-hide">
-                {/* Stepper */}
                 <div className="flex items-center justify-between mb-16 relative px-4">
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-white/5 rounded-full z-0" />
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary rounded-full z-0 transition-all duration-700 shadow-[0_0_15px_rgba(255,45,154,0.5)]" style={{ width: `${((venueStep - 1) / 2) * 100}%` }} />
@@ -1271,7 +1258,6 @@ export default function Clubs() {
 
                 <div className="mt-8">
                   <AnimatePresence mode="wait">
-                    {/* Venue Step 1 */}
                     {venueStep === 1 && (
                       <motion.div key="venueStep1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-10">
                         <FormSection title="Basic Information" icon={<Fingerprint className="w-4 h-4" />}>
@@ -1300,7 +1286,6 @@ export default function Clubs() {
                       </motion.div>
                     )}
 
-                    {/* Venue Step 2 – Location + Media (✅ working image upload) */}
                     {venueStep === 2 && (
                       <motion.div key="venueStep2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-12">
                         <FormSection title="Location Details" icon={<MapPin className="w-4 h-4" />}>
@@ -1320,7 +1305,6 @@ export default function Clubs() {
 
                         <FormSection title="Club Media" icon={<Layers className="w-4 h-4" />}>
                           <div className="grid grid-cols-1 gap-12">
-                            {/* Landscape images */}
                             <div className="space-y-6">
                               <div className="flex items-center justify-between">
                                 <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Cover Images</label>
@@ -1357,7 +1341,6 @@ export default function Clubs() {
                               </div>
                             </div>
 
-                            {/* Portrait */}
                             <div className="space-y-6">
                               <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Profile Photo</label>
                               <label className="aspect-[9/16] max-w-[240px] mx-auto rounded-[32px] bg-[#09090B] border border-white/5 overflow-hidden shadow-2xl group relative cursor-pointer hover:border-blue-400/40 transition-all block">
@@ -1382,7 +1365,6 @@ export default function Clubs() {
                       </motion.div>
                     )}
 
-                    {/* Venue Step 3 – Opening Hours */}
                     {venueStep === 3 && (
                       <motion.div key="venueStep3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-10">
                         <FormSection title="Opening Hours" icon={<Clock className="w-4 h-4" />}>
@@ -1418,7 +1400,6 @@ export default function Clubs() {
                 </div>
               </div>
 
-              {/* Modal footer */}
               <div className="p-10 border-t border-white/5 flex items-center justify-between bg-white/[0.02]">
                 <div className="flex items-center gap-4">
                   {venueStep > 1 && (

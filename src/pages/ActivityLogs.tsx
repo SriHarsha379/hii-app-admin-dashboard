@@ -15,6 +15,7 @@ import {
 import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
 
+import { API_BASE } from '../lib/apiConfig';
 const actionColors: any = {
   'CREATE': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   'UPDATE': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
@@ -38,7 +39,7 @@ export default function ActivityLogs() {
   const { data: logs, isLoading } = useQuery({
     queryKey: ['activity-logs'],
     queryFn: async () => {
-      const res = await fetch('/api/activity-logs', {
+      const res = await fetch(`${API_BASE}/activity-logs`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return res.json();

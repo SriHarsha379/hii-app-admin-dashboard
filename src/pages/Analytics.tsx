@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
+import { API_BASE } from '../lib/apiConfig';
 export default function Analytics() {
   const { token, user } = useAuth();
   const [timeRange, setTimeRange] = useState('7d');
@@ -26,7 +27,7 @@ export default function Analytics() {
   const { data: events } = useQuery({
     queryKey: ['events'],
     queryFn: async () => {
-      const res = await fetch('/api/events', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/events/list`, { headers: { Authorization: `Bearer ${token}` } });
       return res.json();
     },
   });
@@ -34,7 +35,7 @@ export default function Analytics() {
   const { data: clubs } = useQuery({
     queryKey: ['clubs'],
     queryFn: async () => {
-      const res = await fetch('/api/clubs', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, { headers: { Authorization: `Bearer ${token}` } });
       return res.json();
     },
   });
@@ -42,14 +43,14 @@ export default function Analytics() {
   const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
-      const res = await fetch('/api/users', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/users`, { headers: { Authorization: `Bearer ${token}` } });
       return res.json();
     },
     enabled: user?.role === 'SUPER_ADMIN',
   });
 
   // ── Scaffolded query — disabled until a real endpoint exists ─────────────────
-  // TODO: replace '/api/TODO_ANALYTICS_STATS' with the real source for revenue,
+  // TODO: replace `${API_BASE}/TODO_ANALYTICS_STATS` with the real source for revenue,
   // earnings, bookings, engagement rate, and avg session time. Field names below
   // (revenue/earnings/bookings/engagementRate/avgSessionTime) are guesses —
   // adjust once the real response shape is known. If these actually live on
@@ -57,7 +58,7 @@ export default function Analytics() {
   const { data: extendedStats } = useQuery({
     queryKey: ['analytics-extended', timeRange],
     queryFn: async () => {
-      const res = await fetch(`/api/TODO_ANALYTICS_STATS?range=${timeRange}`, {
+      const res = await fetch(`${API_BASE}/TODO_ANALYTICS_STATS?range=${timeRange}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return res.json();

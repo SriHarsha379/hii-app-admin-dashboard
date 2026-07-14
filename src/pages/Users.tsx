@@ -82,6 +82,7 @@ const statusColors: any = {
 
 import UserProfilePreview from '../components/UserProfilePreview';
 
+import { API_BASE } from '../lib/apiConfig';
 export default function Users() {
   const { token } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
@@ -94,7 +95,7 @@ export default function Users() {
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
-      const res = await fetch('/api/users', {
+      const res = await fetch(`${API_BASE}/users`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return res.json();
