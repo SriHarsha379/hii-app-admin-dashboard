@@ -485,7 +485,7 @@ export default function Events() {
         date:           eventFormData.date,
         start_time:     eventFormData.start_time,
         end_time:       eventFormData.end_time,
-        city:           eventFormData.city,
+        city_id:        eventFormData.city,
         venue_id:       vendor_id,
         genre:          eventFormData.genre,
         event_type:     eventFormData.event_type,
@@ -630,7 +630,7 @@ export default function Events() {
             <FilterPanel>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">City</label>
-                <FilterDropdown value={filterCity} onChange={setFilterCity} options={[{ label: 'All Cities', value: 'ALL' }, ...(cities?.map((c: any) => ({ label: c.name, value: c.name })) || [])]} />
+                <FilterDropdown value={filterCity} onChange={setFilterCity} options={[{ label: 'All Cities', value: 'ALL' }, ...(cities?.map((c: any) => ({ label: c.city_name, value: c.city_name })) || [])]} />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Status</label>
@@ -1155,7 +1155,7 @@ export default function Events() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                         <div className="space-y-3">
                           <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">City</label>
-                          <FilterDropdown value={eventFormData.city} onChange={(val) => setEventFormData({ ...eventFormData, city: val })} options={cities?.map((c: any) => ({ label: c.name, value: c.name })) || []} placeholder="Select city" buttonClassName="py-4 px-8 rounded-2xl text-sm bg-[#09090B] border-white/5 hover:border-white/10 text-white/60" />
+                          <FilterDropdown value={eventFormData.city} onChange={(val) => setEventFormData({ ...eventFormData, city: val })} options={cities?.map((c: any) => ({ label: c.city_name, value: c._id })) || []} placeholder="Select city" buttonClassName="py-4 px-8 rounded-2xl text-sm bg-[#09090B] border-white/5 hover:border-white/10 text-white/60" />
                         </div>
                         <div className="space-y-3">
                           <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Venue</label>

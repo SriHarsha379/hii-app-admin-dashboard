@@ -119,7 +119,7 @@ export default function ClubOnboarding() {
   });
 
   const cityOptions = Array.isArray(cities)
-    ? cities.map((c: any) => ({ label: c.name, value: c.name }))
+    ? cities.map((c: any) => ({ label: c.city_name, value: c._id }))
     : [];
 
   const venueTypeOptions = Array.isArray(venueTypes)
@@ -211,7 +211,7 @@ export default function ClubOnboarding() {
         },
         body: JSON.stringify({
           name: venueFormData.name,
-          city: venueFormData.city,
+          city_id: venueFormData.city,
           address: venueFormData.address,
           contact_info: JSON.stringify({
             phone: venueFormData.phone,
