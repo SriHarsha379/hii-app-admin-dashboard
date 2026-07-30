@@ -801,6 +801,13 @@ export default function Layout() {
             <Outlet context={{ setIsClubProfileOpen, setIsEventProfileOpen }} />
           </div>
         </div>
+
+        {/* Footer */}
+        <footer className="shrink-0 py-3 px-4 sm:px-6 border-t border-border/50 bg-background/50 backdrop-blur-xl text-center">
+          <p className="text-[10px] font-medium text-muted-foreground tracking-wide">
+            App designed by The Branding Hood
+          </p>
+        </footer>
       </main>
 
       {/* Right Sidebar */}
