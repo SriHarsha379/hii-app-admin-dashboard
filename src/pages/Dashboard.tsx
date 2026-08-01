@@ -11,7 +11,20 @@ import {
   Activity,
   Ticket
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import {
+  AreaChart,
+  Area,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts';
+import { cn, groupByDate, countBy } from '../lib/utils';
 import { motion } from 'motion/react';
 import { GlowCard } from '../components/ui/spotlight-card';
 import NormalAdminProfile from '../components/NormalAdminProfile';
@@ -126,6 +139,23 @@ export default function Dashboard() {
   // "active" = has a real last_active/isActive flag. No more 30%-of-total guess.
   const activeUsers  = userList.filter((u: any) => u.last_active || u.isActive).length;
 
+  // ── Growth chart data, built entirely from real createdAt timestamps on
+  // the users/events/clubs already fetched above. No random/mock values.
+  const userGrowth  = groupByDate(userList,  (u: any) => u.createdAt, 14, 'day');
+  const eventGrowth = groupByDate(eventList, (e: any) => e.createdAt, 14, 'day');
+  const clubGrowth  = groupByDate(clubList,  (c: any) => c.createdAt, 14, 'day');
+  const growthChartData = userGrowth.map((bucket, i) => ({
+    date: bucket.label,
+    Users: bucket.count,
+    Events: eventGrowth[i]?.count ?? 0,
+    Clubs: clubGrowth[i]?.count ?? 0,
+  }));
+
+  // ── Breakdown chart data, also built from the same real events/clubs.
+  const eventStatusData = countBy(eventList, (e: any) => e.status);
+  const clubStatusData  = countBy(clubList,  (c: any) => c.is_active ? 'Active' : 'Inactive');
+  const PIE_COLORS = ['#3B82F6', '#A855F7', '#F59E0B', '#10B981', '#EF4444', '#6366F1'];
+
   // ── Early return for NORMAL_ADMIN ────────────────────────────────────────────
   if (user?.role === 'NORMAL_ADMIN') return <NormalAdminProfile />;
 
@@ -185,6 +215,101 @@ export default function Dashboard() {
           updateText="Awaiting endpoint"
         />
       </div>
+
+      {/* Growth Chart — real data only, built from the users/events/clubs
+          already fetched above (grouped by their actual createdAt dates). */}
+      {user?.role === 'SUPER_ADMIN' && (
+        <div className="glass-card p-6 rounded-2xl">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-sm font-black text-white uppercase tracking-wider">Growth Overview</h3>
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mt-1">
+                New users, events &amp; clubs — last 14 days
+              </p>
+            </div>
+          </div>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+              <AreaChart data={growthChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="colorEvents" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#A855F7" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#A855F7" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="colorClubs" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#F59E0B" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis dataKey="date" stroke="rgba(255,255,255,0.2)" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="rgba(255,255,255,0.2)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#12121A', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                  itemStyle={{ color: '#fff' }}
+                />
+                <Legend wrapperStyle={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 900, letterSpacing: '0.1em' }} />
+                <Area type="monotone" dataKey="Users"  stroke="#3B82F6" strokeWidth={2} fillOpacity={1} fill="url(#colorUsers)" />
+                <Area type="monotone" dataKey="Events" stroke="#A855F7" strokeWidth={2} fillOpacity={1} fill="url(#colorEvents)" />
+                <Area type="monotone" dataKey="Clubs"  stroke="#F59E0B" strokeWidth={2} fillOpacity={1} fill="url(#colorClubs)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Breakdown charts — also real data, no placeholders */}
+      {user?.role === 'SUPER_ADMIN' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="glass-card p-6 rounded-2xl">
+            <h3 className="text-sm font-black text-white uppercase tracking-wider mb-1">Events by Status</h3>
+            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">From the events already loaded</p>
+            <div className="h-[240px]">
+              {eventStatusData.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No events yet</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                  <PieChart>
+                    <Pie data={eventStatusData} dataKey="count" nameKey="label" innerRadius={55} outerRadius={85} paddingAngle={3}>
+                      {eventStatusData.map((_, i) => (
+                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Legend wrapperStyle={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 900, letterSpacing: '0.1em' }} />
+                    <Tooltip contentStyle={{ backgroundColor: '#12121A', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px' }} itemStyle={{ color: '#fff' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+
+          <div className="glass-card p-6 rounded-2xl">
+            <h3 className="text-sm font-black text-white uppercase tracking-wider mb-1">Clubs by Status</h3>
+            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">Active vs. inactive, from the clubs already loaded</p>
+            <div className="h-[240px]">
+              {clubStatusData.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No clubs yet</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                  <PieChart>
+                    <Pie data={clubStatusData} dataKey="count" nameKey="label" innerRadius={55} outerRadius={85} paddingAngle={3}>
+                      {clubStatusData.map((entry, i) => (
+                        <Cell key={i} fill={entry.label === 'Active' ? '#10B981' : '#EF4444'} />
+                      ))}
+                    </Pie>
+                    <Legend wrapperStyle={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 900, letterSpacing: '0.1em' }} />
+                    <Tooltip contentStyle={{ backgroundColor: '#12121A', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px' }} itemStyle={{ color: '#fff' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
