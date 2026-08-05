@@ -79,6 +79,22 @@ export default function Ticketing() {
     }
   };
 
+  // NOTE: exports the guest list only — salesData/genderData/ticketTiers are
+  // hardcoded empty arrays on this page (no backend query wired up yet), so
+  // there's nothing real to export for those sections until that's fixed.
+  const exportData = () => {
+    const headers = ['Name', 'Email', 'Type', 'Status'];
+    const rows = filteredGuests.map((g: any) => [
+      `"${g.name || ''}"`, `"${g.email || ''}"`, `"${g.type || ''}"`, `"${g.status || ''}"`,
+    ]);
+    const csv  = [headers.join(','), ...rows.map((r: string[]) => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = `guest-list-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -87,11 +103,11 @@ export default function Ticketing() {
           <p className="text-[10px] font-black text-muted-foreground mt-1 uppercase tracking-[0.2em]">Manage ticket sales, pricing tiers, and guest lists</p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 transition-colors flex items-center gap-2">
+          <button onClick={exportData} className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 transition-colors flex items-center gap-2">
             <Download className="w-4 h-4" />
             Export Data
           </button>
-          <button 
+          <button
             onClick={() => setIsTierModalOpen(true)}
             className="px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-secondary text-[10px] font-black uppercase tracking-widest text-white hover:opacity-90 transition-opacity flex items-center gap-2 shadow-lg shadow-primary/20"
           >
@@ -113,8 +129,8 @@ export default function Ticketing() {
             onClick={() => setActiveTab(tab.id)}
             className={cn(
               "flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap",
-              activeTab === tab.id 
-                ? "bg-primary/20 text-primary border border-primary/30 shadow-[0_0_20px_rgba(255,45,154,0.1)]" 
+              activeTab === tab.id
+                ? "bg-primary/20 text-primary border border-primary/30 shadow-[0_0_20px_rgba(255,45,154,0.1)]"
                 : "text-muted-foreground hover:text-white hover:bg-white/5"
             )}
           >
@@ -157,7 +173,7 @@ export default function Ticketing() {
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                     <XAxis dataKey="time" stroke="rgba(255,255,255,0.2)" fontSize={12} tickLine={false} axisLine={false} />
                     <YAxis stroke="rgba(255,255,255,0.2)" fontSize={12} tickLine={false} axisLine={false} />
-                    <Tooltip 
+                    <Tooltip
                       contentStyle={{ backgroundColor: '#12121A', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px' }}
                       itemStyle={{ color: '#fff' }}
                     />
@@ -218,7 +234,7 @@ export default function Ticketing() {
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip 
+                    <Tooltip
                       contentStyle={{ backgroundColor: '#12121A', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px' }}
                       itemStyle={{ color: '#fff' }}
                     />
@@ -256,7 +272,7 @@ export default function Ticketing() {
       {activeTab === 'tiers' && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           {ticketTiers.map((tier) => (
-            <motion.div 
+            <motion.div
               key={tier.id}
               whileHover={{ y: -5 }}
               className="glass-card p-6 rounded-2xl relative overflow-hidden group"
@@ -267,7 +283,7 @@ export default function Ticketing() {
                 </div>
               )}
               <h3 className="text-lg font-bold text-white mb-4">{tier.name}</h3>
-              
+
               <div className="space-y-4">
                 <div>
                   <div className="flex items-center justify-between text-sm mb-1">
@@ -275,7 +291,7 @@ export default function Ticketing() {
                     <span className="text-white font-medium">{tier.sold} / {tier.capacity}</span>
                   </div>
                   <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                    <div 
+                    <div
                       className={cn(
                         "h-full rounded-full",
                         tier.status === 'sold_out' ? "bg-red-400" : "bg-primary"
@@ -284,7 +300,7 @@ export default function Ticketing() {
                     ></div>
                   </div>
                 </div>
-                
+
                 <div className="pt-4 border-t border-white/10 flex gap-2">
                   <button className="flex-1 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium text-white transition-colors">
                     Edit Tier
@@ -310,19 +326,19 @@ export default function Ticketing() {
           <div className="p-4 border-b border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search guest list..." 
+                placeholder="Search guest list..."
                 className="w-full pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder:text-muted-foreground/30 focus:outline-none focus:border-primary/50 transition-colors"
               />
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              <input 
-                type="file" 
-                accept=".csv" 
-                className="hidden" 
+              <input
+                type="file"
+                accept=".csv"
+                className="hidden"
                 ref={fileInputRef}
                 onChange={(e) => {
                   if (e.target.files && e.target.files.length > 0) {
@@ -330,7 +346,7 @@ export default function Ticketing() {
                   }
                 }}
               />
-              <button 
+              <button
                 onClick={() => fileInputRef.current?.click()}
                 className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 transition-colors flex items-center gap-2"
               >
@@ -341,7 +357,7 @@ export default function Ticketing() {
                 <Filter className="w-4 h-4" />
                 Filter
               </button>
-              <button 
+              <button
                 onClick={() => setIsGuestModalOpen(true)}
                 className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 transition-colors flex items-center gap-2"
               >
@@ -354,7 +370,7 @@ export default function Ticketing() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-white/10">
-                  <th 
+                  <th
                     className="p-4 text-xs font-bold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
                     onClick={() => handleSort('name')}
                   >
@@ -363,7 +379,7 @@ export default function Ticketing() {
                       {sortField === 'name' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-50" />}
                     </div>
                   </th>
-                  <th 
+                  <th
                     className="p-4 text-xs font-bold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
                     onClick={() => handleSort('type')}
                   >
@@ -372,7 +388,7 @@ export default function Ticketing() {
                       {sortField === 'type' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-50" />}
                     </div>
                   </th>
-                  <th 
+                  <th
                     className="p-4 text-xs font-bold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
                     onClick={() => handleSort('email')}
                   >
@@ -381,7 +397,7 @@ export default function Ticketing() {
                       {sortField === 'email' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-50" />}
                     </div>
                   </th>
-                  <th 
+                  <th
                     className="p-4 text-xs font-bold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
                     onClick={() => handleSort('status')}
                   >
@@ -440,14 +456,14 @@ export default function Ticketing() {
       {/* Ticket Tier Modal */}
       {isTierModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="glass-card w-full max-w-lg rounded-2xl border border-white/10 overflow-hidden flex flex-col max-h-[90vh]"
           >
             <div className="p-6 border-b border-white/10 flex items-center justify-between shrink-0">
               <h3 className="text-xl font-black text-white uppercase tracking-tight">Add <span className="text-primary neon-text">Ticket Tier</span></h3>
-              <button 
+              <button
                 onClick={() => setIsTierModalOpen(false)}
                 className="p-2 rounded-xl hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
               >
@@ -486,13 +502,13 @@ export default function Ticketing() {
               </div>
             </div>
             <div className="p-6 border-t border-white/10 flex justify-end gap-3 shrink-0">
-              <button 
+              <button
                 onClick={() => setIsTierModalOpen(false)}
                 className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-sm font-medium text-white hover:bg-white/10 transition-colors"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={() => setIsTierModalOpen(false)}
                 className="px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-secondary text-sm font-bold text-white hover:opacity-90 transition-opacity"
               >
@@ -506,14 +522,14 @@ export default function Ticketing() {
       {/* Guest List Modal */}
       {isGuestModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="glass-card w-full max-w-md rounded-2xl border border-white/10 overflow-hidden flex flex-col max-h-[90vh]"
           >
             <div className="p-6 border-b border-white/10 flex items-center justify-between shrink-0">
               <h3 className="text-xl font-black text-white uppercase tracking-tight">Add <span className="text-primary neon-text">Guest</span></h3>
-              <button 
+              <button
                 onClick={() => setIsGuestModalOpen(false)}
                 className="p-2 rounded-xl hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
               >
@@ -550,13 +566,13 @@ export default function Ticketing() {
               </div>
             </div>
             <div className="p-6 border-t border-white/10 flex justify-end gap-3 shrink-0">
-              <button 
+              <button
                 onClick={() => setIsGuestModalOpen(false)}
                 className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 transition-colors"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={() => setIsGuestModalOpen(false)}
                 className="px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-secondary text-[10px] font-black uppercase tracking-widest text-white hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
               >

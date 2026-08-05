@@ -89,12 +89,26 @@ export default function SupportActivity() {
            item.message?.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
+  const exportData = () => {
+    const headers = ['User', 'Subject', 'Priority', 'Status', 'Date'];
+    const rows = filteredData.map((item: any) => [
+      `"${item.username || ''}"`, `"${item.subject || ''}"`, `"${item.priority || 'MEDIUM'}"`,
+      `"${item.status || 'OPEN'}"`, `"${item.created_at ? new Date(item.created_at).toLocaleDateString() : ''}"`,
+    ]);
+    const csv  = [headers.join(','), ...rows.map((r: string[]) => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = `${activeTab}-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-xl font-bold text-white tracking-tight">Support & Requests</h2>
         <div className="flex items-center gap-3">
-          <button className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold hover:bg-white/10 transition-all flex items-center gap-2">
+          <button onClick={exportData} className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold hover:bg-white/10 transition-all flex items-center gap-2">
             <Download className="w-4 h-4" />
             Export Data
           </button>
@@ -159,11 +173,11 @@ export default function SupportActivity() {
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <div className="relative flex-1 sm:flex-none">
                     <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      placeholder="Search..." 
+                      placeholder="Search..."
                       className="w-full sm:w-64 bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary/50"
                     />
                   </div>
@@ -281,17 +295,17 @@ export default function SupportActivity() {
 
               <div className="space-y-4">
                 <h5 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Internal Response</h5>
-                <textarea 
+                <textarea
                   rows={4}
                   value={responseMessage}
                   onChange={(e) => setResponseMessage(e.target.value)}
-                  placeholder="Type your response to the user..." 
+                  placeholder="Type your response to the user..."
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none"
                 ></textarea>
               </div>
 
               <div className="flex gap-3 pt-4">
-                <button 
+                <button
                   onClick={() => updateStatusMutation.mutate({ id: selectedItem.id, type: activeTab as any, status: 'CLOSED' })}
                   disabled={updateStatusMutation.isPending}
                   className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-sm font-bold hover:bg-white/10 transition-all flex items-center justify-center gap-2"
@@ -299,7 +313,7 @@ export default function SupportActivity() {
                   <Trash2 className="w-4 h-4 text-red-400" />
                   Close
                 </button>
-                <button 
+                <button
                   onClick={() => updateStatusMutation.mutate({ id: selectedItem.id, type: activeTab as any, status: 'RESOLVED' })}
                   disabled={updateStatusMutation.isPending || !responseMessage}
                   className="flex-[2] py-3 rounded-xl bg-gradient-to-br from-primary to-purple-600 text-sm font-bold shadow-lg shadow-primary/20 hover:scale-105 transition-all flex items-center justify-center gap-2 disabled:opacity-50"

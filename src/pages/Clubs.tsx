@@ -605,8 +605,7 @@ export default function Clubs() {
                           onClick={async (e) => {
                             e.stopPropagation();
                             if (!confirm('Delete this event?')) return;
-                            // TODO: real path is `${API_BASE}/events/delete_event/${event._id || event.id}`
-                            await fetch(`${API_BASE}/events/${event._id || event.id}`, {
+                            await fetch(`${API_BASE}/events/delete_event/${event._id || event.id}`, {
                               method: 'DELETE',
                               headers: { Authorization: `Bearer ${token}` },
                             });

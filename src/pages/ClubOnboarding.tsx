@@ -198,12 +198,20 @@ export default function ClubOnboarding() {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      // NOTE: POST /api/clubs currently only persists name, city, address,
-      // contact_info. The extra fields (type, capacity, description,
-      // landscape_urls, portraits, portrait_url, working_hours) are sent here
-      // so they're ready once the backend route is extended to store them — but
-      // they will be silently ignored by the current handler.
-      const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, {
+      // FIXED (path/method): was POSTing to /vendor/get_all_vendors, a GET-only
+      // route — every submission would have failed. Now hits the correct
+      // POST /vendor/add_vendor route.
+      //
+      // STILL TODO (Phase 2 — multipart rewrite): the real /vendor/add_vendor
+      // route expects multipart/form-data with a `business_image` file field
+      // (see vendorRoute.js: upload.single("business_image")), not a JSON
+      // body. This request will still fail until it's rebuilt to send
+      // FormData the same way Events/Venues create-update is being rewritten
+      // elsewhere. Extended fields (type, capacity, description,
+      // landscape_urls, portraits, portrait_url, working_hours) are included
+      // below so they're ready once that rewrite lands, but are ignored by
+      // the backend until then.
+      const res = await fetch(`${API_BASE}/vendor/add_vendor`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

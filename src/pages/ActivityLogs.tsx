@@ -52,6 +52,20 @@ export default function ActivityLogs() {
            item.resource?.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
+  const exportData = () => {
+    const headers = ['Admin', 'Action', 'Resource', 'Date'];
+    const rows = filteredData.map((item: any) => [
+      `"${item.admin_name || ''}"`, `"${item.action || ''}"`, `"${item.resource || ''}"`,
+      `"${item.created_at ? new Date(item.created_at).toLocaleString() : ''}"`,
+    ]);
+    const csv  = [headers.join(','), ...rows.map((r: string[]) => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = `activity-logs-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -69,15 +83,15 @@ export default function ActivityLogs() {
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <div className="relative flex-1 sm:flex-none">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search logs..." 
+                  placeholder="Search logs..."
                   className="w-full sm:w-64 bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary/50"
                 />
               </div>
-              <button className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2">
+              <button onClick={exportData} className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2">
                 <Download className="w-4 h-4" />
                 Export Logs
               </button>

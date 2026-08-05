@@ -128,6 +128,20 @@ export default function Admins() {
     return matchesSearch && matchesRole && matchesStatus;
   });
 
+  const exportData = () => {
+    const headers = ['Name', 'Email', 'Role', 'Status', 'Created'];
+    const rows = filteredAdmins.map((a: any) => [
+      `"${a.name || ''}"`, `"${a.email || ''}"`, `"${a.role || 'ADMIN'}"`,
+      `"${a.status || 'ACTIVE'}"`, `"${a.created_at ? new Date(a.created_at).toLocaleDateString() : ''}"`,
+    ]);
+    const csv  = [headers.join(','), ...rows.map((r: string[]) => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a2   = document.createElement('a');
+    a2.href = url; a2.download = `admins-${new Date().toISOString().slice(0, 10)}.csv`; a2.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
@@ -139,11 +153,11 @@ export default function Admins() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button className="px-5 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2">
+          <button onClick={exportData} className="px-5 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2">
             <Download className="w-3.5 h-3.5" />
             Export Data
           </button>
-          <button 
+          <button
             onClick={() => setIsAddModalOpen(true)}
             className="px-6 py-3 rounded-2xl bg-gradient-to-br from-primary to-purple-600 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
           >
@@ -179,11 +193,11 @@ export default function Admins() {
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <div className="relative flex-1 sm:flex-none">
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search admins..." 
+                placeholder="Search admins..."
                 className="w-full sm:w-64 bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-white/20"
               />
             </div>
@@ -237,8 +251,8 @@ export default function Admins() {
                   <td colSpan={5} className="px-6 py-12 text-center text-xs text-muted-foreground">No admins found.</td>
                 </tr>
               ) : filteredAdmins.map((admin: any) => (
-                <tr 
-                  key={admin.id} 
+                <tr
+                  key={admin.id}
                   onClick={() => setSelectedAdmin(admin)}
                   className="group hover:bg-white/5 transition-colors cursor-pointer"
                 >
@@ -296,7 +310,7 @@ export default function Admins() {
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
               className="fixed inset-y-0 right-0 w-full max-w-[420px] bg-black z-[111] shadow-[0_0_100px_rgba(0,0,0,0.8)] overflow-hidden border-l border-white/5"
             >
-              <UserProfilePreview 
+              <UserProfilePreview
                 user={selectedAdmin}
                 onClose={() => setSelectedAdmin(null)}
               />
@@ -318,27 +332,27 @@ export default function Admins() {
             <div className="p-8 space-y-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest tracking-[0.2em]">Full Name</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={newAdmin.name}
                   onChange={(e) => setNewAdmin({ ...newAdmin, name: e.target.value })}
-                  placeholder="Enter full name" 
+                  placeholder="Enter full name"
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-white/20"
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest tracking-[0.2em]">Email Address</label>
-                <input 
-                  type="email" 
+                <input
+                  type="email"
                   value={newAdmin.email}
                   onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
-                  placeholder="Enter email" 
+                  placeholder="Enter email"
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-white/20"
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest tracking-[0.2em]">Access Level</label>
-                <select 
+                <select
                   value={newAdmin.role}
                   onChange={(e) => setNewAdmin({ ...newAdmin, role: e.target.value })}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50 appearance-none"
@@ -350,14 +364,14 @@ export default function Admins() {
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest tracking-[0.2em]">Set Password</label>
                 <div className="relative">
-                  <input 
-                    type={showPassword ? "text" : "password"} 
+                  <input
+                    type={showPassword ? "text" : "password"}
                     value={newAdmin.password}
                     onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })}
-                    placeholder="Enter password" 
+                    placeholder="Enter password"
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-white/20"
                   />
-                  <button 
+                  <button
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white"
                   >
@@ -367,13 +381,13 @@ export default function Admins() {
               </div>
 
               <div className="flex gap-3 pt-4">
-                <button 
+                <button
                   onClick={() => setIsAddModalOpen(false)}
                   className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-[11px] font-black uppercase tracking-widest hover:bg-white/10 transition-all"
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   onClick={() => addAdminMutation.mutate(newAdmin)}
                   disabled={addAdminMutation.isPending}
                   className="flex-1 py-3 rounded-xl bg-gradient-to-br from-primary to-purple-600 text-[11px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 transition-all flex items-center justify-center gap-2 disabled:opacity-50"

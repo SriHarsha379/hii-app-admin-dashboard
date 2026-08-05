@@ -241,7 +241,18 @@ export default function PollsContests() {
   });
 
   const exportData = () => {
-    console.log('Exporting data...', sortedPolls);
+    const headers = ['Title', 'City', 'Votes', 'End Date', 'Status'];
+    const rows = sortedPolls.map((poll: any) => [
+      `"${poll.title || ''}"`, `"${poll.city || ''}"`, `"${poll.votes || 0}"`,
+      `"${poll.end_date ? new Date(poll.end_date).toLocaleDateString() : ''}"`,
+      `"${poll.status || ''}"`,
+    ]);
+    const csv  = [headers.join(','), ...rows.map((r: string[]) => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = `polls-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleAddOption = () => {
@@ -323,7 +334,7 @@ export default function PollsContests() {
                         />
                       </div>
                     </FilterPanel>
-                    <button 
+                    <button
                       onClick={() => setIsAddModalOpen(true)}
                       className="px-4 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 text-[10px] font-bold uppercase tracking-widest hover:bg-primary/20 transition-all flex items-center gap-2"
                     >
@@ -336,7 +347,7 @@ export default function PollsContests() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-white/5 border-b border-white/5">
-                        <th 
+                        <th
                           className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
                           onClick={() => handleSort('title')}
                         >
@@ -346,7 +357,7 @@ export default function PollsContests() {
                           </div>
                         </th>
                         <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Votes</th>
-                        <th 
+                        <th
                           className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
                           onClick={() => handleSort('end_date')}
                         >
@@ -387,18 +398,18 @@ export default function PollsContests() {
                           </td>
                           <td className="px-6 py-4 text-right">
                             <div className="flex items-center justify-end gap-3">
-                              <button 
+                              <button
                                 onClick={() => {
-                                  updatePollStatusMutation.mutate({ 
-                                    id: poll.id, 
-                                    status: poll.status === 'ACTIVE' ? 'PENDING' : 'ACTIVE' 
+                                  updatePollStatusMutation.mutate({
+                                    id: poll.id,
+                                    status: poll.status === 'ACTIVE' ? 'PENDING' : 'ACTIVE'
                                   });
                                 }}
                                 disabled={updatePollStatusMutation.isPending}
                                 className={cn(
                                   "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-50",
-                                  poll.status === 'ACTIVE' 
-                                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
+                                  poll.status === 'ACTIVE'
+                                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                                     : "bg-white/5 text-muted-foreground border border-white/10 hover:bg-white/10 hover:text-white"
                                 )}
                               >
@@ -429,15 +440,15 @@ export default function PollsContests() {
                   <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <BarChart data={voteData} layout="vertical">
                       <XAxis type="number" hide />
-                      <YAxis 
-                        dataKey="name" 
-                        type="category" 
-                        axisLine={false} 
-                        tickLine={false} 
+                      <YAxis
+                        dataKey="name"
+                        type="category"
+                        axisLine={false}
+                        tickLine={false}
                         tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
                         width={80}
                       />
-                      <Tooltip 
+                      <Tooltip
                         cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                         contentStyle={{ backgroundColor: '#111118', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '12px' }}
                       />
@@ -488,7 +499,7 @@ export default function PollsContests() {
                   />
                 </div>
               </FilterPanel>
-              <button 
+              <button
                 onClick={() => setIsAddContestModalOpen(true)}
                 className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all flex items-center gap-2"
               >
@@ -511,7 +522,7 @@ export default function PollsContests() {
                         {contest.status}
                       </span>
                       {contest.status === 'PENDING' && (
-                        <button 
+                        <button
                           onClick={() => updateContestStatusMutation.mutate({ id: contest.id, status: 'ACTIVE' })}
                           className="text-[10px] px-2 py-1 rounded-lg font-bold border border-primary/20 bg-primary/10 text-primary hover:bg-primary/20 transition-all uppercase"
                         >
@@ -537,7 +548,7 @@ export default function PollsContests() {
                       {contest.city}
                     </div>
                   </div>
-                  <button 
+                  <button
                     onClick={() => setSelectedContest(contest)}
                     className="w-full py-3 rounded-xl bg-white/5 border border-white/10 text-sm font-bold hover:bg-white/10 transition-all flex items-center justify-center gap-2"
                   >
@@ -569,11 +580,11 @@ export default function PollsContests() {
             <div className="p-8 space-y-6 max-h-[80vh] overflow-y-auto">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Poll Title</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={newPoll.title}
                   onChange={(e) => setNewPoll({ ...newPoll, title: e.target.value })}
-                  placeholder="Enter poll question..." 
+                  placeholder="Enter poll question..."
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50"
                 />
               </div>
@@ -581,7 +592,7 @@ export default function PollsContests() {
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Target City</label>
                   <div className="relative">
-                    <select 
+                    <select
                       value={newPoll.city}
                       onChange={(e) => setNewPoll({ ...newPoll, city: e.target.value })}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50 appearance-none"
@@ -598,8 +609,8 @@ export default function PollsContests() {
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">End Date</label>
-                <input 
-                  type="date" 
+                <input
+                  type="date"
                   value={newPoll.endDate}
                   onChange={(e) => setNewPoll({ ...newPoll, endDate: e.target.value })}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50 [color-scheme:dark]"
@@ -609,7 +620,7 @@ export default function PollsContests() {
               <div className="space-y-4 pt-4 border-t border-white/5">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Answer Options</label>
-                  <button 
+                  <button
                     onClick={handleAddOption}
                     className="text-xs text-primary hover:text-primary/80 font-bold flex items-center gap-1"
                   >
@@ -618,15 +629,15 @@ export default function PollsContests() {
                 </div>
                 {newPoll.options.map((option, index) => (
                   <div key={index} className="flex items-center gap-2">
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={option}
                       onChange={(e) => handleOptionChange(index, e.target.value)}
-                      placeholder={`Option ${index + 1}`} 
+                      placeholder={`Option ${index + 1}`}
                       className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50"
                     />
                     {newPoll.options.length > 2 && (
-                      <button 
+                      <button
                         onClick={() => handleRemoveOption(index)}
                         className="p-3 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
                       >
@@ -638,13 +649,13 @@ export default function PollsContests() {
               </div>
 
               <div className="flex gap-3 pt-4">
-                <button 
+                <button
                   onClick={() => setIsAddModalOpen(false)}
                   className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-sm font-bold hover:bg-white/10 transition-all"
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   onClick={() => addPollMutation.mutate(newPoll)}
                   disabled={addPollMutation.isPending}
                   className="flex-1 py-3 rounded-xl bg-gradient-to-br from-primary to-purple-600 text-sm font-bold shadow-lg shadow-primary/20 hover:scale-105 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
@@ -670,11 +681,11 @@ export default function PollsContests() {
             <div className="p-8 space-y-6 max-h-[80vh] overflow-y-auto">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Contest Title</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={newContest.title}
                   onChange={(e) => setNewContest({ ...newContest, title: e.target.value })}
-                  placeholder="Enter contest title..." 
+                  placeholder="Enter contest title..."
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50"
                 />
               </div>
@@ -682,7 +693,7 @@ export default function PollsContests() {
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Target City</label>
                   <div className="relative">
-                    <select 
+                    <select
                       value={newContest.city}
                       onChange={(e) => setNewContest({ ...newContest, city: e.target.value })}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50 appearance-none"
@@ -699,27 +710,27 @@ export default function PollsContests() {
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Rules</label>
-                <textarea 
+                <textarea
                   value={newContest.rules}
                   onChange={(e) => setNewContest({ ...newContest, rules: e.target.value })}
-                  placeholder="Enter contest rules..." 
+                  placeholder="Enter contest rules..."
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50 min-h-[100px]"
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Reward</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={newContest.reward}
                   onChange={(e) => setNewContest({ ...newContest, reward: e.target.value })}
-                  placeholder="Enter reward (e.g., VIP Access)..." 
+                  placeholder="Enter reward (e.g., VIP Access)..."
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50"
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">End Date</label>
-                <input 
-                  type="date" 
+                <input
+                  type="date"
                   value={newContest.deadline}
                   onChange={(e) => setNewContest({ ...newContest, deadline: e.target.value })}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50 [color-scheme:dark]"
@@ -727,13 +738,13 @@ export default function PollsContests() {
               </div>
             </div>
             <div className="p-6 border-t border-white/5 bg-white/[0.02] flex justify-end gap-3">
-              <button 
+              <button
                 onClick={() => setIsAddContestModalOpen(false)}
                 className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white text-sm font-bold transition-all"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={() => addContestMutation.mutate(newContest)}
                 disabled={!newContest.title || !newContest.deadline || !newContest.reward || addContestMutation.isPending}
                 className="px-6 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
@@ -805,7 +816,7 @@ export default function PollsContests() {
                           </div>
                           <span className={cn(
                             "text-[10px] px-2 py-1 rounded-lg font-bold border uppercase tracking-widest",
-                            participant.status === 'WINNER' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : 
+                            participant.status === 'WINNER' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
                             participant.status === 'RUNNER_UP' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
                             "bg-white/5 text-muted-foreground border-white/10"
                           )}>
