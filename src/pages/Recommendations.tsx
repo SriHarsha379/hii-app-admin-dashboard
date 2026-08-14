@@ -514,8 +514,15 @@ export default function Recommendations() {
       </div>
 
       {/* ── Tab: Active ──────────────────────────────────────────────────────── */}
+      {/* AnimatePresence mode="wait" needs to see a single child swap, not three
+          sibling `{cond && <motion.div key=.../>}` blocks in its children array.
+          With the old structure the exit animation for the outgoing tab could
+          get stuck (no WAAPI support in some environments, or the diff not
+          resolving) and the incoming tab's content never mounted — the page
+          just went blank after clicking "Add Recommendation". A single
+          ternary guarantees AnimatePresence always tracks exactly one child. */}
       <AnimatePresence mode="wait">
-        {activeTab === 'active' && (
+        {activeTab === 'active' ? (
           <motion.div
             key="active"
             initial={{ opacity: 0, y: 10 }}
@@ -569,10 +576,7 @@ export default function Recommendations() {
               </div>
             )}
           </motion.div>
-        )}
-
-        {/* ── Tab: Add / Edit ──────────────────────────────────────────────────── */}
-        {activeTab === 'add' && (
+        ) : activeTab === 'add' ? (
           <motion.div
             key="add"
             initial={{ opacity: 0, y: 10 }}
@@ -865,10 +869,7 @@ export default function Recommendations() {
               </form>
             )}
           </motion.div>
-        )}
-
-        {/* ── Tab: Preview ──────────────────────────────────────────────────────── */}
-        {activeTab === 'preview' && (
+        ) : activeTab === 'preview' ? (
           <motion.div
             key="preview"
             initial={{ opacity: 0, y: 10 }}
@@ -960,7 +961,7 @@ export default function Recommendations() {
               </div>
             )}
           </motion.div>
-        )}
+        ) : null}
       </AnimatePresence>
 
       {/* Delete confirmation */}

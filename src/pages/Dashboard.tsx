@@ -9,7 +9,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Activity,
-  Ticket
+  Ticket,
+  Info
 } from 'lucide-react';
 import {
   AreaChart,
@@ -266,8 +267,14 @@ export default function Dashboard() {
       {user?.role === 'SUPER_ADMIN' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="glass-card p-6 rounded-2xl">
-            <h3 className="text-sm font-black text-white uppercase tracking-wider mb-1">Events by Status</h3>
-            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">From the events already loaded</p>
+            <div className="flex items-center gap-1.5 mb-1">
+              <h3 className="text-sm font-black text-white uppercase tracking-wider">Events by Status</h3>
+              <Info
+                className="w-3 h-3 text-muted-foreground/60 cursor-help"
+                title="Shows how your event pipeline is split across its lifecycle stages — Upcoming, Live, Completed, Cancelled — so you can see at a glance how much is still active vs. wrapped up. If every slice is one color, it just means all loaded events currently share that one status."
+              />
+            </div>
+            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">Breakdown by lifecycle stage — Upcoming, Live, Completed, Cancelled</p>
             <div className="h-[240px]">
               {eventStatusData.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No events yet</div>
@@ -288,8 +295,14 @@ export default function Dashboard() {
           </div>
 
           <div className="glass-card p-6 rounded-2xl">
-            <h3 className="text-sm font-black text-white uppercase tracking-wider mb-1">Clubs by Status</h3>
-            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">Active vs. inactive, from the clubs already loaded</p>
+            <div className="flex items-center gap-1.5 mb-1">
+              <h3 className="text-sm font-black text-white uppercase tracking-wider">Clubs by Status</h3>
+              <Info
+                className="w-3 h-3 text-muted-foreground/60 cursor-help"
+                title="Shows what share of your clubs/venues are Active (visible and bookable in the app) vs. Inactive (hidden from users, e.g. temporarily closed or deactivated by an admin)."
+              />
+            </div>
+            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">Active (visible to users) vs. Inactive (hidden)</p>
             <div className="h-[240px]">
               {clubStatusData.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No clubs yet</div>

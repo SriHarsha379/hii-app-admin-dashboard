@@ -94,16 +94,22 @@ export default function ClubOnboarding() {
   const { data: cities, isLoading: loadingCities } = useQuery({
     queryKey: ['cities'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/cities`, { headers: { Authorization: `Bearer ${token}` } });
-      return res.json();
+      // NOTE: was hitting `${API_BASE}/cities` (bare alias root, no handler → 404).
+      const res = await fetch(`${API_BASE}/city/get_all_cities`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return json.data ?? [];
     },
   });
 
   const { data: venueTypes, isLoading: loadingVenueTypes } = useQuery({
     queryKey: ['venueTypes'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/venueTypes`, { headers: { Authorization: `Bearer ${token}` } });
-      return res.json();
+      // NOTE: `${API_BASE}/venueTypes` doesn't exist on the backend either —
+      // "venue types" are just Categories with category_type: 2 (1 = Event, 2 = Venue).
+      const res = await fetch(`${API_BASE}/category/get_category`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      const list = Array.isArray(json.data) ? json.data : [];
+      return list.filter((c: any) => c.category_type === 2);
     },
   });
 
@@ -112,8 +118,10 @@ export default function ClubOnboarding() {
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error('Failed to load clubs');
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
+      const json = await res.json();
+      // Backend returns { success, message, data: [...] } — was reading the
+      // raw response as the array itself, so this list was always empty.
+      return Array.isArray(json.data) ? json.data : [];
     },
     enabled: Boolean(token) && step === 'claim',
   });
@@ -123,7 +131,7 @@ export default function ClubOnboarding() {
     : [];
 
   const venueTypeOptions = Array.isArray(venueTypes)
-    ? venueTypes.map((t: any) => ({ label: t.name, value: t.name }))
+    ? venueTypes.map((t: any) => ({ label: t.category_name, value: t.category_name }))
     : [];
 
   // ── Registration form ──────────────────────────────────────────────────────

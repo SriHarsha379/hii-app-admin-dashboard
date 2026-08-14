@@ -115,8 +115,11 @@ export default function AdsBroadcast() {
   const { data: cities } = useQuery({
     queryKey: ['cities'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/cities`, { headers: { Authorization: `Bearer ${token}` } });
-      return res.json();
+      // NOTE: was hitting `${API_BASE}/cities` (bare alias root, no handler → 404),
+      // which is why the featured-events / broadcast city dropdowns were empty.
+      const res = await fetch(`${API_BASE}/city/get_all_cities`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return json.data ?? [];
     }
   });
 
@@ -144,9 +147,9 @@ export default function AdsBroadcast() {
     mutationFn: async (data: { city: string; eventId: string; duration: number }) => {
       const res = await fetch(`${API_BASE}/events/feature`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify(data)
       });
@@ -161,9 +164,9 @@ export default function AdsBroadcast() {
     mutationFn: async (broadcast: any) => {
       const res = await fetch(`${API_BASE}/broadcasts`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify(broadcast)
       });
@@ -281,10 +284,7 @@ export default function AdsBroadcast() {
                         onChange={setFilterCity}
                         options={[
                           { label: 'All Cities', value: 'ALL' },
-                          { label: 'Mumbai', value: 'Mumbai' },
-                          { label: 'Delhi', value: 'Delhi' },
-                          { label: 'Bangalore', value: 'Bangalore' },
-                          { label: 'Goa', value: 'Goa' },
+                          ...((Array.isArray(cities) ? cities : []).map((c: any) => ({ label: c.city_name, value: c.city_name }))),
                         ]}
                       />
                     </div>
@@ -417,10 +417,7 @@ export default function AdsBroadcast() {
                         onChange={setFilterCity}
                         options={[
                           { label: 'All Cities', value: 'ALL' },
-                          { label: 'Mumbai', value: 'Mumbai' },
-                          { label: 'Delhi', value: 'Delhi' },
-                          { label: 'Bangalore', value: 'Bangalore' },
-                          { label: 'Goa', value: 'Goa' },
+                          ...((Array.isArray(cities) ? cities : []).map((c: any) => ({ label: c.city_name, value: c.city_name }))),
                         ]}
                       />
                     </div>
@@ -562,8 +559,8 @@ export default function AdsBroadcast() {
                       className="w-full bg-[#09090B] border border-white/5 rounded-[24px] px-8 py-6 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 appearance-none font-medium"
                     >
                       <option value="ALL">All Hubs</option>
-                      {cities?.map((city: any) => (
-                        <option key={city.id} value={city.name}>{city.name}</option>
+                      {(Array.isArray(cities) ? cities : []).map((city: any) => (
+                        <option key={city._id || city.id} value={city.city_name}>{city.city_name}</option>
                       ))}
                     </select>
                   </div>
@@ -716,9 +713,9 @@ export default function AdsBroadcast() {
                             className="w-full bg-[#09090B] border border-white/5 rounded-[24px] px-8 py-6 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 appearance-none font-medium"
                           >
                             <option value="all">All Cities</option>
-                            <option value="mumbai">Mumbai</option>
-                            <option value="delhi">Delhi</option>
-                            <option value="bangalore">Bangalore</option>
+                            {(Array.isArray(cities) ? cities : []).map((city: any) => (
+                              <option key={city._id || city.id} value={city.city_name}>{city.city_name}</option>
+                            ))}
                           </select>
                         </div>
                         <div className="space-y-4 group/field">
