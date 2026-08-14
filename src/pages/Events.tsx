@@ -35,7 +35,6 @@ import {
   Edit2,
   Eye,
   AlertTriangle,
-  ArrowUpDown, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -60,12 +59,6 @@ import EventProfilePreview from '../components/EventProfilePreview';
 import { Layout as LayoutIcon } from 'lucide-react';
 
 import { API_BASE } from '../lib/apiConfig';
-import {
-  createEvent as createEventRequest,
-  updateEvent as updateEventRequest,
-  deleteEvent as deleteEventRequest,
-  toYMD,
-} from '../lib/eventsApi';
 const statusColors: any = {
   ACTIVE:    'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   PAST:      'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
@@ -82,38 +75,40 @@ const statusLabel = (e: any) => {
   return e.status || 'ACTIVE';
 };
 
-// ─── Local image preview ──────────────────────────────────────────────────────
-// There is no `/upload` endpoint on this backend. Files are NOT pre-uploaded;
-// they are held in component state and attached directly to the multipart
-// create/update request by lib/eventsApi.ts. These helpers only produce a
-// local object URL so the operator can see what they picked.
-//
-// Each slot therefore tracks two things:
-//   file    - a File the operator just chose (uploaded on submit), or null
-//   preview - a blob: URL for a new File, OR an existing remote path on edit
-type ImageSlot = { file: File | null; preview: string };
-
-const emptySlot = (): ImageSlot => ({ file: null, preview: '' });
-const slotFromUrl = (url: string): ImageSlot => ({ file: null, preview: url || '' });
-const slotFromFile = (file: File): ImageSlot => ({ file, preview: URL.createObjectURL(file) });
+// TODO: BROKEN - there is no `/upload` route on the real backend (that endpoint
+// only existed in an old, unused Mongoose codebase). The real backend's
+// eventRoute.js expects multipart form-data directly on create/update
+// (`upload.fields([{ name: "venue_image" }, { name: "artist_images" }, ...])`),
+// not a separate upload step that returns a URL. This function will always
+// fail until image upload is rewired to attach files directly to the
+// create/update FormData instead of pre-uploading.
+async function uploadFile(file: File, token: string): Promise<string> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${API_BASE}/upload`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  if (!res.ok) throw new Error('Upload failed');
+  const data = await res.json();
+  return data.url ?? data.path ?? data.secure_url;
+}
 
 // ─── ImageUploadZone ──────────────────────────────────────────────────────────
 function ImageUploadZone({
-  label, hint, slot, onChange, aspect,
-}: { label: string; hint: string; slot: ImageSlot; onChange: (s: ImageSlot) => void; aspect: string }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [error, setError] = useState('');
+  label, hint, value, onChange, aspect, token,
+}: { label: string; hint: string; value: string; onChange: (url: string) => void; aspect: string; token: string }) {
+  const inputRef   = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error,     setError]     = useState('');
 
-  // No network call here - the file is attached to the create/update request
-  // on submit, so selection is instant and cannot fail.
-  const handleFile = (file: File) => {
-    if (!file.type.startsWith('image/')) { setError('Please choose an image file.'); return; }
-    setError('');
-    onChange(slotFromFile(file));
+  const handleFile = async (file: File) => {
+    setError(''); setUploading(true);
+    try   { onChange(await uploadFile(file, token)); }
+    catch { setError('Upload failed. Try again.'); }
+    finally { setUploading(false); }
   };
-
-  const value = slot.preview;
-  const uploading = false;
 
   return (
     <div className="space-y-3">
@@ -157,14 +152,13 @@ function ImageUploadZone({
 }
 
 // ─── GalleryUploadZone ────────────────────────────────────────────────────────
-function GalleryUploadZone({ slots, onChange }: { slots: ImageSlot[]; onChange: (s: ImageSlot[]) => void }) {
-  const handleFile = (index: number, file: File) => {
-    if (!file.type.startsWith('image/')) return;
-    const next = [...slots];
-    next[index] = slotFromFile(file);
-    onChange(next);
+function GalleryUploadZone({ urls, onChange, token }: { urls: string[]; onChange: (u: string[]) => void; token: string }) {
+  const handleFile = async (index: number, file: File) => {
+    try {
+      const url  = await uploadFile(file, token);
+      const next = [...urls]; next[index] = url; onChange(next);
+    } catch {}
   };
-  const urls = slots.map((s) => s.preview);
   return (
     <div className="space-y-3">
       <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1 block">Gallery Preview</label>
@@ -285,27 +279,6 @@ export default function Events() {
   const [searchTerm,     setSearchTerm]     = useState('');
   const [filterStatus,   setFilterStatus]   = useState('ALL');
   const [filterCity,     setFilterCity]     = useState('ALL');
-  // Sort state - mirrors the pattern already used on the Users page so the
-  // three list screens behave identically.
-  const [sortField,      setSortField]      = useState('created_at');
-  const [sortOrder,      setSortOrder]      = useState<'asc' | 'desc'>('desc');
-
-  const handleSort = (field: string) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('asc');
-    }
-  };
-
-  // Renders the correct arrow for a sortable column header.
-  const sortIcon = (field: string) =>
-    sortField === field
-      ? (sortOrder === 'asc'
-          ? <ArrowUp className="w-3 h-3 text-primary" />
-          : <ArrowDown className="w-3 h-3 text-primary" />)
-      : <ArrowUpDown className="w-3 h-3 opacity-50" />;
   const [selectedEvent,  setSelectedEvent]  = useState<any>(null);
   const [isCreatingEvent,setIsCreatingEvent]= useState(false);
   const [isEditingEvent, setIsEditingEvent] = useState(false);
@@ -328,14 +301,9 @@ export default function Events() {
   const blankForm = {
     title: '', city: '', venue_id: '', vendor_id: '',
     genre: [] as string[], event_type: [] as string[],
-    date: '', end_date: '', is_multi_day: false,
-    start_time: '', end_time: '', description: '',
-    address: '', latitude: '', longitude: '',
-    // Image slots hold the chosen File plus a preview URL. On edit they are
-    // seeded from existing remote paths with file: null, meaning "unchanged".
-    poster:    emptySlot()  as ImageSlot,   // -> venue_image
-    landscape: emptySlot()  as ImageSlot,   // -> first gallery image
-    gallery:   [emptySlot(), emptySlot(), emptySlot(), emptySlot()] as ImageSlot[],
+    date: '', start_time: '', end_time: '', description: '',
+    poster_url: '', landscape_url: '',
+    gallery_urls: ['', '', '', ''] as string[],
     ticketing_link: '',
   };
   const [eventFormData, setEventFormData] = useState<any>(blankForm);
@@ -393,15 +361,38 @@ export default function Events() {
   const getVendorName = (id: string) => vendorList.find((v: any) => (v._id || v.id) === id)?.name || '';
 
   // ── Mutations ──────────────────────────────────────────────────────────────
-  // FIXED: posts multipart form-data to /events/create_event via lib/eventsApi.
+  // TODO: BROKEN - real backend path is POST /events/create_event and it
+  // expects multipart form-data (fields: venue_image, artist_images,
+  // gallery_images, event_layout_images), not JSON at POST /events. This
+  // mutation needs a rewrite to build FormData before it will actually work.
   const createEventMutation = useMutation({
-    mutationFn: async (data: any) => createEventRequest(data, token),
+    mutationFn: async (data: any) => {
+      const res = await fetch(`${API_BASE}/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to create event'); }
+      return res.json();
+    },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['events'] }); setIsCreatingEvent(false); setEventFormData(blankForm); setCreationStep(1); },
   });
 
-  // FIXED: puts multipart form-data to /events/update_event/:id via lib/eventsApi.
+  // TODO: BROKEN - real backend path is PUT /events/update_event/:id and it
+  // expects multipart form-data, not JSON at PUT /events/:id. Needs a rewrite
+  // to build FormData before it will actually work.
   const updateEventMutation = useMutation({
-    mutationFn: async (data: any) => updateEventRequest(data, token),
+    mutationFn: async (data: any) => {
+      const id = data._id || data.id;
+      const { _id, id: _removed, ...body } = data;
+      const res = await fetch(`${API_BASE}/events/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to update event'); }
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
       setIsCreatingEvent(false); setIsEditingEvent(false);
@@ -412,7 +403,14 @@ export default function Events() {
   // FIXED: real backend path is DELETE /events/delete_event/:id (this one
   // doesn't require multipart, so it's a straightforward URL fix).
   const deleteEventMutation = useMutation({
-    mutationFn: async (id: string) => deleteEventRequest(id, token),
+    mutationFn: async (id: string) => {
+      const res = await fetch(`${API_BASE}/events/delete_event/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to delete event');
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
       setDeleteTarget(null);
@@ -448,25 +446,6 @@ export default function Events() {
     else if (filterStatus !== 'ALL')       matchesStatus = e.status === filterStatus;
     const matchesCity = filterCity === 'ALL' || e.city === filterCity;
     return matchesSearch && matchesStatus && matchesCity;
-  }).sort((a: any, b: any) => {
-    // `date` is a "YYYY-MM-DD" string, which sorts correctly lexicographically.
-    // created_at is an ISO timestamp, likewise. Everything else is compared
-    // case-insensitively as a string.
-    let aValue = a[sortField];
-    let bValue = b[sortField];
-
-    // Missing values always sort last, regardless of direction, so blank rows
-    // don't crowd the top of the table.
-    if (aValue == null && bValue == null) return 0;
-    if (aValue == null) return 1;
-    if (bValue == null) return -1;
-
-    if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-    if (typeof bValue === 'string') bValue = bValue.toLowerCase();
-
-    if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
-    return 0;
   });
 
   // ── CSV Export ─────────────────────────────────────────────────────────────
@@ -500,48 +479,22 @@ export default function Events() {
       if (!eventFormData.city)        missing.push('City');
       if (missing.length) { setSubmitError(`Please fill in: ${missing.join(', ')}`); return; }
 
-      // Gallery files sent to the backend: the landscape banner first, then
-      // whichever gallery slots hold a newly chosen File.
-      const galleryFiles = [eventFormData.landscape, ...eventFormData.gallery]
-        .filter((s: ImageSlot) => s?.file)
-        .map((s: ImageSlot) => s.file as File);
-
-      // Slots that still point at an existing remote path (no new File) must
-      // be echoed back or updateEvent will drop them.
-      const existingGallery = [eventFormData.landscape, ...eventFormData.gallery]
-        .filter((s: ImageSlot) => s && !s.file && s.preview && !s.preview.startsWith('blob:'))
-        .map((s: ImageSlot) => s.preview);
-
-      // NOTE: `genre` is intentionally NOT sent. eventModel.js has no genre
-      // field - events are categorised via category_ids only. Sending it would
-      // be silently discarded by the controller.
       const payload = {
         title:          eventFormData.title,
         description:    eventFormData.description,
         date:           eventFormData.date,
-        end_date:       eventFormData.end_date,
-        is_multi_day:   eventFormData.is_multi_day,
         start_time:     eventFormData.start_time,
         end_time:       eventFormData.end_time,
         city_id:        eventFormData.city,
         venue_id:       vendor_id,
+        genre:          eventFormData.genre,
         event_type:     eventFormData.event_type,
-        address:        eventFormData.address,
-        latitude:       eventFormData.latitude,
-        longitude:      eventFormData.longitude,
-        poster_file:    eventFormData.poster?.file ?? null,
-        gallery_files:  galleryFiles,
-        existing_gallery_images: existingGallery,
+        poster_url:     eventFormData.poster_url,
+        landscape_urls: [eventFormData.landscape_url, ...eventFormData.gallery_urls].filter(Boolean),
         ticketing_link: eventFormData.ticketing_link,
         // pass the stored id so updateEventMutation can build the correct URL
         ...(isEditingEvent && eventFormData.id ? { id: eventFormData.id, _id: eventFormData.id } : {}),
       };
-
-      // venue_image is required by the controller on create.
-      if (!isEditingEvent && !payload.poster_file) {
-        setSubmitError('Please upload a main poster image.');
-        return;
-      }
 
       if (isEditingEvent && eventFormData.id) {
         await updateEventMutation.mutateAsync(payload);
@@ -570,19 +523,13 @@ export default function Events() {
       start_time:    event.start_time   || '',
       end_time:      event.end_time     || '',
       description:   event.description  || '',
-      poster:    slotFromUrl(event.venue_image || event.poster_url || ''),
-      landscape: slotFromUrl(
-        (Array.isArray(event.gallery_images) ? event.gallery_images[0] : '')
-        || event.landscape_url
+      poster_url:    event.poster_url   || '',
+      landscape_url: event.landscape_url
         || (Array.isArray(event.landscape_urls) ? event.landscape_urls[0] : '')
-        || ''
-      ),
-      gallery: (() => {
-        const rest = Array.isArray(event.gallery_images)
-          ? event.gallery_images.slice(1)
-          : (Array.isArray(event.landscape_urls) ? event.landscape_urls.slice(1) : []);
-        return [0, 1, 2, 3].map((i) => slotFromUrl(rest[i] || ''));
-      })(),
+        || '',
+      gallery_urls:  Array.isArray(event.landscape_urls)
+        ? [...event.landscape_urls.slice(1), '', '', '', ''].slice(0, 4)
+        : ['', '', '', ''],
       ticketing_link: event.ticketing_link || '',
     };
 
@@ -684,30 +631,6 @@ export default function Events() {
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">City</label>
                 <FilterDropdown value={filterCity} onChange={setFilterCity} options={[{ label: 'All Cities', value: 'ALL' }, ...(cities?.map((c: any) => ({ label: c.city_name, value: c.city_name })) || [])]} />
-
-                {/* Sort field + direction. Events render as cards rather than a
-                    table, so there are no column headers to click - the field
-                    is a dropdown and the arrow button toggles direction. */}
-                <FilterDropdown
-                  value={sortField}
-                  onChange={setSortField}
-                  options={[
-                    { label: 'Sort: Date Added', value: 'created_at' },
-                    { label: 'Sort: Event Date', value: 'date' },
-                    { label: 'Sort: Title',      value: 'title' },
-                    { label: 'Sort: City',       value: 'city' },
-                    { label: 'Sort: Status',     value: 'status' },
-                  ]}
-                />
-                <button
-                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                  title={sortOrder === 'asc' ? 'Ascending - click for descending' : 'Descending - click for ascending'}
-                  aria-label={sortOrder === 'asc' ? 'Sort ascending' : 'Sort descending'}
-                  className="px-4 py-3 rounded-xl bg-[#09090B] border border-white/5 hover:border-white/10 text-white/60 hover:text-white transition-all flex items-center gap-2"
-                >
-                  {sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />}
-                  <span className="text-[10px] font-black uppercase tracking-widest">{sortOrder}</span>
-                </button>
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Status</label>
@@ -1266,10 +1189,10 @@ export default function Events() {
                   <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-12">
                     <FormSection title="Event Media" icon={<Image className="w-4 h-4" />}>
                       <div className="space-y-10">
-                        <ImageUploadZone label="Main Banner (Landscape)" hint="Recommended: 1920×820 JPG/PNG" slot={eventFormData.landscape} onChange={(slot) => setEventFormData({ ...eventFormData, landscape: slot })} aspect="aspect-[21/9]" />
+                        <ImageUploadZone label="Main Banner (Landscape)" hint="Recommended: 1920×820 JPG/PNG" value={eventFormData.landscape_url} onChange={(url) => setEventFormData({ ...eventFormData, landscape_url: url })} aspect="aspect-[21/9]" token={token} />
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                          <ImageUploadZone label="Main Poster (Portrait)" hint="Recommended: 1080×1350" slot={eventFormData.poster} onChange={(slot) => setEventFormData({ ...eventFormData, poster: slot })} aspect="aspect-[4/5]" />
-                          <GalleryUploadZone slots={eventFormData.gallery} onChange={(slots) => setEventFormData({ ...eventFormData, gallery: slots })} />
+                          <ImageUploadZone label="Main Poster (Portrait)" hint="Recommended: 1080×1350" value={eventFormData.poster_url} onChange={(url) => setEventFormData({ ...eventFormData, poster_url: url })} aspect="aspect-[4/5]" token={token} />
+                          <GalleryUploadZone urls={eventFormData.gallery_urls} onChange={(urls) => setEventFormData({ ...eventFormData, gallery_urls: urls })} token={token} />
                         </div>
                       </div>
                     </FormSection>
@@ -1308,8 +1231,8 @@ export default function Events() {
                             <p><span className="text-white/30">City:</span>  {eventFormData.city  || '—'}</p>
                             <p><span className="text-white/30">Date:</span>  {eventFormData.date  || '—'}</p>
                             <p><span className="text-white/30">Genres:</span> {eventFormData.genre?.join(', ') || '—'}</p>
-                            <p><span className="text-white/30">Poster:</span>  {eventFormData.poster?.preview    ? '✓ Selected' : '✗ Missing'}</p>
-                            <p><span className="text-white/30">Banner:</span>  {eventFormData.landscape?.preview ? '✓ Selected' : '✗ Missing'}</p>
+                            <p><span className="text-white/30">Poster:</span>  {eventFormData.poster_url   ? '✓ Uploaded' : '✗ Missing'}</p>
+                            <p><span className="text-white/30">Banner:</span>  {eventFormData.landscape_url ? '✓ Uploaded' : '✗ Missing'}</p>
                           </div>
                         </div>
                       </div>
