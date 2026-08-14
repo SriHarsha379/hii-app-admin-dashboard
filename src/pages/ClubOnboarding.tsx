@@ -34,25 +34,22 @@ import { FilterDropdown } from '../components/FilterDropdown';
 import { useQuery } from '@tanstack/react-query';
 
 import { API_BASE } from '../lib/apiConfig';
+import { createVendor as createVendorRequest } from '../lib/eventsApi';
 // ── Image upload helper ───────────────────────────────────────────────────────
 // Sends a file to /api/upload (multer endpoint) and returns the server-side URL.
 // Using base64 strings directly would make the payload enormous and break image
 // rendering everywhere downstream.
-async function uploadImage(file: File, token: string): Promise<string> {
-  const body = new FormData();
-  body.append('file', file);
-  const res = await fetch(`${API_BASE}/upload`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body,
-  });
-  if (!res.ok) throw new Error(`Upload failed with status ${res.status}`);
-  const data = await res.json();
-  return data.url as string; // e.g. "/uploads/1234567890-portrait.jpg"
-}
+// There is no `/upload` endpoint on this backend, so images cannot be
+// pre-uploaded to obtain a URL. The single image the Vendor model can actually
+// store (`business_image`) is held as a File and attached to the multipart
+// add_vendor request on submit. Extra portrait/gallery images collected by
+// this form have nowhere to go on the Vendor model - they are kept as local
+// previews only so the operator sees what they picked.
+const localPreview = (file: File) => URL.createObjectURL(file);
 
 const initialForm = {
   name: '',
+  business_image_file: null as File | null,
   type: '',
   email: '',
   capacity: '',
@@ -162,34 +159,24 @@ export default function ClubOnboarding() {
 
   // ── Image upload handlers ──────────────────────────────────────────────────
 
+  // The first portrait becomes business_image (the only image the Vendor
+  // model stores). No network call - the File rides along with the submit.
   const handlePortraitUpload = async (file: File) => {
     setUploadError(null);
-    setUploadingPortrait(true);
-    try {
-      const url = await uploadImage(file, token!);
-      setVenueFormData((f) => ({
-        ...f,
-        portraits: [...f.portraits, url],
-        portrait_url: f.portraits.length === 0 ? url : f.portrait_url,
-      }));
-    } catch (err: any) {
-      setUploadError(err.message || 'Portrait upload failed.');
-    } finally {
-      setUploadingPortrait(false);
-    }
+    const url = localPreview(file);
+    setVenueFormData((f) => ({
+      ...f,
+      portraits: [...f.portraits, url],
+      portrait_url: f.portraits.length === 0 ? url : f.portrait_url,
+      business_image_file: f.business_image_file ?? file,
+    }));
   };
 
+  // Preview only - the Vendor model has no gallery field, so these are not
+  // persisted anywhere until one is added server-side.
   const handleLandscapeUpload = async (file: File) => {
     setUploadError(null);
-    setUploadingLandscape(true);
-    try {
-      const url = await uploadImage(file, token!);
-      setVenueFormData((f) => ({ ...f, landscape_urls: [...f.landscape_urls, url] }));
-    } catch (err: any) {
-      setUploadError(err.message || 'Gallery upload failed.');
-    } finally {
-      setUploadingLandscape(false);
-    }
+    setVenueFormData((f) => ({ ...f, landscape_urls: [...f.landscape_urls, localPreview(file)] }));
   };
 
   // ── Submit ─────────────────────────────────────────────────────────────────
@@ -198,49 +185,31 @@ export default function ClubOnboarding() {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      // FIXED (path/method): was POSTing to /vendor/get_all_vendors, a GET-only
-      // route — every submission would have failed. Now hits the correct
-      // POST /vendor/add_vendor route.
+      // FIXED (Phase 2): now sends multipart/form-data via lib/eventsApi so
+      // the `business_image` file field reaches multer, instead of a JSON body
+      // that upload.single() cannot parse.
       //
-      // STILL TODO (Phase 2 — multipart rewrite): the real /vendor/add_vendor
-      // route expects multipart/form-data with a `business_image` file field
-      // (see vendorRoute.js: upload.single("business_image")), not a JSON
-      // body. This request will still fail until it's rebuilt to send
-      // FormData the same way Events/Venues create-update is being rewritten
-      // elsewhere. Extended fields (type, capacity, description,
-      // landscape_urls, portraits, portrait_url, working_hours) are included
-      // below so they're ready once that rewrite lands, but are ignored by
-      // the backend until then.
-      const res = await fetch(`${API_BASE}/vendor/add_vendor`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      // vendorController.createVendor hard-requires name, email, phone_number,
+      // city, state, address, password and vendor_type - and `city`/`state`
+      // must be ObjectIds, not display names. The extended fields this form
+      // collects (type, capacity, description, working_hours, galleries) have
+      // no corresponding columns on the Vendor model and are dropped rather
+      // than sent and silently discarded.
+      await createVendorRequest(
+        {
           name: venueFormData.name,
-          city_id: venueFormData.city,
+          email: venueFormData.email,
+          phone_number: venueFormData.phone,
+          city: venueFormData.city_id || venueFormData.city,
+          state: venueFormData.state_id || venueFormData.state,
           address: venueFormData.address,
-          contact_info: JSON.stringify({
-            phone: venueFormData.phone,
-            email: venueFormData.email,
-            contactName: venueFormData.contactName,
-          }),
-          // Extended fields — ignored by backend until the route is updated:
-          type: venueFormData.type,
-          capacity: venueFormData.capacity ? Number(venueFormData.capacity) : undefined,
-          description: venueFormData.description,
-          landscape_urls: venueFormData.landscape_urls,
-          portrait_url: venueFormData.portrait_url,
-          portraits: venueFormData.portraits,
-          working_hours: workingHours,
-        }),
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(body?.error || `Registration failed with status ${res.status}`);
-      }
+          landmark: venueFormData.landmark,
+          vendor_type: venueFormData.vendor_type || 'owner',
+          password: venueFormData.password,
+          business_image_file: venueFormData.business_image_file ?? null,
+        } as any,
+        token!,
+      );
 
       updateUser({ organisation: venueFormData.name });
       setIsSuccess(true);

@@ -63,7 +63,8 @@ import {
   Upload,
   Layers,
   Sparkles,
-  Camera
+  Camera,
+  ArrowUpDown, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { FilterDropdown } from '../components/FilterDropdown';
@@ -75,6 +76,12 @@ import ClubProfilePreview from '../components/ClubProfilePreview';
 import EventProfilePreview from '../components/EventProfilePreview';
 
 import { API_BASE } from '../lib/apiConfig';
+import {
+  createEvent as createEventRequest,
+  updateEvent as updateEventRequest,
+  createVendor as createVendorRequest,
+  updateVendor as updateVendorRequest,
+} from '../lib/eventsApi';
 const statusColors: any = {
   'ACTIVE': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   'PENDING': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
@@ -82,27 +89,12 @@ const statusColors: any = {
   'SUSPENDED': 'bg-purple-500/10 text-purple-400 border-purple-500/20',
 };
 
-// ─── Upload helper ────────────────────────────────────────────────────────────
-// TODO: BROKEN - there is no `/upload` route on the real backend (that endpoint
-// only existed in an old, unused Mongoose codebase). The real backend's
-// vendorRoute.js / eventRoute.js expect multipart form-data directly on the
-// create/update calls (e.g. `upload.single("business_image")`,
-// `upload.fields([{ name: "venue_image" }, ...])`), not a separate upload step
-// that returns a URL. This function will always fail until the submit handlers
-// below are rewritten to build FormData with the exact field names the backend
-// controllers expect (see vendorController.js / eventController.js).
-async function uploadFile(file: File, token: string): Promise<string> {
-  const form = new FormData();
-  form.append('file', file);
-  const res = await fetch(`${API_BASE}/upload`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: form,
-  });
-  if (!res.ok) throw new Error('Upload failed');
-  const data = await res.json();
-  return data.url as string;
-}
+// ─── Uploads ──────────────────────────────────────────────────────────────────
+// There is no `/upload` endpoint on this backend. Files are attached directly
+// to the multipart create/update requests by lib/eventsApi.ts, so no
+// pre-upload step exists. File objects are held in component state
+// (posterFile / bannerFile / venuePortraitFile / venueLandscapeFiles) and
+// passed straight through on submit.
 
 export default function Clubs() {
   const { token, user } = useAuth();
@@ -114,6 +106,8 @@ export default function Clubs() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [filterCity, setFilterCity] = useState('ALL');
+  const [sortField, setSortField] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedClub, setSelectedClub] = useState<any>(null);
   const [isCreatingClub, setIsCreatingClub] = useState(false);
   const [isViewingVenue, setIsViewingVenue] = useState(false);
@@ -256,106 +250,98 @@ export default function Clubs() {
     setSelectedEvent(null);
   };
 
-  // TODO: BROKEN - see uploadFile() note above and eventRoute.js. The real
-  // backend expects POST /events/create_event (multipart, fields: venue_image,
-  // artist_images, gallery_images, event_layout_images) and
-  // PUT /events/update_event/:id, not POST/PUT /events or /events/:id with a
-  // JSON body of pre-uploaded URLs. This handler needs a rewrite to build
-  // FormData directly from posterFile/bannerFile before it will work.
+  // FIXED: posts multipart form-data to /events/create_event and
+  // /events/update_event/:id via lib/eventsApi. Files go up with the request
+  // rather than being pre-uploaded.
   const handleSubmitEvent = async () => {
     try {
       setIsSubmitting(true);
-      let poster_url     = eventFormData.poster_url;
-      let landscape_urls = [...eventFormData.landscape_urls];
-
-      if (posterFile) {
-        poster_url = await uploadFile(posterFile, token!);
-      }
-      if (bannerFile) {
-        landscape_urls[0] = await uploadFile(bannerFile, token!);
-      }
 
       const payload = {
         ...eventFormData,
-        poster_url,
-        landscape_urls,
         venue_id: eventFormData.venue_id || clubData?.id,
-        city:     eventFormData.city     || clubData?.city,
+        city_id:  eventFormData.city_id  || eventFormData.city || clubData?.city,
+        // banner is sent as the first gallery image; poster becomes venue_image
+        poster_file:   posterFile ?? null,
+        gallery_files: bannerFile ? [bannerFile] : [],
+        // preserve any existing remote gallery paths that weren't replaced
+        existing_gallery_images: Array.isArray(eventFormData.landscape_urls)
+          ? eventFormData.landscape_urls.filter((u: string) => u && !u.startsWith('blob:'))
+          : [],
+        ...(isEditingEvent && selectedEvent?.id
+          ? { id: selectedEvent.id, _id: selectedEvent.id }
+          : {}),
       };
 
-      // TODO: real paths are `${API_BASE}/events/create_event` (POST) and
-      // `${API_BASE}/events/update_event/${selectedEvent?.id}` (PUT), and they
-      // expect multipart form-data, not JSON.
-      const url    = isEditingEvent ? `${API_BASE}/events/${selectedEvent?.id}` : `${API_BASE}/events`;
-      const method = isEditingEvent ? 'PUT' : 'POST';
+      // venue_image is required by eventController.createEvent.
+      if (!isEditingEvent && !payload.poster_file) {
+        alert('Please upload a poster image before saving.');
+        return;
+      }
 
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) throw new Error('Failed to save event');
+      if (isEditingEvent && selectedEvent?.id) {
+        await updateEventRequest(payload as any, token!);
+      } else {
+        await createEventRequest(payload as any, token!);
+      }
 
       queryClient.invalidateQueries({ queryKey: ['events-admin'] });
       setIsCreatingEvent(false);
       resetEventForm();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to save event. Please try again.');
+      alert(err?.message || 'Failed to save event. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // TODO: BROKEN - see uploadFile() note above and vendorRoute.js. The real
-  // backend expects POST /vendor/add_vendor (multipart, field: business_image)
-  // and PUT /vendor/update_vendor/:id, not POST/PUT /mongo/vendors with a JSON
-  // body of pre-uploaded URLs. This handler needs a rewrite to build FormData
-  // directly from venuePortraitFile/venueLandscapeFiles before it will work.
+  // FIXED: posts multipart form-data to /vendor/add_vendor and
+  // /vendor/update_vendor/:id via lib/eventsApi (was JSON to /mongo/vendors,
+  // a prefix that is not mounted anywhere on the backend).
+  //
+  // NOTE: vendorController.createVendor hard-requires name, email,
+  // phone_number, city, state, address, password and vendor_type. `city` and
+  // `state` must be ObjectIds, not display names - `state` in particular has
+  // no picker in this form and must be derived from the chosen city.
   const handleSubmitVenue = async () => {
     try {
       setIsSubmitting(true);
 
-      const landscape_urls = await Promise.all(
-        venueLandscapeFiles.map(async (file, i) => {
-          if (file) return uploadFile(file, token!);
-          return venueFormData.landscape_urls[i] || '';
-        })
-      );
-
-      let portrait_url = venueFormData.portrait_url;
-      if (venuePortraitFile) {
-        portrait_url = await uploadFile(venuePortraitFile, token!);
-      }
-
       const payload = {
-        ...venueFormData,
-        landscape_urls,
-        portrait_url,
-        working_hours: workingHours.filter(h => h.active),
+        name:         venueFormData.name,
+        email:        venueFormData.email,
+        phone_number: venueFormData.phone_number,
+        city:         venueFormData.city_id   || venueFormData.city,
+        state:        venueFormData.state_id  || venueFormData.state,
+        address:      venueFormData.address,
+        landmark:     venueFormData.landmark,
+        vendor_type:  venueFormData.vendor_type || 'owner',
+        password:     venueFormData.password,
+        business_image_file: venuePortraitFile ?? null,
+        ...(selectedClub ? { _id: selectedClub._id } : {}),
       };
 
-      // TODO: real paths are `${API_BASE}/vendor/add_vendor` (POST) and
-      // `${API_BASE}/vendor/update_vendor/${selectedClub._id}` (PUT), and they
-      // expect multipart form-data, not JSON.
-      const url    = selectedClub ? `${API_BASE}/mongo/vendors/${selectedClub._id}` : `${API_BASE}/mongo/vendors`;
-      const method = selectedClub ? 'PUT' : 'POST';
+      const missing = ['name', 'email', 'phone_number', 'city', 'state', 'address']
+        .filter((k) => !(payload as any)[k]);
+      if (!selectedClub && !payload.password) missing.push('password');
+      if (missing.length) {
+        alert(`Please fill in: ${missing.join(', ')}`);
+        return;
+      }
 
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) throw new Error('Failed to save venue');
+      if (selectedClub) {
+        await updateVendorRequest(payload as any, token!);
+      } else {
+        await createVendorRequest(payload as any, token!);
+      }
 
       queryClient.invalidateQueries({ queryKey: ['clubs'] });
       setIsCreatingClub(false);
       resetVenueForm();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to save venue. Please try again.');
+      alert(err?.message || 'Failed to save venue. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -453,7 +439,27 @@ export default function Clubs() {
     const matchesStatus  = filterStatus === 'ALL' || c.status === filterStatus;
     const matchesCity    = filterCity   === 'ALL' || c.city === filterCity;
     return matchesSearch && matchesStatus && matchesCity;
+  }).sort((a: any, b: any) => {
+    let aValue = a[sortField];
+    let bValue = b[sortField];
+
+    // Missing values always sort last so blank rows don't crowd the top.
+    if (aValue == null && bValue == null) return 0;
+    if (aValue == null) return 1;
+    if (bValue == null) return -1;
+
+    if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+    if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+
+    if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
   });
+
+  const handleSort = (field: string) => {
+    if (sortField === field) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortOrder('asc'); }
+  };
 
   const toggleDay = (index: number) => {
     const newHours  = [...workingHours];
@@ -1055,13 +1061,37 @@ export default function Clubs() {
             <FilterPanel>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">City</label>
+                {/* FIXED: this list was hardcoded to four cities, so any club in
+                    a city outside Mumbai/Delhi/Bangalore/Goa was unreachable
+                    through the filter. Now driven by the live cities query,
+                    which already excludes inactive ones server-side. */}
                 <FilterDropdown value={filterCity} onChange={setFilterCity} options={[
                   { label: 'All Cities', value: 'ALL' },
-                  { label: 'Mumbai',    value: 'Mumbai' },
-                  { label: 'Delhi',     value: 'Delhi' },
-                  { label: 'Bangalore', value: 'Bangalore' },
-                  { label: 'Goa',       value: 'Goa' },
+                  ...((cities ?? []).map((c: any) => ({
+                    label: c.city_name ?? c.name,
+                    value: c.city_name ?? c.name,
+                  }))),
                 ]} />
+
+                <FilterDropdown
+                  value={sortField}
+                  onChange={setSortField}
+                  options={[
+                    { label: 'Sort: Date Added', value: 'created_at' },
+                    { label: 'Sort: Name',       value: 'name' },
+                    { label: 'Sort: City',       value: 'city' },
+                    { label: 'Sort: Status',     value: 'status' },
+                  ]}
+                />
+                <button
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  title={sortOrder === 'asc' ? 'Ascending - click for descending' : 'Descending - click for ascending'}
+                  aria-label={sortOrder === 'asc' ? 'Sort ascending' : 'Sort descending'}
+                  className="px-4 py-3 rounded-xl bg-[#09090B] border border-white/5 hover:border-white/10 text-white/60 hover:text-white transition-all flex items-center gap-2"
+                >
+                  {sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />}
+                  <span className="text-[10px] font-black uppercase tracking-widest">{sortOrder}</span>
+                </button>
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Status</label>

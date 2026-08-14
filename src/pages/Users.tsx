@@ -95,11 +95,58 @@ export default function Users() {
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/users`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      return res.json();
+      // FIXED: the real backend route is /users/get_all_user (see
+      // routes/admin/userRoute.js). `/users` alone 404s - it's only the mount
+      // prefix, there is no handler at the router root.
+      //
+      // limit=1000 because this screen filters and sorts client-side; the API
+      // caps limit at 100 per page, so we page through until we have them all.
+      const fetchPage = async (page: number) => {
+        const res = await fetch(
+          `${API_BASE}/users/get_all_user?page=${page}&limit=100`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!res.ok) throw new Error(`Failed to load users (${res.status})`);
+        return res.json();
+      };
+
+      const first = await fetchPage(1);
+      const totalPages = first?.data?.pagination?.total_pages ?? 1;
+      let raw = first?.data?.users ?? [];
+
+      // Guard against a runaway loop if the API ever reports a silly page count.
+      for (let p = 2; p <= Math.min(totalPages, 20); p++) {
+        const next = await fetchPage(p);
+        raw = raw.concat(next?.data?.users ?? []);
+      }
+
+      // ── Shape adapter ──────────────────────────────────────────────────
+      // This screen was written against a different backend and reads
+      // `status`, `city` and `created_at`. The real API returns `is_active`,
+      // a populated `city_id` object and `createdAt`. Map once here rather
+      // than touching every render site.
+      return raw.map((u: any) => ({
+        ...u,
+        id: u._id,
+        status: u.is_deleted ? 'BANNED' : (u.is_active ? 'ACTIVE' : 'INACTIVE'),
+        city: u.city_id?.city_name ?? '',
+        created_at: u.createdAt,
+        mobile: u.phone_number ?? '',
+      }));
     }
+  });
+
+  // Live city list for the filter dropdown - the options below were hardcoded
+  // to four cities, so users in any other city could not be filtered for.
+  const { data: cities } = useQuery({
+    queryKey: ['cities'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/city/get_all_cities`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      return json.data ?? [];
+    },
   });
 
   const filteredUsers = (Array.isArray(users) ? users : [])?.filter((u: any) => {
@@ -110,7 +157,7 @@ export default function Users() {
   }).sort((a: any, b: any) => {
     let aValue = a[sortField];
     let bValue = b[sortField];
-    
+
     if (typeof aValue === 'string') aValue = aValue.toLowerCase();
     if (typeof bValue === 'string') bValue = bValue.toLowerCase();
 
@@ -167,11 +214,11 @@ export default function Users() {
           <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
             <div className="relative flex-1 sm:flex-none">
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search users..." 
+                placeholder="Search users..."
                 className="w-full sm:w-64 bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-white/20"
               />
             </div>
@@ -183,10 +230,10 @@ export default function Users() {
                   onChange={setFilterCity}
                   options={[
                     { label: 'All Cities', value: 'ALL' },
-                    { label: 'Mumbai', value: 'Mumbai' },
-                    { label: 'Delhi', value: 'Delhi' },
-                    { label: 'Bangalore', value: 'Bangalore' },
-                    { label: 'Goa', value: 'Goa' },
+                    ...((cities ?? []).map((c: any) => ({
+                      label: c.city_name ?? c.name,
+                      value: c.city_name ?? c.name,
+                    }))),
                   ]}
                 />
               </div>
@@ -212,7 +259,7 @@ export default function Users() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-white/5 border-b border-white/5 text-[10px] font-black">
-                <th 
+                <th
                   className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
                   onClick={() => handleSort('name')}
                 >
@@ -221,7 +268,7 @@ export default function Users() {
                     {sortField === 'name' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-primary" /> : <ArrowDown className="w-3 h-3 text-primary" />) : <ArrowUpDown className="w-3 h-3 opacity-50" />}
                   </div>
                 </th>
-                <th 
+                <th
                   className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
                   onClick={() => handleSort('status')}
                 >
@@ -230,7 +277,7 @@ export default function Users() {
                     {sortField === 'status' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-primary" /> : <ArrowDown className="w-3 h-3 text-primary" />) : <ArrowUpDown className="w-3 h-3 opacity-50" />}
                   </div>
                 </th>
-                <th 
+                <th
                   className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
                   onClick={() => handleSort('created_at')}
                 >
@@ -288,21 +335,21 @@ export default function Users() {
       <AnimatePresence>
         {selectedUser && (
           <>
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setSelectedUser(null)}
               className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-md"
             />
-            <motion.div 
+            <motion.div
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
               className="fixed inset-y-0 right-0 z-[111] w-full max-w-[420px] bg-black border-l border-white/5 shadow-[0_0_100px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden"
             >
-              <UserProfilePreview 
+              <UserProfilePreview
                 user={selectedUser}
                 onClose={() => setSelectedUser(null)}
               />
