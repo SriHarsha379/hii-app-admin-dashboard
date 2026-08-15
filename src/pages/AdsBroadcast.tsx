@@ -882,8 +882,8 @@ export default function AdsBroadcast() {
                                 <Upload className="w-10 h-10 text-white/20 group-hover:text-primary transition-colors" />
                               </div>
                               <div className="space-y-2">
-                                <span className="text-[11px] font-black uppercase text-white/40 tracking-[0.3em] block">Upload Image</span>
-                                <span className="text-[8px] font-bold text-white/10 uppercase tracking-[0.2em]">Recommended: 1920x1080 | Required</span>
+                                <span className="text-[11px] font-black uppercase text-white/40 tracking-[0.3em] block">Upload Image or Animated GIF</span>
+                                <span className="text-[8px] font-bold text-white/10 uppercase tracking-[0.2em]">Recommended: 1920x1080 · JPG, PNG, WebP, animated GIF · Required</span>
                               </div>
                             </>
                           )}
@@ -892,7 +892,7 @@ export default function AdsBroadcast() {
                       </div>
                     </FormSection>
 
-                    <FormSection title="Video Ad (Optional)" icon={<Video className="w-4 h-4" />}>
+                    <FormSection title="Video (Optional — in addition to the image/GIF above)" icon={<Video className="w-4 h-4" />}>
                       <div className="space-y-4 text-center">
                         <label className="w-full max-w-2xl mx-auto rounded-[32px] bg-[#09090B] border-2 border-dashed border-white/5 flex items-center justify-center gap-4 px-8 py-6 cursor-pointer hover:bg-white/[0.04] hover:border-primary/30 transition-all group relative overflow-hidden">
                           <input
