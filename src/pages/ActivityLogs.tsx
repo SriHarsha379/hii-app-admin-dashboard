@@ -39,10 +39,14 @@ export default function ActivityLogs() {
   const { data: logs, isLoading } = useQuery({
     queryKey: ['activity-logs'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/activity-logs`, {
+      // NOTE: was hitting `${API_BASE}/activity-logs` with no sub-path — the
+      // backend had no model, controller, or route for activity logs at all
+      // until now. Real endpoint is `/activity-logs/get_all`.
+      const res = await fetch(`${API_BASE}/activity-logs/get_all`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return res.json();
+      const json = await res.json();
+      return json.data?.logs ?? [];
     }
   });
 
@@ -121,7 +125,7 @@ export default function ActivityLogs() {
                 ) : filteredData.map((log: any) => {
                   const ActionIcon = actionIcons[log.action] || Activity;
                   return (
-                    <tr key={log.id} className="group hover:bg-white/5 transition-colors">
+                    <tr key={log._id || log.id} className="group hover:bg-white/5 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-primary font-bold text-xs">

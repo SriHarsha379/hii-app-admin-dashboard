@@ -35,6 +35,9 @@ import {
   Edit2,
   Eye,
   AlertTriangle,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -279,6 +282,8 @@ export default function Events() {
   const [searchTerm,     setSearchTerm]     = useState('');
   const [filterStatus,   setFilterStatus]   = useState('ALL');
   const [filterCity,     setFilterCity]     = useState('ALL');
+  const [sortField,      setSortField]      = useState('date');
+  const [sortOrder,      setSortOrder]      = useState<'asc' | 'desc'>('desc');
   const [selectedEvent,  setSelectedEvent]  = useState<any>(null);
   const [isCreatingEvent,setIsCreatingEvent]= useState(false);
   const [isEditingEvent, setIsEditingEvent] = useState(false);
@@ -446,7 +451,36 @@ export default function Events() {
     else if (filterStatus !== 'ALL')       matchesStatus = e.status === filterStatus;
     const matchesCity = filterCity === 'ALL' || e.city === filterCity;
     return matchesSearch && matchesStatus && matchesCity;
+  }).sort((a: any, b: any) => {
+    let aValue = a[sortField];
+    let bValue = b[sortField];
+
+    if (sortField === 'date') {
+      aValue = aValue ? new Date(aValue).getTime() : 0;
+      bValue = bValue ? new Date(bValue).getTime() : 0;
+    } else {
+      if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+      if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+    }
+
+    if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
   });
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: string }) =>
+    sortField === field
+      ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-primary" /> : <ArrowDown className="w-3 h-3 text-primary" />)
+      : <ArrowUpDown className="w-3 h-3 opacity-50" />;
 
   // ── CSV Export ─────────────────────────────────────────────────────────────
   const exportData = () => {
@@ -627,6 +661,18 @@ export default function Events() {
               <button onClick={() => setViewMode('grid')}  className={cn('p-2 rounded-lg transition-all', viewMode === 'grid'  ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-muted-foreground hover:text-white')}><LayoutIcon className="w-4 h-4" /></button>
               <button onClick={() => setViewMode('table')} className={cn('p-2 rounded-lg transition-all', viewMode === 'table' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-muted-foreground hover:text-white')}><Database className="w-4 h-4" /></button>
             </div>
+            {viewMode === 'grid' && (
+              <FilterDropdown
+                value={sortField}
+                onChange={handleSort}
+                options={[
+                  { label: 'Sort: Date', value: 'date' },
+                  { label: 'Sort: Name', value: 'title' },
+                  { label: 'Sort: City', value: 'city' },
+                  { label: 'Sort: Status', value: 'status' },
+                ]}
+              />
+            )}
             <FilterPanel>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">City</label>
@@ -712,10 +758,18 @@ export default function Events() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-white/5 border-b border-white/5">
-                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Event Name</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Venue / City</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Date & Time</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Status</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest cursor-pointer select-none hover:text-white transition-colors" onClick={() => handleSort('title')}>
+                      <div className="flex items-center gap-1.5">Event Name <SortIcon field="title" /></div>
+                    </th>
+                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest cursor-pointer select-none hover:text-white transition-colors" onClick={() => handleSort('city')}>
+                      <div className="flex items-center gap-1.5">Venue / City <SortIcon field="city" /></div>
+                    </th>
+                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest cursor-pointer select-none hover:text-white transition-colors" onClick={() => handleSort('date')}>
+                      <div className="flex items-center gap-1.5">Date & Time <SortIcon field="date" /></div>
+                    </th>
+                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest cursor-pointer select-none hover:text-white transition-colors" onClick={() => handleSort('status')}>
+                      <div className="flex items-center gap-1.5">Status <SortIcon field="status" /></div>
+                    </th>
                     <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Actions</th>
                   </tr>
                 </thead>

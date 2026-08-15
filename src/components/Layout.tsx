@@ -424,6 +424,9 @@ export default function Layout() {
             {user?.role === 'SUPER_ADMIN' && (
               <NavLink to="/users" icon={Users}>Users</NavLink>
             )}
+            {(user?.role === 'SUPER_ADMIN' || user?.role === 'NORMAL_ADMIN') && (
+              <NavLink to="/organiser-requests" icon={UserPlus}>Organiser Requests</NavLink>
+            )}
             {(user?.role === 'SUPER_ADMIN' || user?.role === 'EVENT_ADMIN' || user?.role === 'NORMAL_ADMIN') && (
               <NavLink to="/events" icon={Calendar}>Events</NavLink>
             )}

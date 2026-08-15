@@ -13,7 +13,10 @@ import {
   RefreshCw,
   Reply,
   Trash2,
-  Download
+  Download,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -38,19 +41,59 @@ export default function SupportActivity() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [responseMessage, setResponseMessage] = useState('');
+  const [sortField, setSortField] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const queryClient = useQueryClient();
+
+  // Maps this page's UI-level status labels (used for the Close/Resolve
+  // buttons and the color-coded badges) to each backend model's own status
+  // enum, since ReportProblem and UserReport don't share one.
+  const uiToBackendStatus = (type: 'requests' | 'complaints', uiStatus: string) => {
+    if (type === 'requests') {
+      // ReportProblem: Pending | Inprogress | Resolve | Closed
+      if (uiStatus === 'RESOLVED') return 'Resolve';
+      if (uiStatus === 'CLOSED') return 'Closed';
+      return 'Pending';
+    }
+    // UserReport: Pending | Reviewed | Resolved | Rejected
+    if (uiStatus === 'RESOLVED') return 'Resolved';
+    if (uiStatus === 'CLOSED') return 'Rejected';
+    return 'Pending';
+  };
+
+  const backendToUiStatus = (type: 'requests' | 'complaints', backendStatus: string) => {
+    if (type === 'requests') {
+      const map: Record<string, string> = { Pending: 'PENDING', Inprogress: 'OPEN', Resolve: 'RESOLVED', Closed: 'CLOSED' };
+      return map[backendStatus] || 'PENDING';
+    }
+    const map: Record<string, string> = { Pending: 'PENDING', Reviewed: 'OPEN', Resolved: 'RESOLVED', Rejected: 'CLOSED' };
+    return map[backendStatus] || 'PENDING';
+  };
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, type, status }: { id: string, type: 'requests' | 'complaints', status: string }) => {
-      const res = await fetch(`${API_BASE}/${type}/${id}`, {
-        method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify({ status })
-      });
-      return res.json();
+      const backendStatus = uiToBackendStatus(type, status);
+
+      // NOTE: was PATCHing `${API_BASE}/${type}/${id}` — a route that never
+      // existed on the backend for either type. Each type has its own real
+      // endpoint and payload shape.
+      const res = type === 'requests'
+        ? await fetch(`${API_BASE}/support-requests/update_status/${id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ status: backendStatus, admin_reply: responseMessage }),
+          })
+        : await fetch(`${API_BASE}/users/update_report_status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ report_id: id, status: backendStatus, admin_note: responseMessage }),
+          });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.message?.[0] || json?.message || 'Failed to update status');
+      }
+      return json;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['requests'] });
@@ -63,20 +106,52 @@ export default function SupportActivity() {
   const { data: requests, isLoading: requestsLoading } = useQuery({
     queryKey: ['requests'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/requests`, {
+      // NOTE: was hitting the bare `${API_BASE}/requests` — no matching
+      // backend route existed, so this tab always showed nothing even
+      // though users had real "Report a Problem" tickets sitting in the
+      // database. Real endpoint is `/support-requests/get_all`, and the raw
+      // ReportProblem documents are normalized here into the shape this
+      // page's UI expects (it has no native "subject"/"priority" fields).
+      const res = await fetch(`${API_BASE}/support-requests/get_all`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return res.json();
+      const json = await res.json();
+      const list = json.data?.requests ?? [];
+      return list.map((r: any) => ({
+        id: r._id,
+        username: r.user_id?.name || r.user_id?.email || 'Unknown user',
+        subject: r.description ? (r.description.length > 60 ? `${r.description.slice(0, 60)}…` : r.description) : 'Reported problem',
+        message: r.description || '',
+        priority: 'MEDIUM',
+        status: backendToUiStatus('requests', r.status),
+        created_at: r.createdAt,
+        admin_reply: r.admin_reply || '',
+      }));
     }
   });
 
   const { data: complaints, isLoading: complaintsLoading } = useQuery({
     queryKey: ['complaints'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/complaints`, {
+      // NOTE: was hitting the bare `${API_BASE}/complaints` — same issue.
+      // "Complaints" are user-reports-user records, which already have a
+      // real admin endpoint (built for the Users page fix) at
+      // `/users/get_all_user_reports`.
+      const res = await fetch(`${API_BASE}/users/get_all_user_reports`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return res.json();
+      const json = await res.json();
+      const list = json.data?.reports ?? [];
+      return list.map((r: any) => ({
+        id: r._id,
+        username: r.reported_by?.name || r.reported_by?.email || 'Unknown user',
+        subject: `Reported user: ${r.reported_user?.name || r.reported_user?.email || 'Unknown'}${r.reason ? ` — ${r.reason}` : ''}`,
+        message: r.description || r.reason || '',
+        priority: 'MEDIUM',
+        status: backendToUiStatus('complaints', r.status),
+        created_at: r.createdAt,
+        admin_reply: r.admin_note || '',
+      }));
     }
   });
 
@@ -87,7 +162,36 @@ export default function SupportActivity() {
     return item.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
            item.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
            item.message?.toLowerCase().includes(searchTerm.toLowerCase());
+  }).sort((a: any, b: any) => {
+    let aValue = a[sortField];
+    let bValue = b[sortField];
+
+    if (sortField === 'created_at') {
+      aValue = aValue ? new Date(aValue).getTime() : 0;
+      bValue = bValue ? new Date(bValue).getTime() : 0;
+    } else {
+      if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+      if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+    }
+
+    if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
   });
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: string }) =>
+    sortField === field
+      ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-primary" /> : <ArrowDown className="w-3 h-3 text-primary" />)
+      : <ArrowUpDown className="w-3 h-3 opacity-50" />;
 
   const exportData = () => {
     const headers = ['User', 'Subject', 'Priority', 'Status', 'Date'];
@@ -191,11 +295,19 @@ export default function SupportActivity() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-white/5 border-b border-white/5">
-                      <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">User</th>
+                      <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest cursor-pointer select-none hover:text-white transition-colors" onClick={() => handleSort('username')}>
+                        <div className="flex items-center gap-1.5">User <SortIcon field="username" /></div>
+                      </th>
                       <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Subject</th>
-                      <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Priority</th>
-                      <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Status</th>
-                      <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Date</th>
+                      <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest cursor-pointer select-none hover:text-white transition-colors" onClick={() => handleSort('priority')}>
+                        <div className="flex items-center gap-1.5">Priority <SortIcon field="priority" /></div>
+                      </th>
+                      <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest cursor-pointer select-none hover:text-white transition-colors" onClick={() => handleSort('status')}>
+                        <div className="flex items-center gap-1.5">Status <SortIcon field="status" /></div>
+                      </th>
+                      <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest cursor-pointer select-none hover:text-white transition-colors" onClick={() => handleSort('created_at')}>
+                        <div className="flex items-center gap-1.5">Date <SortIcon field="created_at" /></div>
+                      </th>
                       <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest text-right">Actions</th>
                     </tr>
                   </thead>

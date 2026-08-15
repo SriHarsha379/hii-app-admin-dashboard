@@ -63,7 +63,10 @@ import {
   Upload,
   Layers,
   Sparkles,
-  Camera
+  Camera,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { FilterDropdown } from '../components/FilterDropdown';
@@ -114,6 +117,8 @@ export default function Clubs() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [filterCity, setFilterCity] = useState('ALL');
+  const [sortField, setSortField] = useState('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedClub, setSelectedClub] = useState<any>(null);
   const [isCreatingClub, setIsCreatingClub] = useState(false);
   const [isViewingVenue, setIsViewingVenue] = useState(false);
@@ -453,7 +458,31 @@ export default function Clubs() {
     const matchesStatus  = filterStatus === 'ALL' || c.status === filterStatus;
     const matchesCity    = filterCity   === 'ALL' || c.city === filterCity;
     return matchesSearch && matchesStatus && matchesCity;
+  }).sort((a: any, b: any) => {
+    let aValue = a[sortField];
+    let bValue = b[sortField];
+
+    if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+    if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+
+    if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
   });
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: string }) =>
+    sortField === field
+      ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-primary" /> : <ArrowDown className="w-3 h-3 text-primary" />)
+      : <ArrowUpDown className="w-3 h-3 opacity-50" />;
 
   const toggleDay = (index: number) => {
     const newHours  = [...workingHours];
@@ -1052,15 +1081,26 @@ export default function Clubs() {
                 <Database className="w-4 h-4" />
               </button>
             </div>
+            {viewMode === 'grid' && (
+              <FilterDropdown
+                value={sortField}
+                onChange={handleSort}
+                options={[
+                  { label: 'Sort: Name', value: 'name' },
+                  { label: 'Sort: City', value: 'city' },
+                  { label: 'Sort: Status', value: 'status' },
+                ]}
+              />
+            )}
             <FilterPanel>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">City</label>
                 <FilterDropdown value={filterCity} onChange={setFilterCity} options={[
                   { label: 'All Cities', value: 'ALL' },
-                  { label: 'Mumbai',    value: 'Mumbai' },
-                  { label: 'Delhi',     value: 'Delhi' },
-                  { label: 'Bangalore', value: 'Bangalore' },
-                  { label: 'Goa',       value: 'Goa' },
+                  // Was a hardcoded 4-city list (Mumbai/Delhi/Bangalore/Goa)
+                  // instead of the real cities already fetched above — venues
+                  // in any other active city couldn't be filtered at all.
+                  ...((Array.isArray(cities) ? cities : []).map((c: any) => ({ label: c.city_name, value: c.city_name }))),
                 ]} />
               </div>
               <div className="space-y-1">
@@ -1138,10 +1178,16 @@ export default function Clubs() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-white/5 border-b border-white/5">
-                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Club / Category</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Location</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest cursor-pointer select-none hover:text-white transition-colors" onClick={() => handleSort('name')}>
+                      <div className="flex items-center gap-1.5">Club / Category <SortIcon field="name" /></div>
+                    </th>
+                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest cursor-pointer select-none hover:text-white transition-colors" onClick={() => handleSort('city')}>
+                      <div className="flex items-center gap-1.5">Location <SortIcon field="city" /></div>
+                    </th>
                     <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Stats</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Status</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest cursor-pointer select-none hover:text-white transition-colors" onClick={() => handleSort('status')}>
+                      <div className="flex items-center gap-1.5">Status <SortIcon field="status" /></div>
+                    </th>
                     <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Actions</th>
                   </tr>
                 </thead>
@@ -1293,7 +1339,7 @@ export default function Clubs() {
                               <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">City</label>
                               <select value={venueFormData.city} onChange={(e) => setVenueFormData({ ...venueFormData, city: e.target.value })} className="w-full bg-[#09090B] border border-white/5 rounded-[24px] px-8 py-5 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 appearance-none font-medium">
                                 <option value="">Select City...</option>
-                                {cities?.map((city: any) => <option key={city._id || city.id} value={city.name}>{city.name}</option>)}
+                                {(Array.isArray(cities) ? cities : []).map((city: any) => <option key={city._id || city.id} value={city.city_name}>{city.city_name}</option>)}
                               </select>
                             </div>
                             <div className="col-span-1 md:col-span-2">

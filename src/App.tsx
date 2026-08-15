@@ -30,6 +30,7 @@ const queryClient = new QueryClient({
 
 import ClubOnboarding from './pages/ClubOnboarding';
 import EventAdminOnboarding from './pages/EventAdminOnboarding';
+import OrganiserRequests from './pages/OrganiserRequests';
 
 const ProtectedRoute = ({ 
   children, 
@@ -81,6 +82,7 @@ export default function App() {
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route index element={<Dashboard />} />
               <Route path="users" element={<ProtectedRoute requireSuperAdmin><Users /></ProtectedRoute>} />
+              <Route path="organiser-requests" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'NORMAL_ADMIN']}><OrganiserRequests /></ProtectedRoute>} />
               <Route path="events" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'EVENT_ADMIN', 'NORMAL_ADMIN']}><Events /></ProtectedRoute>} />
               <Route path="clubs" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CLUB_ADMIN', 'NORMAL_ADMIN']}><Clubs /></ProtectedRoute>} />
               <Route path="ticketing" element={<Ticketing />} />

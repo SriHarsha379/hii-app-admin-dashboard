@@ -88,18 +88,29 @@ export default function Users() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [filterCity, setFilterCity] = useState('ALL');
-  const [sortField, setSortField] = useState('created_at');
+  const [sortField, setSortField] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedUser, setSelectedUser] = useState<any>(null);
 
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/users`, {
+      const res = await fetch(`${API_BASE}/users/get_all_user`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return res.json();
+      const json = await res.json();
+      // Backend returns { success, message, data: { users, total, page, limit } }
+      return json.data?.users ?? [];
     }
+  });
+
+  const { data: cities } = useQuery({
+    queryKey: ['cities'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/city/get_all_cities`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return json.data ?? [];
+    },
   });
 
   const filteredUsers = (Array.isArray(users) ? users : [])?.filter((u: any) => {
@@ -183,10 +194,9 @@ export default function Users() {
                   onChange={setFilterCity}
                   options={[
                     { label: 'All Cities', value: 'ALL' },
-                    { label: 'Mumbai', value: 'Mumbai' },
-                    { label: 'Delhi', value: 'Delhi' },
-                    { label: 'Bangalore', value: 'Bangalore' },
-                    { label: 'Goa', value: 'Goa' },
+                    // Only active cities are ever returned by /city/get_all_cities,
+                    // so this list can't include inactive/disabled cities.
+                    ...((Array.isArray(cities) ? cities : []).map((c: any) => ({ label: c.city_name, value: c.city_name }))),
                   ]}
                 />
               </div>
@@ -232,11 +242,11 @@ export default function Users() {
                 </th>
                 <th 
                   className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
-                  onClick={() => handleSort('created_at')}
+                  onClick={() => handleSort('createdAt')}
                 >
                   <div className="flex items-center gap-2">
                     Joined Date
-                    {sortField === 'created_at' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-primary" /> : <ArrowDown className="w-3 h-3 text-primary" />) : <ArrowUpDown className="w-3 h-3 opacity-50" />}
+                    {sortField === 'createdAt' ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-primary" /> : <ArrowDown className="w-3 h-3 text-primary" />) : <ArrowUpDown className="w-3 h-3 opacity-50" />}
                   </div>
                 </th>
                 <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Actions</th>
@@ -270,7 +280,7 @@ export default function Users() {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <p className="text-xs text-white font-medium">{new Date(user.created_at).toLocaleDateString()}</p>
+                    <p className="text-xs text-white font-medium">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}</p>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <button className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition-all">

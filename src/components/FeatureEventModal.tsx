@@ -30,11 +30,11 @@ interface FeatureEventModalProps {
   initialCity?: string;
 }
 
-export function FeatureEventModal({
-  isOpen,
-  onClose,
-  cities,
-  events,
+export function FeatureEventModal({ 
+  isOpen, 
+  onClose, 
+  cities, 
+  events, 
   onConfirm,
   initialEventId = '',
   initialCity = 'ALL'
@@ -54,7 +54,7 @@ export function FeatureEventModal({
       setSelectedEventId(initialEventId);
       setDuration(7);
       setSearchTerm('');
-
+      
       // If initialEventId is provided, find the event to set search term or just keep it
       if (initialEventId) {
         const event = events.find(e => e.id === initialEventId);
@@ -90,7 +90,7 @@ const selectedEvent = useMemo(() => {
 
   const handleConfirm = async () => {
     if (!selectedEventId || duration < 1) return;
-
+    
     setIsSubmitting(true);
     try {
       await onConfirm({
@@ -132,7 +132,7 @@ const selectedEvent = useMemo(() => {
             </div>
             <h3 className="text-sm font-bold text-white uppercase tracking-wider">Feature Event</h3>
           </div>
-          <button
+          <button 
             onClick={onClose}
             className="p-2 rounded-lg hover:bg-white/10 transition-all text-muted-foreground hover:text-white"
           >
@@ -162,7 +162,7 @@ const selectedEvent = useMemo(() => {
             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Select Event</label>
             <div className="relative">
               <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
+              <input 
                 type="text"
                 value={searchTerm}
                 onChange={(e) => {
@@ -219,9 +219,9 @@ onClick={() => {
                           )}
                         >
                           <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10 shrink-0">
-                            <img
-                              src={event.poster_url || `https://picsum.photos/seed/${event.id}/100/100`}
-                              alt=""
+                            <img 
+                              src={event.poster_url || `https://picsum.photos/seed/${event.id}/100/100`} 
+                              alt="" 
                               className="w-full h-full object-cover"
                               referrerPolicy="no-referrer"
                             />
@@ -256,7 +256,7 @@ onClick={() => {
             <div className="flex items-center gap-3">
               <div className="flex-1 relative">
                 <Calendar className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input
+                <input 
                   type="number"
                   value={duration}
                   onChange={(e) => {
@@ -267,13 +267,13 @@ onClick={() => {
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <button
+                <button 
                   onClick={incrementDuration}
                   className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:text-primary transition-all"
                 >
                   <ChevronUp className="w-4 h-4" />
                 </button>
-                <button
+                <button 
                   onClick={decrementDuration}
                   className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:text-primary transition-all"
                 >
@@ -287,13 +287,13 @@ onClick={() => {
 
         {/* Footer */}
         <div className="p-6 border-t border-white/5 bg-white/5 flex items-center gap-3">
-          <button
+          <button 
             onClick={onClose}
             className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-sm font-bold hover:bg-white/10 transition-all"
           >
             Cancel
           </button>
-          <button
+          <button 
             onClick={handleConfirm}
             disabled={!selectedEventId || isSubmitting}
             className={cn(

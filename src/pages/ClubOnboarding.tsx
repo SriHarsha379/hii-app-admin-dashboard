@@ -206,50 +206,51 @@ export default function ClubOnboarding() {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      // FIXED (path/method): was POSTing to /vendor/get_all_vendors, a GET-only
-      // route — every submission would have failed. Now hits the correct
-      // POST /vendor/add_vendor route.
-      //
-      // STILL TODO (Phase 2 — multipart rewrite): the real /vendor/add_vendor
-      // route expects multipart/form-data with a `business_image` file field
-      // (see vendorRoute.js: upload.single("business_image")), not a JSON
-      // body. This request will still fail until it's rebuilt to send
-      // FormData the same way Events/Venues create-update is being rewritten
-      // elsewhere. Extended fields (type, capacity, description,
-      // landscape_urls, portraits, portrait_url, working_hours) are included
-      // below so they're ready once that rewrite lands, but are ignored by
-      // the backend until then.
+      const selectedCity = (Array.isArray(cities) ? cities : []).find((c: any) => c._id === venueFormData.city);
+      if (!selectedCity) {
+        throw new Error('Select a city before submitting.');
+      }
+      if (!venueFormData.email || !venueFormData.phone) {
+        throw new Error('Email and phone number are required.');
+      }
+
+      // FIXED (Phase 2): the real `/vendor/add_vendor` route requires
+      // multipart/form-data (not JSON) with name, email, phone_number, city,
+      // state, address, password, and vendor_type — none of which this form
+      // was actually sending (no password/state field existed at all, so
+      // every submission failed backend validation with "All fields are
+      // required including vendor type"). This club-claim flow creates an
+      // "owner" vendor and auto-generates a password, which the backend
+      // emails to the registrant as part of its existing welcome email.
+      // `state` is resolved from the selected city's `state_id` since the
+      // form only collects a city.
+      const generatedPassword = `Hii-${Math.random().toString(36).slice(2, 8)}${Math.floor(Math.random() * 100)}!`;
+
+      const body = new FormData();
+      body.append('name', venueFormData.name);
+      body.append('email', venueFormData.email);
+      body.append('phone_number', venueFormData.phone);
+      body.append('city', venueFormData.city);
+      body.append('state', selectedCity.state_id);
+      body.append('address', venueFormData.address || 'Not provided');
+      body.append('password', generatedPassword);
+      body.append('vendor_type', 'owner');
+
       const res = await fetch(`${API_BASE}/vendor/add_vendor`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: venueFormData.name,
-          city_id: venueFormData.city,
-          address: venueFormData.address,
-          contact_info: JSON.stringify({
-            phone: venueFormData.phone,
-            email: venueFormData.email,
-            contactName: venueFormData.contactName,
-          }),
-          // Extended fields — ignored by backend until the route is updated:
-          type: venueFormData.type,
-          capacity: venueFormData.capacity ? Number(venueFormData.capacity) : undefined,
-          description: venueFormData.description,
-          landscape_urls: venueFormData.landscape_urls,
-          portrait_url: venueFormData.portrait_url,
-          portraits: venueFormData.portraits,
-          working_hours: workingHours,
-        }),
+        headers: { Authorization: `Bearer ${token}` },
+        body,
       });
 
       if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(body?.error || `Registration failed with status ${res.status}`);
+        const body2 = await res.json().catch(() => null);
+        throw new Error(body2?.message?.[0] || body2?.message || `Registration failed with status ${res.status}`);
       }
 
+      // New signups now require Super Admin approval before they can log in
+      // — see the "Organiser Requests" review page. This isn't a failure,
+      // just sets expectations correctly instead of implying the account is
+      // immediately usable.
       updateUser({ organisation: venueFormData.name });
       setIsSuccess(true);
     } catch (err: any) {
@@ -295,8 +296,8 @@ export default function ClubOnboarding() {
           <div className="space-y-6">
             <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
               <h1 className="text-5xl md:text-7xl font-black text-white tracking-tighter uppercase mb-2">
-                Setup <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-400">Complete</span>
+                Request <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-400">Submitted</span>
               </h1>
               <div className="h-1.5 w-24 bg-primary mx-auto rounded-full shadow-[0_0_20px_rgba(255,45,154,0.5)]" />
             </motion.div>
@@ -306,7 +307,7 @@ export default function ClubOnboarding() {
               transition={{ delay: 0.3 }}
               className="text-white/40 max-w-lg mx-auto text-sm md:text-base font-medium leading-relaxed tracking-wide"
             >
-              Your venue profile has been successfully listed. You now have full access to your venue dashboard and event management tools.
+              Your venue has been submitted for review. A Super Admin will approve your account shortly — check your email for login details and a heads-up once you're approved.
             </motion.p>
           </div>
           <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }} className="pt-4">

@@ -25,13 +25,24 @@ export default function ClubProfilePreview({ club, onClose }: ClubProfilePreview
 
   const data = React.useMemo(() => {
     const base = club || {};
+    // `city` (and `state`) come back from the vendor list API as populated
+    // objects — { _id, city_name } — not plain strings. Rendering that
+    // object directly as a React child throws "Objects are not valid as a
+    // React child" and crashes the whole preview, which is why clicking a
+    // venue turned the screen black (the dark backdrop renders, then the
+    // crash wipes out everything behind it). Unwrap it the same way the
+    // Clubs grid card already does defensively.
+    const cityName = typeof base.city === 'object' && base.city !== null
+      ? (base.city.city_name || '')
+      : (base.city || '');
+
     return {
       name: base.name || 'Unnamed club',
-      portrait_url: base.portrait_url || base.poster_url || '',
+      portrait_url: base.portrait_url || base.poster_url || base.business_image || '',
       tags: Array.isArray(base.tags) ? base.tags : [],
       date: base.date || 'Schedule not set',
       time: base.time || 'Hours not set',
-      location: base.city || base.location || 'Location not set',
+      location: cityName || base.location || 'Location not set',
       venue: base.venue || base.name || 'Venue not set',
       followers: String(base.likes || 0),
       capacity: base.capacity || 'Not set',
