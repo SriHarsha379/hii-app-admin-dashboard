@@ -213,8 +213,10 @@ export default function Recommendations() {
   const { data: cities } = useQuery({
     queryKey: ['cities'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/cities`, { headers: { Authorization: `Bearer ${token}`} });
-      return res.json();
+      // NOTE: was hitting `${API_BASE}/cities` (bare alias root, no handler → 404).
+      const res = await fetch(`${API_BASE}/city/get_all_cities`, { headers: { Authorization: `Bearer ${token}`} });
+      const json = await res.json();
+      return json.data ?? [];
     },
   });
 
@@ -324,7 +326,7 @@ export default function Recommendations() {
   };
 
   const filterResources = (q: string) => {
-    const label = (item: any) => (form.type === 'event' ? item.title : item.name);
+    const label = (item: any) => (form.type === 'event' ? item.venue_name : item.name);
     // Some documents (e.g. inserted directly into MongoDB, bypassing schema
     // validation) may be missing a title/name. Exclude them from the picker
     // rather than rendering an unlabeled, effectively unusable row.
@@ -350,7 +352,7 @@ export default function Recommendations() {
   };
 
   const selectResource = (item: any) => {
-    const label = form.type === 'event' ? item.title : item.name;
+    const label = form.type === 'event' ? item.venue_name : item.name;
     setForm((f) => ({ ...f, resource_id: item._id, resource_label: label }));
     setSearchQuery(label);
     setSearchResults([]);
@@ -456,7 +458,7 @@ export default function Recommendations() {
   const recList = Array.isArray(recommendations) ? recommendations : [];
   const previewList = Array.isArray(preview) ? preview : [];
   const cityOptions = Array.isArray(cities)
-    ? cities.map((c: any) => ({ label: c.name, value: c.name }))
+    ? cities.slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((c: any) => ({ label: c.city_name, value: c.city_name }))
     : [];
 
   const tabs = [
@@ -686,7 +688,7 @@ export default function Recommendations() {
                               </div>
                             ) : (
                               searchResults.map((item: any) => {
-                                const label = form.type === 'event' ? item.title : item.name;
+                                const label = form.type === 'event' ? item.venue_name : item.name;
                                 return (
                                   <button
                                     key={item._id}
@@ -704,7 +706,7 @@ export default function Recommendations() {
                                     <div className="min-w-0">
                                       <p className="text-xs font-bold text-white truncate">{label}</p>
                                       {item.city && (
-                                        <p className="text-[9px] text-muted-foreground">{item.city}</p>
+                                        <p className="text-[9px] text-muted-foreground">{typeof item.city === 'object' ? item.city?.city_name : item.city}</p>
                                       )}
                                     </div>
                                   </button>
@@ -888,8 +890,12 @@ export default function Recommendations() {
               </div>
             ) : (
               <div className="flex gap-8 items-start justify-center">
-                {/* Phone shell */}
-                <div className="w-[360px] shrink-0">
+                {/* Phone shell — was a hard-coded w-[360px] with shrink-0,
+                    which forces horizontal overflow on any screen narrower
+                    than ~360px + padding instead of shrinking to fit. Now
+                    caps at 360px on wide screens but shrinks gracefully on
+                    small ones. */}
+                <div className="w-full max-w-[360px] shrink-0">
                   <div className="relative bg-[#0a0a0a] rounded-[3rem] border-4 border-white/10 shadow-2xl overflow-hidden">
                     {/* Status bar */}
                     <div className="h-10 bg-black/50 flex items-center justify-between px-6">

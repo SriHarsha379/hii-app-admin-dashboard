@@ -18,7 +18,8 @@ import {
   Layers,
   ArrowUpRight,
   CheckCircle2,
-  Users2
+  Users2,
+  X
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -55,7 +56,14 @@ export default function EventAdminProfile() {
 
   const eventList = Array.isArray(events) ? events.filter((e: any) => e && typeof e === 'object') : [];
   const liveEvents = eventList.filter(e => e.status === 'LIVE');
-  const upcomingEvents = eventList.filter(e => e.status === 'UPCOMING').slice(0, 4);
+  // Was capped at .slice(0, 4) — but this is a dedicated full-page tab
+  // (same as the LIVE and PAST tabs, neither of which have any cap), not a
+  // small preview widget, so silently hiding anything past the 4th
+  // upcoming event was inconsistent and easy to mistake for "that's all
+  // there is." Still sorted so the soonest events show first.
+  const upcomingEvents = eventList
+    .filter(e => e.status === 'UPCOMING')
+    .sort((a: any, b: any) => new Date(a.date || a.createdAt || 0).getTime() - new Date(b.date || b.createdAt || 0).getTime());
   const pastEvents = eventList.filter(e => e.status === 'COMPLETED');
 
   const associatedClubs = (Array.isArray(clubs) ? clubs : []).slice(0, 4);
@@ -67,7 +75,7 @@ export default function EventAdminProfile() {
         <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform duration-1000">
           <Layers className="w-80 h-80" />
         </div>
-        
+
         <div className="flex flex-col md:flex-row gap-10 items-start relative z-10">
           <div className="relative">
             <div className="w-40 h-40 rounded-[40px] overflow-hidden border-2 border-primary/20 group-hover:border-primary transition-all duration-700 shadow-2xl bg-primary/10 flex items-center justify-center">
@@ -123,8 +131,8 @@ export default function EventAdminProfile() {
                   onClick={() => setActiveTab(tab)}
                   className={cn(
                     "px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                    activeTab === tab 
-                      ? "bg-primary text-white shadow-lg shadow-primary/20" 
+                    activeTab === tab
+                      ? "bg-primary text-white shadow-lg shadow-primary/20"
                       : "text-white/40 hover:text-white"
                   )}
                 >
@@ -291,12 +299,12 @@ export default function EventAdminProfile() {
                 <div className="absolute top-0 right-0 p-4 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity">
                    <Trophy className="w-24 h-24 text-primary" />
                 </div>
-                
+
                 <div className="relative">
                   <div className="w-28 h-28 rounded-[32px] overflow-hidden border-2 border-white/10 group-hover:border-primary/50 transition-all duration-500 shadow-2xl">
-                    <img 
-                      src={club.logo || `https://api.dicebear.com/7.x/initials/svg?seed=${club.name}`} 
-                      className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" 
+                    <img
+                      src={club.logo || `https://api.dicebear.com/7.x/initials/svg?seed=${club.name}`}
+                      className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"
                       alt=""
                     />
                   </div>
@@ -307,7 +315,7 @@ export default function EventAdminProfile() {
 
                 <div className="space-y-1">
                   <h4 className="text-lg font-black text-white uppercase tracking-tight truncate max-w-[200px]">{club.name}</h4>
-                  <p className="text-[10px] font-bold text-primary uppercase tracking-widest">{club.city}</p>
+                  <p className="text-[10px] font-bold text-primary uppercase tracking-widest">{(typeof club.city === 'object' ? club.city?.city_name : club.city) || '—'}</p>
                 </div>
 
                 <div className="w-full pt-6 border-t border-white/5 flex items-center justify-center gap-6">
@@ -367,6 +375,16 @@ export default function EventAdminProfile() {
                 {/* Header */}
                 <div className="px-10 py-8 border-b border-white/5 flex items-center justify-between">
                   <h3 className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Live Analytics & Operations</h3>
+                  {/* Was missing entirely — the only way to close this card
+                      was clicking the dark backdrop, which isn't
+                      discoverable, so users had no visible way out short of
+                      the browser back button. */}
+                  <button
+                    onClick={() => setSelectedEvent(null)}
+                    className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all text-muted-foreground hover:text-white"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
 
                 <div className="p-10">
@@ -374,9 +392,9 @@ export default function EventAdminProfile() {
                     {/* Left Column */}
                     <div className="space-y-8 text-left">
                       <div className="aspect-[16/10] rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl">
-                        <img 
-                          src={selectedEvent.poster_url || `https://picsum.photos/seed/${selectedEvent.id}/800/600`} 
-                          alt="" 
+                        <img
+                          src={selectedEvent.poster_url || `https://picsum.photos/seed/${selectedEvent.id}/800/600`}
+                          alt=""
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -421,10 +439,10 @@ export default function EventAdminProfile() {
                             <Users2 className="w-12 h-12 text-white/20" />
                           </div>
                           <div className="mt-6 w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                            <motion.div 
+                            <motion.div
                               initial={{ width: 0 }}
                               animate={{ width: '75%' }}
-                              className="h-full bg-primary shadow-[0_0_15px_rgba(255,45,154,0.5)]" 
+                              className="h-full bg-primary shadow-[0_0_15px_rgba(255,45,154,0.5)]"
                             />
                           </div>
                           <div className="flex justify-between items-center mt-2 group">
@@ -460,7 +478,7 @@ export default function EventAdminProfile() {
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
               className="fixed inset-y-0 right-0 w-full max-w-[420px] bg-black z-[130] shadow-[0_0_100px_rgba(0,0,0,0.8)] border-l border-white/5 overflow-hidden"
             >
-              <EventProfilePreview 
+              <EventProfilePreview
                 eventData={selectedEvent}
                 onClose={() => setSelectedEvent(null)}
                 hideCloseButton
@@ -489,8 +507,8 @@ export default function EventAdminProfile() {
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
               className="fixed inset-y-0 right-0 w-full max-w-[420px] bg-black z-[111] shadow-[0_0_100px_rgba(0,0,0,0.8)] overflow-hidden border-l border-white/5"
             >
-              <ClubProfilePreview 
-                club={selectedClub} 
+              <ClubProfilePreview
+                club={selectedClub}
                 onClose={() => setSelectedClub(null)}
               />
             </motion.div>

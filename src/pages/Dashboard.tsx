@@ -93,18 +93,20 @@ export default function Dashboard() {
     },
   });
 
-  // TODO: userRoute.js is disabled on the backend (userController.js missing exports:
-  // getAllUsers, getUserById, updateUserStatus, getDeletedUsers, getUserDetails,
-  // imageUpload, getUserBookings, getUserReports, updateUserReportStatus).
-  // Re-enable this query once those routes are restored on the backend.
+  // FIXED: this query was disabled (`enabled: false`) because the backend's
+  // admin user-listing endpoint didn't exist yet at the time — that gap was
+  // closed (see userController.getAllUsers / routes/admin/userRoute.js), but
+  // this query was never re-enabled or updated to match the real URL/shape.
+  // Real endpoint is `/user/get_all_user` (not `/user/getAllUsers`), and it
+  // returns `{ users, total, page, limit }` under `data`, not a bare array.
   const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/user/getAllUsers`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/user/get_all_user`, { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json();
-      return json.data ?? [];
+      return json.data?.users ?? [];
     },
-    enabled: false, // flip to `user?.role === 'SUPER_ADMIN'` once backend is ready
+    enabled: user?.role === 'SUPER_ADMIN',
   });
 
   // ── Scaffolded queries — disabled until real endpoints are wired in ──────────
@@ -137,8 +139,10 @@ export default function Dashboard() {
   const activeEvents = eventList.filter((e: any) => e.status === 'LIVE' || e.status === 'UPCOMING').length;
   const pastEvents   = eventList.filter((e: any) => e.status === 'COMPLETED').length;
   const totalUsers   = userList.length;
-  // "active" = has a real last_active/isActive flag. No more 30%-of-total guess.
-  const activeUsers  = userList.filter((u: any) => u.last_active || u.isActive).length;
+  // "active" = the real `is_active` field on the User model. The previous
+  // check (`last_active` / `isActive`) didn't match any real field name —
+  // neither exists on the schema — so this always evaluated to 0.
+  const activeUsers  = userList.filter((u: any) => u.is_active).length;
 
   // ── Growth chart data, built entirely from real createdAt timestamps on
   // the users/events/clubs already fetched above. No random/mock values.
@@ -187,7 +191,7 @@ export default function Dashboard() {
         {user?.role === 'SUPER_ADMIN' && (
           <>
             <MetricCard title="Total Users"  value={totalUsers || 0}  icon={Users}    updateText="From /api/users" />
-            <MetricCard title="Active Users" value={activeUsers || 0} icon={Activity} updateText="Has last_active or isActive flag" />
+            <MetricCard title="Active Users" value={activeUsers || 0} icon={Activity} updateText="is_active flag (not deactivated/banned)" />
           </>
         )}
         {(user?.role === 'SUPER_ADMIN' || user?.role === 'EVENT_ADMIN') && (

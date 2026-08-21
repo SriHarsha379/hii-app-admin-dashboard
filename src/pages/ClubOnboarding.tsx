@@ -127,7 +127,7 @@ export default function ClubOnboarding() {
   });
 
   const cityOptions = Array.isArray(cities)
-    ? cities.map((c: any) => ({ label: c.city_name, value: c._id }))
+    ? cities.slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((c: any) => ({ label: c.city_name, value: c._id }))
     : [];
 
   const venueTypeOptions = Array.isArray(venueTypes)

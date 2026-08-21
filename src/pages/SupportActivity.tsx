@@ -38,6 +38,7 @@ const statusColors: any = {
 export default function SupportActivity() {
   const { token } = useAuth();
   const [activeTab, setActiveTab] = useState('requests');
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [responseMessage, setResponseMessage] = useState('');
@@ -125,6 +126,7 @@ export default function SupportActivity() {
         priority: 'MEDIUM',
         status: backendToUiStatus('requests', r.status),
         created_at: r.createdAt,
+        updatedAt: r.updatedAt,
         admin_reply: r.admin_reply || '',
       }));
     }
@@ -150,6 +152,7 @@ export default function SupportActivity() {
         priority: 'MEDIUM',
         status: backendToUiStatus('complaints', r.status),
         created_at: r.createdAt,
+        updatedAt: r.updatedAt,
         admin_reply: r.admin_note || '',
       }));
     }
@@ -159,9 +162,12 @@ export default function SupportActivity() {
   const isLoading = activeTab === 'requests' ? requestsLoading : complaintsLoading;
 
   const filteredData = (Array.isArray(currentData) ? currentData : [])?.filter((item: any) => {
-    return item.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = item.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
            item.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
            item.message?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = !statusFilter
+      || (statusFilter === 'UNRESOLVED' ? (item.status !== 'RESOLVED' && item.status !== 'CLOSED') : item.status === statusFilter);
+    return matchesSearch && matchesStatus;
   }).sort((a: any, b: any) => {
     let aValue = a[sortField];
     let bValue = b[sortField];
@@ -248,25 +254,78 @@ export default function SupportActivity() {
             exit={{ opacity: 0, y: -20 }}
             className="space-y-6"
           >
-            {/* Stats */}
+            {/* Stats — was showing item.length for "Open"/"Pending" (i.e. ALL
+                requests/complaints regardless of status, not just open/pending
+                ones), and Avg. Response Time / Resolution Rate were hardcoded
+                fake values ("2.4h", "94%") that never reflected real data.
+                Now computed for real, and every card is clickable — clicking
+                switches to the relevant tab and filters the list below to
+                match, so the numbers on top and the rows on bottom always agree. */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {[
-                { label: 'Open Requests', value: requests?.length || '0', icon: MessageSquarePlus, color: 'text-blue-400', bg: 'bg-blue-400/10' },
-                { label: 'Pending Complaints', value: complaints?.length || '0', icon: Flag, color: 'text-red-400', bg: 'bg-red-400/10' },
-                { label: 'Avg. Response Time', value: '2.4h', icon: Clock, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-                { label: 'Resolution Rate', value: '94%', icon: CheckCircle2, color: 'text-purple-400', bg: 'bg-purple-400/10' },
-              ].map((stat) => (
-                <div key={stat.label} className="glass-card p-6 rounded-2xl border border-white/10 flex items-center gap-4">
-                  <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", stat.bg)}>
-                    <stat.icon className={cn("w-6 h-6", stat.color)} />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{stat.label}</p>
-                    <p className="text-2xl font-bold text-white">{stat.value}</p>
-                  </div>
-                </div>
-              ))}
+              {(() => {
+                const reqList = Array.isArray(requests) ? requests : [];
+                const compList = Array.isArray(complaints) ? complaints : [];
+                const openRequests = reqList.filter((r: any) => r.status !== 'RESOLVED' && r.status !== 'CLOSED').length;
+                const pendingComplaints = compList.filter((c: any) => c.status === 'PENDING').length;
+
+                const allClosed = [...reqList, ...compList].filter((i: any) => i.status === 'RESOLVED' || i.status === 'CLOSED');
+                const resolutionRate = (reqList.length + compList.length) > 0
+                  ? Math.round((allClosed.length / (reqList.length + compList.length)) * 100)
+                  : 0;
+
+                const resolvedWithTimes = allClosed.filter((i: any) => i.created_at && i.updatedAt);
+                const avgResolveMs = resolvedWithTimes.length > 0
+                  ? resolvedWithTimes.reduce((sum: number, i: any) => sum + (new Date(i.updatedAt).getTime() - new Date(i.created_at).getTime()), 0) / resolvedWithTimes.length
+                  : null;
+                const avgResolveLabel = avgResolveMs === null ? '—' : avgResolveMs < 3600000
+                  ? `${Math.round(avgResolveMs / 60000)}m`
+                  : `${(avgResolveMs / 3600000).toFixed(1)}h`;
+
+                return [
+                  {
+                    label: 'Open Requests', value: openRequests, icon: MessageSquarePlus, color: 'text-blue-400', bg: 'bg-blue-400/10',
+                    onClick: () => { setActiveTab('requests'); setStatusFilter('UNRESOLVED'); },
+                  },
+                  {
+                    label: 'Pending Complaints', value: pendingComplaints, icon: Flag, color: 'text-red-400', bg: 'bg-red-400/10',
+                    onClick: () => { setActiveTab('complaints'); setStatusFilter('PENDING'); },
+                  },
+                  {
+                    label: 'Avg. Time to Resolve', value: avgResolveLabel, icon: Clock, color: 'text-emerald-400', bg: 'bg-emerald-400/10',
+                    onClick: null, // computed average, not tied to one filterable status
+                  },
+                  {
+                    label: 'Resolution Rate', value: `${resolutionRate}%`, icon: CheckCircle2, color: 'text-purple-400', bg: 'bg-purple-400/10',
+                    onClick: () => { setActiveTab('requests'); setStatusFilter('RESOLVED'); },
+                  },
+                ].map((stat) => (
+                  <button
+                    key={stat.label}
+                    onClick={stat.onClick || undefined}
+                    disabled={!stat.onClick}
+                    className={cn(
+                      "glass-card p-6 rounded-2xl border border-white/10 flex items-center gap-4 text-left transition-all",
+                      stat.onClick ? "hover:border-primary/40 hover:bg-white/[0.04] cursor-pointer" : "cursor-default"
+                    )}
+                  >
+                    <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center shrink-0", stat.bg)}>
+                      <stat.icon className={cn("w-6 h-6", stat.color)} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{stat.label}</p>
+                      <p className="text-2xl font-bold text-white">{stat.value}</p>
+                    </div>
+                  </button>
+                ));
+              })()}
             </div>
+
+            {statusFilter && (
+              <div className="flex items-center gap-2 text-xs text-white/50">
+                <span>Filtered by status: <span className="text-white font-bold">{statusFilter === 'UNRESOLVED' ? 'Open (not resolved)' : statusFilter}</span></span>
+                <button onClick={() => setStatusFilter(null)} className="text-primary hover:underline font-bold">Clear</button>
+              </div>
+            )}
 
             {/* Table */}
             <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">

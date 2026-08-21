@@ -78,39 +78,17 @@ const statusLabel = (e: any) => {
   return e.status || 'ACTIVE';
 };
 
-// TODO: BROKEN - there is no `/upload` route on the real backend (that endpoint
-// only existed in an old, unused Mongoose codebase). The real backend's
-// eventRoute.js expects multipart form-data directly on create/update
-// (`upload.fields([{ name: "venue_image" }, { name: "artist_images" }, ...])`),
-// not a separate upload step that returns a URL. This function will always
-// fail until image upload is rewired to attach files directly to the
-// create/update FormData instead of pre-uploading.
-async function uploadFile(file: File, token: string): Promise<string> {
-  const form = new FormData();
-  form.append('file', file);
-  const res = await fetch(`${API_BASE}/upload`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: form,
-  });
-  if (!res.ok) throw new Error('Upload failed');
-  const data = await res.json();
-  return data.url ?? data.path ?? data.secure_url;
-}
-
 // ─── ImageUploadZone ──────────────────────────────────────────────────────────
 function ImageUploadZone({
-  label, hint, value, onChange, aspect, token,
-}: { label: string; hint: string; value: string; onChange: (url: string) => void; aspect: string; token: string }) {
+  label, hint, value, onChange, onFileChange, aspect,
+}: { label: string; hint: string; value: string; onChange: (url: string) => void; onFileChange: (file: File | null) => void; aspect: string }) {
   const inputRef   = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const [error,     setError]     = useState('');
+  const [error, setError] = useState('');
 
-  const handleFile = async (file: File) => {
-    setError(''); setUploading(true);
-    try   { onChange(await uploadFile(file, token)); }
-    catch { setError('Upload failed. Try again.'); }
-    finally { setUploading(false); }
+  const handleFile = (file: File) => {
+    setError('');
+    onFileChange(file);
+    onChange(URL.createObjectURL(file));
   };
 
   return (
@@ -118,11 +96,11 @@ function ImageUploadZone({
       <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1 block">{label}</label>
       <div
         className={cn(aspect, 'w-full rounded-[40px] bg-[#09090B] border-2 border-dashed border-white/5 flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-white/[0.04] hover:border-primary/30 transition-all group relative overflow-hidden')}
-        onClick={() => !uploading && inputRef.current?.click()}
+        onClick={() => inputRef.current?.click()}
         onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
         onDragOver={(e) => e.preventDefault()}
       >
-        {value && !uploading && (
+        {value && (
           <>
             <img src={value} alt="" className="absolute inset-0 w-full h-full object-cover" />
             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -130,13 +108,7 @@ function ImageUploadZone({
             </div>
           </>
         )}
-        {uploading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 gap-3">
-            <Loader2 className="w-8 h-8 text-primary animate-spin" />
-            <span className="text-[11px] font-black uppercase text-white/60 tracking-[0.2em]">Uploading…</span>
-          </div>
-        )}
-        {!value && !uploading && (
+        {!value && (
           <>
             <div className="w-16 h-16 rounded-[24px] bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-primary/20 transition-all relative z-10 shadow-2xl">
               <Upload className="w-8 h-8 text-white/20 group-hover:text-primary transition-colors" />
@@ -155,12 +127,12 @@ function ImageUploadZone({
 }
 
 // ─── GalleryUploadZone ────────────────────────────────────────────────────────
-function GalleryUploadZone({ urls, onChange, token }: { urls: string[]; onChange: (u: string[]) => void; token: string }) {
-  const handleFile = async (index: number, file: File) => {
-    try {
-      const url  = await uploadFile(file, token);
-      const next = [...urls]; next[index] = url; onChange(next);
-    } catch {}
+// FIXED: same pre-upload problem as ImageUploadZone — now holds raw Files
+// via onFilesChange for direct multipart submission, using local preview URLs.
+function GalleryUploadZone({ urls, onChange, onFilesChange }: { urls: string[]; onChange: (u: string[]) => void; onFilesChange: (i: number, f: File) => void }) {
+  const handleFile = (index: number, file: File) => {
+    onFilesChange(index, file);
+    const next = [...urls]; next[index] = URL.createObjectURL(file); onChange(next);
   };
   return (
     <div className="space-y-3">
@@ -292,6 +264,7 @@ export default function Events() {
   const [submitError,    setSubmitError]    = useState('');
   const [isPreviewing,   setIsPreviewing]   = useState(false);
   const [isFeaturing,    setIsFeaturing]    = useState(false);
+  const [isViewingFeatured, setIsViewingFeatured] = useState(false);
   const [deleteTarget,   setDeleteTarget]   = useState<any>(null);
   const [isDeleting,     setIsDeleting]     = useState(false);
   const [creationStep,   setCreationStep]   = useState(1);
@@ -307,11 +280,18 @@ export default function Events() {
     title: '', city: '', venue_id: '', vendor_id: '',
     genre: [] as string[], event_type: [] as string[],
     date: '', start_time: '', end_time: '', description: '',
+    address: '', latitude: '', longitude: '',
     poster_url: '', landscape_url: '',
     gallery_urls: ['', '', '', ''] as string[],
     ticketing_link: '',
   };
   const [eventFormData, setEventFormData] = useState<any>(blankForm);
+  // Raw File objects for the required backend multipart fields — separate
+  // from eventFormData since Files can't round-trip through JSON/local
+  // storage the way the rest of the form state does.
+  const [posterFile, setPosterFile] = useState<File | null>(null);
+  const [landscapeFile, setLandscapeFile] = useState<File | null>(null);
+  const [galleryFiles, setGalleryFiles] = useState<(File | null)[]>([null, null, null, null]);
 
   // ── Queries (FIXED: correct paths + response unwrapping) ─────────────────────
   const { data: events, isLoading } = useQuery({
@@ -341,15 +321,17 @@ export default function Events() {
     },
   });
 
-  // TODO: no eventTypeRoute.js exists on the backend yet - disabled until a
-  // real endpoint is added. Dropdown will show no options until then.
+  // FIXED: there was no eventTypeRoute.js on the backend — "event types" are
+  // actually Category documents with category_type: 1 (2 = Venue), same
+  // fix applied in ManageFilters.tsx and ClubOnboarding.tsx.
   const { data: eventTypes } = useQuery({
     queryKey: ['eventTypes'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/eventTypes`, { headers: { Authorization: `Bearer ${token}` } });
-      return res.json();
+      const res = await fetch(`${API_BASE}/category/get_category`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      const list = Array.isArray(json.data) ? json.data : [];
+      return list.filter((c: any) => c.category_type === 1);
     },
-    enabled: false,
   });
 
   const { data: vendors } = useQuery({
@@ -363,45 +345,84 @@ export default function Events() {
 
   const vendorList   = Array.isArray(vendors) ? vendors : [];
   const getVendorId  = (e: any) => { if (!e) return ''; if (typeof e.vendor_id === 'object') return e.vendor_id?._id || e.vendor_id?.id || ''; return e.vendor_id || e.venue_id || ''; };
+
+  // EVENT_ADMIN accounts should only ever create/edit events for their own
+  // organisation — previously the create form always started with a blank
+  // vendor picker and required manually finding + selecting themselves out
+  // of every vendor in the system, which is confusing and risks accidentally
+  // creating an event under someone else's account. Super/Normal Admin still
+  // get the full picker, since they manage on behalf of any vendor.
+  const isEventAdmin = user?.role === 'EVENT_ADMIN';
+  const ownVendor = isEventAdmin ? vendorList.find((v: any) => v.name === user?.organisation) : null;
   const getVendorName = (id: string) => vendorList.find((v: any) => (v._id || v.id) === id)?.name || '';
 
   // ── Mutations ──────────────────────────────────────────────────────────────
-  // TODO: BROKEN - real backend path is POST /events/create_event and it
-  // expects multipart form-data (fields: venue_image, artist_images,
-  // gallery_images, event_layout_images), not JSON at POST /events. This
-  // mutation needs a rewrite to build FormData before it will actually work.
+  // FIXED: was POSTing JSON to the wrong URL entirely (`/events` instead of
+  // `/events/create_event`). Real backend expects multipart/form-data with
+  // specific field names (venue_name, city_id, category_ids as a JSON
+  // string, address, latitude, longitude, venue_image as a file, etc.) —
+  // see buildEventFormData() below, shared with the update mutation.
+  const buildEventFormData = () => {
+    const body = new FormData();
+    body.append('venue_name', eventFormData.title);
+    body.append('city_id', eventFormData.city);
+    body.append('category_ids', JSON.stringify(eventFormData.event_type || []));
+    body.append('start_time', eventFormData.start_time);
+    body.append('end_time', eventFormData.end_time);
+    body.append('address', eventFormData.address);
+    body.append('start_date', eventFormData.date);
+    body.append('is_multi_day', 'false');
+    body.append('about', eventFormData.description || '');
+    body.append('latitude', eventFormData.latitude || '0');
+    body.append('longitude', eventFormData.longitude || '0');
+    if (eventFormData.vendor_id) body.append('vendor_id', eventFormData.vendor_id);
+    if (posterFile) body.append('venue_image', posterFile);
+    if (landscapeFile) body.append('event_layout_images', landscapeFile);
+    galleryFiles.forEach((f) => { if (f) body.append('gallery_images', f); });
+    return body;
+  };
+
   const createEventMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await fetch(`${API_BASE}/events`, {
+    mutationFn: async () => {
+      const res = await fetch(`${API_BASE}/events/create_event`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(data),
+        headers: { Authorization: `Bearer ${token}` },
+        body: buildEventFormData(),
       });
-      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to create event'); }
-      return res.json();
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.message?.[0] || json?.message || 'Failed to create event');
+      }
+      return json;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['events'] }); setIsCreatingEvent(false); setEventFormData(blankForm); setCreationStep(1); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      setIsCreatingEvent(false); setEventFormData(blankForm); setCreationStep(1);
+      setPosterFile(null); setLandscapeFile(null); setGalleryFiles([null, null, null, null]);
+    },
   });
 
-  // TODO: BROKEN - real backend path is PUT /events/update_event/:id and it
-  // expects multipart form-data, not JSON at PUT /events/:id. Needs a rewrite
-  // to build FormData before it will actually work.
+  // FIXED: same URL + multipart problem as create, plus the real endpoint is
+  // PUT `/events/update_event/:id`, not `/events/:id`.
   const updateEventMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const id = data._id || data.id;
-      const { _id, id: _removed, ...body } = data;
-      const res = await fetch(`${API_BASE}/events/${id}`, {
+    mutationFn: async () => {
+      const id = eventFormData.id;
+      const res = await fetch(`${API_BASE}/events/update_event/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(body),
+        headers: { Authorization: `Bearer ${token}` },
+        body: buildEventFormData(),
       });
-      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to update event'); }
-      return res.json();
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.message?.[0] || json?.message || 'Failed to update event');
+      }
+      return json;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
       setIsCreatingEvent(false); setIsEditingEvent(false);
       setSelectedEvent(null); setEventFormData(blankForm); setCreationStep(1);
+      setPosterFile(null); setLandscapeFile(null); setGalleryFiles([null, null, null, null]);
     },
   });
 
@@ -422,26 +443,54 @@ export default function Events() {
     },
   });
 
-  // TODO: BROKEN - there is no `/events/feature` route on the real backend.
-  // Featuring events is not yet implemented server-side.
+  // FIXED: real endpoint is POST /events/feature/:id (was hitting a
+  // nonexistent /events/feature with no route at all).
   const featureEventMutation = useMutation({
     mutationFn: async (data: { city: string; eventId: string; duration: number }) => {
-      const res = await fetch(`${API_BASE}/events/feature`, {
+      const res = await fetch(`${API_BASE}/events/feature/${data.eventId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ duration: data.duration, city: data.city }),
       });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.message?.[0] || json?.message || 'Failed to feature event');
+      }
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['featured-events'] });
+    },
+  });
+
+  const unfeatureEventMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`${API_BASE}/events/unfeature/${id}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to unfeature event');
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['events'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['featured-events'] });
+    },
+  });
+
+  const { data: featuredEvents, isLoading: featuredLoading } = useQuery({
+    queryKey: ['featured-events'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/events/featured`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return Array.isArray(json.data) ? json.data : [];
+    },
+    enabled: isViewingFeatured,
   });
 
   // ── Derived stats ──────────────────────────────────────────────────────────
   const eventList        = Array.isArray(events) ? events : [];
-  const liveCount        = eventList.filter((e: any) => e.status === 'LIVE' || e.status === 'UPCOMING').length;
-  const cancelledCount   = eventList.filter((e: any) => e.status === 'CANCELLED').length;
-  const totalAttendance  = eventList.reduce((s: number, e: any) => s + (Number(e.attendance)   || 0), 0);
-  const totalTicketsSold = eventList.reduce((s: number, e: any) => s + (Number(e.tickets_sold) || 0), 0);
 
   const filteredEvents = eventList.filter((e: any) => {
     const matchesSearch  = e.title?.toLowerCase().includes(searchTerm.toLowerCase()) || e.city?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -467,6 +516,14 @@ export default function Events() {
     if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
     return 0;
   });
+
+  // Was computed from the full unfiltered `eventList`, so the top stat
+  // cards never matched whatever the search/status/city filters below had
+  // narrowed the table down to. Now derived from `filteredEvents` instead.
+  const liveCount        = filteredEvents.filter((e: any) => e.status === 'LIVE' || e.status === 'UPCOMING').length;
+  const cancelledCount   = filteredEvents.filter((e: any) => e.status === 'CANCELLED').length;
+  const totalAttendance  = filteredEvents.reduce((s: number, e: any) => s + (Number(e.attendance)   || 0), 0);
+  const totalTicketsSold = filteredEvents.reduce((s: number, e: any) => s + (Number(e.tickets_sold) || 0), 0);
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -509,31 +566,17 @@ export default function Events() {
       if (!eventFormData.date)        missing.push('Event Date');
       if (!eventFormData.start_time)  missing.push('Start Time');
       if (!eventFormData.end_time)    missing.push('End Time');
-      if (!eventFormData.description) missing.push('Description');
       if (!eventFormData.city)        missing.push('City');
+      if (!eventFormData.address)     missing.push('Address');
+      if (!eventFormData.latitude)    missing.push('Latitude');
+      if (!eventFormData.longitude)   missing.push('Longitude');
+      if (!isEditingEvent && !posterFile) missing.push('Main Poster image');
       if (missing.length) { setSubmitError(`Please fill in: ${missing.join(', ')}`); return; }
 
-      const payload = {
-        title:          eventFormData.title,
-        description:    eventFormData.description,
-        date:           eventFormData.date,
-        start_time:     eventFormData.start_time,
-        end_time:       eventFormData.end_time,
-        city_id:        eventFormData.city,
-        venue_id:       vendor_id,
-        genre:          eventFormData.genre,
-        event_type:     eventFormData.event_type,
-        poster_url:     eventFormData.poster_url,
-        landscape_urls: [eventFormData.landscape_url, ...eventFormData.gallery_urls].filter(Boolean),
-        ticketing_link: eventFormData.ticketing_link,
-        // pass the stored id so updateEventMutation can build the correct URL
-        ...(isEditingEvent && eventFormData.id ? { id: eventFormData.id, _id: eventFormData.id } : {}),
-      };
-
       if (isEditingEvent && eventFormData.id) {
-        await updateEventMutation.mutateAsync(payload);
+        await updateEventMutation.mutateAsync();
       } else {
-        await createEventMutation.mutateAsync(payload);
+        await createEventMutation.mutateAsync();
       }
     } catch (e: any) {
       setSubmitError(e.message || 'Something went wrong');
@@ -556,7 +599,10 @@ export default function Events() {
       date:          event.date         ? event.date.slice(0, 10) : '',
       start_time:    event.start_time   || '',
       end_time:      event.end_time     || '',
-      description:   event.description  || '',
+      description:   event.description  || event.about || '',
+      address:       event.address      || '',
+      latitude:      event.latitude != null ? String(event.latitude) : '',
+      longitude:     event.longitude != null ? String(event.longitude) : '',
       poster_url:    event.poster_url   || '',
       landscape_url: event.landscape_url
         || (Array.isArray(event.landscape_urls) ? event.landscape_urls[0] : '')
@@ -569,6 +615,7 @@ export default function Events() {
 
     // Set form data BEFORE opening modal so it renders with data already in place
     setEventFormData(filled);
+    setPosterFile(null); setLandscapeFile(null); setGalleryFiles([null, null, null, null]);
     setIsEditingEvent(true);
     setCreationStep(1);
     setSubmitError('');
@@ -608,15 +655,18 @@ export default function Events() {
           <button onClick={exportData} className="px-5 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2">
             <Download className="w-3.5 h-3.5" /> Export CSV
           </button>
-          {/* ✅ Featured — only for non-EVENT_ADMIN */}
+          {/* FIXED: was directly opening the "feature a new event" action
+              modal. Neeraj's feedback: this button should show the list of
+              currently-featured events, not jump straight to featuring a
+              new one — that action now lives inside the list panel itself. */}
           {user?.role !== 'EVENT_ADMIN' && (
-            <button onClick={() => setIsFeaturing(true)} className="px-5 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2">
+            <button onClick={() => setIsViewingFeatured(true)} className="px-5 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2">
               <Star className="w-3.5 h-3.5" /> Featured
             </button>
           )}
           {/* ✅ Create Event */}
           <button
-            onClick={() => { setEventFormData(blankForm); setIsEditingEvent(false); setIsCreatingEvent(true); setCreationStep(1); setSubmitError(''); setModalKey(k => k + 1); }}
+            onClick={() => { setEventFormData({ ...blankForm, vendor_id: ownVendor?._id || '', venue_id: ownVendor?._id || '' }); setPosterFile(null); setLandscapeFile(null); setGalleryFiles([null, null, null, null]); setIsEditingEvent(false); setIsCreatingEvent(true); setCreationStep(1); setSubmitError(''); setModalKey(k => k + 1); }}
             className="px-6 py-3 rounded-2xl bg-gradient-to-br from-primary to-purple-600 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
           >
             <Plus className="w-4 h-4" /> Create Event
@@ -627,13 +677,13 @@ export default function Events() {
       {/* Stats — all from real data */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
         {[
-          { label: 'Total Events',    value: eventList.length,                                                                                                           icon: Calendar,  color: 'text-blue-400',    bg: 'bg-blue-400/10'    },
+          { label: 'Total Events',    value: filteredEvents.length,                                                                                                      icon: Calendar,  color: 'text-blue-400',    bg: 'bg-blue-400/10'    },
           { label: 'Live & Upcoming', value: liveCount,                                                                                                                  icon: Zap,       color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
           { label: 'Total Attendance',value: totalAttendance.toLocaleString(),                                                                                           icon: Users,     color: 'text-purple-400',  bg: 'bg-purple-400/10'  },
           { label: 'Tickets Sold',    value: totalTicketsSold.toLocaleString(),                                                                                          icon: Ticket,    color: 'text-amber-400',   bg: 'bg-amber-400/10'   },
-          { label: 'Cities',          value: [...new Set(eventList.map((e: any) => e.city).filter(Boolean))].length,                                                     icon: MapPin,    color: 'text-pink-400',    bg: 'bg-pink-400/10'    },
-          { label: 'Genres',          value: [...new Set(eventList.flatMap((e: any) => Array.isArray(e.genre) ? e.genre : [e.genre]).filter(Boolean))].length,           icon: Activity,  color: 'text-amber-400',   bg: 'bg-amber-400/10'   },
-          { label: 'Venues',          value: [...new Set(eventList.map((e: any) => getVendorId(e)).filter(Boolean))].length,                                             icon: Building2, color: 'text-cyan-400',    bg: 'bg-cyan-400/10'    },
+          { label: 'Cities',          value: [...new Set(filteredEvents.map((e: any) => e.city).filter(Boolean))].length,                                               icon: MapPin,    color: 'text-pink-400',    bg: 'bg-pink-400/10'    },
+          { label: 'Genres',          value: [...new Set(filteredEvents.flatMap((e: any) => Array.isArray(e.genre) ? e.genre : [e.genre]).filter(Boolean))].length,     icon: Activity,  color: 'text-amber-400',   bg: 'bg-amber-400/10'   },
+          { label: 'Venues',          value: [...new Set(filteredEvents.map((e: any) => getVendorId(e)).filter(Boolean))].length,                                       icon: Building2, color: 'text-cyan-400',    bg: 'bg-cyan-400/10'    },
           { label: 'Cancelled',       value: cancelledCount,                                                                                                             icon: XCircle,   color: 'text-red-400',     bg: 'bg-red-400/10'     },
         ].map((stat) => (
           <div key={stat.label} className="glass-card p-5 rounded-[2rem] border border-white/10 flex flex-col gap-3 hover:border-white/20 transition-all group">
@@ -676,7 +726,7 @@ export default function Events() {
             <FilterPanel>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">City</label>
-                <FilterDropdown value={filterCity} onChange={setFilterCity} options={[{ label: 'All Cities', value: 'ALL' }, ...(cities?.map((c: any) => ({ label: c.city_name, value: c.city_name })) || [])]} />
+                <FilterDropdown value={filterCity} onChange={setFilterCity} options={[{ label: 'All Cities', value: 'ALL' }, ...((cities?.slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')) || []).map((c: any) => ({ label: c.city_name, value: c.city_name })))]} />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Status</label>
@@ -1017,6 +1067,80 @@ export default function Events() {
         )}
       </AnimatePresence>
 
+      {/* Featured Events list — the actual "Featured" tab content. Shows
+          what's currently featured (with remaining days + city scope, or
+          "All Cities" if unscoped), with Unfeature per row and a "+ Feature
+          Event" button that opens the existing select-event/city/duration
+          modal as an action from within this list, not as the entry point. */}
+      <AnimatePresence>
+        {isViewingFeatured && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-card w-full max-w-2xl max-h-[80vh] rounded-3xl border border-white/10 overflow-hidden shadow-2xl flex flex-col"
+            >
+              <div className="p-8 border-b border-white/5 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+                    <Star className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-white uppercase tracking-tight">Featured Events</h3>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">{Array.isArray(featuredEvents) ? featuredEvents.length : 0} currently featured</p>
+                  </div>
+                </div>
+                <button onClick={() => setIsViewingFeatured(false)} className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all text-muted-foreground hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-3">
+                {featuredLoading ? (
+                  <div className="py-12 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+                ) : !featuredEvents || featuredEvents.length === 0 ? (
+                  <div className="py-12 text-center space-y-2">
+                    <Star className="w-8 h-8 text-white/10 mx-auto" />
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">No events currently featured</p>
+                  </div>
+                ) : (
+                  featuredEvents.map((ev: any) => {
+                    const daysLeft = ev.featured_until ? Math.max(0, Math.ceil((new Date(ev.featured_until).getTime() - Date.now()) / (24 * 60 * 60 * 1000))) : null;
+                    return (
+                      <div key={ev._id} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-white truncate">{ev.venue_name || ev.title}</p>
+                          <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
+                            <span>{ev.featured_city || 'All Cities'}</span>
+                            <span>·</span>
+                            <span>{daysLeft != null ? `${daysLeft} day${daysLeft === 1 ? '' : 's'} left` : 'No expiry'}</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => unfeatureEventMutation.mutate(ev._id)}
+                          disabled={unfeatureEventMutation.isPending}
+                          className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-[10px] font-black uppercase tracking-widest text-red-400 hover:bg-red-500/20 transition-all shrink-0 disabled:opacity-50"
+                        >
+                          Unfeature
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="p-6 border-t border-white/5 shrink-0">
+                <button
+                  onClick={() => { setIsViewingFeatured(false); setIsFeaturing(true); }}
+                  className="w-full py-3.5 rounded-2xl bg-primary text-white text-[11px] font-black uppercase tracking-widest hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
+                >
+                  <Star className="w-4 h-4" /> Feature an Event
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* ✅ Feature Modal */}
       <FeatureEventModal
         isOpen={isFeaturing}
@@ -1209,22 +1333,30 @@ export default function Events() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                         <div className="space-y-3">
                           <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">City</label>
-                          <FilterDropdown value={eventFormData.city} onChange={(val) => setEventFormData({ ...eventFormData, city: val })} options={cities?.map((c: any) => ({ label: c.city_name, value: c._id })) || []} placeholder="Select city" buttonClassName="py-4 px-8 rounded-2xl text-sm bg-[#09090B] border-white/5 hover:border-white/10 text-white/60" />
+                          <FilterDropdown value={eventFormData.city} onChange={(val) => setEventFormData({ ...eventFormData, city: val })} options={cities?.slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((c: any) => ({ label: c.city_name, value: c._id })) || []} placeholder="Select city" buttonClassName="py-4 px-8 rounded-2xl text-sm bg-[#09090B] border-white/5 hover:border-white/10 text-white/60" />
                         </div>
                         <div className="space-y-3">
                           <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Venue</label>
-                          <div className="relative">
-                            <Building2 className="absolute left-6 top-1/2 -translate-y-1/2 text-white/20 w-4 h-4 z-10" />
-                            <FilterDropdown value={eventFormData.vendor_id || eventFormData.venue_id} onChange={(vendorId) => setEventFormData({ ...eventFormData, vendor_id: vendorId, venue_id: vendorId })} options={vendorList.map((v: any) => ({ label: v.name, value: v._id || v.id }))} placeholder="Select venue" buttonClassName="py-4 pl-14 pr-8 rounded-2xl text-sm bg-[#09090B] border-white/5 hover:border-white/10 text-white/60" />
-                          </div>
+                          {isEventAdmin ? (
+                            <div className="flex items-center gap-3 py-4 pl-6 pr-8 rounded-2xl text-sm bg-[#09090B] border border-white/5 text-white/60">
+                              <Building2 className="text-white/20 w-4 h-4 shrink-0" />
+                              <span className="truncate">{ownVendor?.name || user?.organisation || 'Your organisation'}</span>
+                              <span className="ml-auto text-[9px] font-black uppercase tracking-widest text-white/20 shrink-0">Locked to your account</span>
+                            </div>
+                          ) : (
+                            <div className="relative">
+                              <Building2 className="absolute left-6 top-1/2 -translate-y-1/2 text-white/20 w-4 h-4 z-10" />
+                              <FilterDropdown value={eventFormData.vendor_id || eventFormData.venue_id} onChange={(vendorId) => setEventFormData({ ...eventFormData, vendor_id: vendorId, venue_id: vendorId })} options={vendorList.map((v: any) => ({ label: v.name, value: v._id || v.id }))} placeholder="Select venue" buttonClassName="py-4 pl-14 pr-8 rounded-2xl text-sm bg-[#09090B] border-white/5 hover:border-white/10 text-white/60" />
+                            </div>
+                          )}
                         </div>
                         <div className="space-y-3">
-                          <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Genres</label>
+                          <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Genres <span className="text-white/20 normal-case tracking-normal">(not yet stored by the backend — for your own notes)</span></label>
                           <MultiSelectDropdown options={genres?.map((g: any) => ({ label: g.name, value: g.name })) || []} value={eventFormData.genre} onChange={(val) => setEventFormData({ ...eventFormData, genre: val })} placeholder="Select genres" />
                         </div>
                         <div className="space-y-3">
                           <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Categories</label>
-                          <MultiSelectDropdown options={eventTypes?.map((t: any) => ({ label: t.name, value: t.name })) || []} value={eventFormData.event_type} onChange={(val) => setEventFormData({ ...eventFormData, event_type: val })} placeholder="Select categories" />
+                          <MultiSelectDropdown options={eventTypes?.map((t: any) => ({ label: t.category_name, value: t._id })) || []} value={eventFormData.event_type} onChange={(val) => setEventFormData({ ...eventFormData, event_type: val })} placeholder="Select categories" />
                         </div>
                       </div>
                     </FormSection>
@@ -1235,6 +1367,15 @@ export default function Events() {
                         <RefinedField label="End Time"    name="end_time"   type="time" value={eventFormData.end_time}   onChange={(e: any) => setEventFormData({ ...eventFormData, end_time:   e.target.value })} icon={<Clock className="w-4 h-4" />} />
                       </div>
                     </FormSection>
+                    <FormSection title="Location" icon={<MapPin className="w-4 h-4" />}>
+                      <div className="space-y-8">
+                        <RefinedField label="Address" name="address" value={eventFormData.address} onChange={(e: any) => setEventFormData({ ...eventFormData, address: e.target.value })} placeholder="Street address / venue location" icon={<MapPin className="w-4 h-4" />} />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                          <RefinedField label="Latitude" name="latitude" type="number" value={eventFormData.latitude} onChange={(e: any) => setEventFormData({ ...eventFormData, latitude: e.target.value })} placeholder="e.g. 19.0760" icon={<MapPin className="w-4 h-4" />} />
+                          <RefinedField label="Longitude" name="longitude" type="number" value={eventFormData.longitude} onChange={(e: any) => setEventFormData({ ...eventFormData, longitude: e.target.value })} placeholder="e.g. 72.8777" icon={<MapPin className="w-4 h-4" />} />
+                        </div>
+                      </div>
+                    </FormSection>
                   </motion.div>
                 )}
 
@@ -1243,10 +1384,10 @@ export default function Events() {
                   <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-12">
                     <FormSection title="Event Media" icon={<Image className="w-4 h-4" />}>
                       <div className="space-y-10">
-                        <ImageUploadZone label="Main Banner (Landscape)" hint="Recommended: 1920×820 JPG/PNG" value={eventFormData.landscape_url} onChange={(url) => setEventFormData({ ...eventFormData, landscape_url: url })} aspect="aspect-[21/9]" token={token} />
+                        <ImageUploadZone label="Main Banner (Landscape)" hint="Recommended: 1920×820 JPG/PNG" value={eventFormData.landscape_url} onChange={(url) => setEventFormData({ ...eventFormData, landscape_url: url })} onFileChange={setLandscapeFile} aspect="aspect-[21/9]" />
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                          <ImageUploadZone label="Main Poster (Portrait)" hint="Recommended: 1080×1350" value={eventFormData.poster_url} onChange={(url) => setEventFormData({ ...eventFormData, poster_url: url })} aspect="aspect-[4/5]" token={token} />
-                          <GalleryUploadZone urls={eventFormData.gallery_urls} onChange={(urls) => setEventFormData({ ...eventFormData, gallery_urls: urls })} token={token} />
+                          <ImageUploadZone label="Main Poster (Portrait)" hint="Recommended: 1080×1350 · Required" value={eventFormData.poster_url} onChange={(url) => setEventFormData({ ...eventFormData, poster_url: url })} onFileChange={setPosterFile} aspect="aspect-[4/5]" />
+                          <GalleryUploadZone urls={eventFormData.gallery_urls} onChange={(urls) => setEventFormData({ ...eventFormData, gallery_urls: urls })} onFilesChange={(i, f) => setGalleryFiles((prev) => { const next = [...prev]; next[i] = f; return next; })} />
                         </div>
                       </div>
                     </FormSection>

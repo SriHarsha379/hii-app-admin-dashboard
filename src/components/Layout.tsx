@@ -402,7 +402,7 @@ export default function Layout() {
           </AnimatePresence>
           <nav className={cn("px-3 space-y-1", isLeftSidebarOpen ? "mb-8" : "mb-2")}>
             <NavLink to="/" icon={LayoutDashboard}>Overview</NavLink>
-            {user?.role !== 'NORMAL_ADMIN' && <NavLink to="/analytics" icon={BarChart3}>Analytics</NavLink>}
+            {user?.role !== 'NORMAL_ADMIN' && user?.role !== 'CLUB_ADMIN' && <NavLink to="/analytics" icon={BarChart3}>Analytics</NavLink>}
             {user?.role === 'SUPER_ADMIN' && (
               <NavLink to="/ads-broadcast" icon={Radio}>Ads & Broadcast</NavLink>
             )}

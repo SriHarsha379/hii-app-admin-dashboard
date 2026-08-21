@@ -78,14 +78,20 @@ import { FeatureEventModal } from '../components/FeatureEventModal';
 
 import { API_BASE } from '../lib/apiConfig';
 
-// Backend serves uploaded files (ad images/videos) from a static `/uploads`
-// route alongside the API, not under API_BASE itself. No root server file
-// was available to confirm the exact mount path, so this is the standard
-// convention for this codebase's `middleware/upload.js` (files land in a
-// project-root `/uploads` folder) — verify against the real deployment and
-// adjust here if it differs.
-const UPLOADS_BASE = API_BASE.replace(/\/app\/server\/api\/v1\/admin\/?$/, '') + '/uploads';
-const adAssetUrl = (filename?: string | null) => (filename ? `${UPLOADS_BASE}/${filename}` : '');
+// Confirmed against the live deployment (hii.life/app/server is the actual
+// mounted app root — see cPanel's Node.js App config): uploads are served
+// at `/app/server/uploads/...`, NOT stripped to the domain root. The
+// earlier guess (stripping to `/uploads`) 404'd in production.
+const UPLOADS_BASE = API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads');
+// Some ad records already in the database were seeded with a full
+// picsum.photos placeholder URL as `ad_image` rather than a local uploaded
+// filename. Blindly prepending `/uploads/` to those produces a broken
+// `/uploads/https://picsum.photos/...` URL — pass full URLs through as-is.
+const adAssetUrl = (filename?: string | null) => {
+  if (!filename) return '';
+  if (/^https?:\/\//i.test(filename)) return filename;
+  return `${UPLOADS_BASE}/${filename}`;
+};
 
 const channels = [
   { id: 'push', label: 'Push Notification', icon: Bell, color: 'text-blue-400', bg: 'bg-blue-400/10' },
@@ -106,6 +112,7 @@ export default function AdsBroadcast() {
     content: ''
   });
   const [isCreatingAd, setIsCreatingAd] = useState(false);
+  const [editingAdId, setEditingAdId] = useState<string | null>(null);
   const [adStep, setAdStep] = useState(1);
   const [adFormData, setAdFormData] = useState({
     name: '',
@@ -116,12 +123,19 @@ export default function AdsBroadcast() {
     untilPaused: false,
     imageUrl: '',
     videoUrl: '',
-    linkUrl: ''
+    linkUrl: '',
+    videoWidth: '',
+    videoHeight: ''
   });
   const [adImageFile, setAdImageFile] = useState<File | null>(null);
   const [adVideoFile, setAdVideoFile] = useState<File | null>(null);
   const [adSubmitError, setAdSubmitError] = useState('');
   const [filterAdStatus, setFilterAdStatus] = useState('ALL');
+  const [isExportingAds, setIsExportingAds] = useState(false);
+  const [exportStatus, setExportStatus] = useState('ALL');
+  const [exportDateFrom, setExportDateFrom] = useState('');
+  const [exportDateTo, setExportDateTo] = useState('');
+  const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [filterCity, setFilterCity] = useState('ALL');
 
@@ -155,13 +169,16 @@ export default function AdsBroadcast() {
     }
   });
 
-  // The "Create Campaign" wizard previously had no submit handler at all —
-  // the image picker was a non-interactive div and the final button just
-  // closed the modal. This wires it to the real backend, which only
-  // persists: ad_image (required), ad_video (optional), expiry_date
-  // (required), link_url (optional). Campaign name / city / audience
-  // targeting aren't stored anywhere on the backend yet — see the note in
-  // the Targeting section of the form.
+  const resetAdForm = () => {
+    setIsCreatingAd(false);
+    setEditingAdId(null);
+    setAdStep(1);
+    setAdFormData({ name: '', city: 'all', audience: 'all', startDate: '', endDate: '', untilPaused: false, imageUrl: '', videoUrl: '', linkUrl: '', videoWidth: '', videoHeight: '' });
+    setAdImageFile(null);
+    setAdVideoFile(null);
+    setAdSubmitError('');
+  };
+
   const createAdMutation = useMutation({
     mutationFn: async () => {
       if (!adImageFile) throw new Error('An ad image is required.');
@@ -175,9 +192,17 @@ export default function AdsBroadcast() {
         throw new Error('Destination link must start with http:// or https://');
       }
 
+      if (adVideoFile && (!adFormData.videoWidth || !adFormData.videoHeight)) {
+        throw new Error('Video width and height are required when a video is attached.');
+      }
+
       const body = new FormData();
       body.append('ad_image', adImageFile);
-      if (adVideoFile) body.append('ad_video', adVideoFile);
+      if (adVideoFile) {
+        body.append('ad_video', adVideoFile);
+        body.append('video_width', adFormData.videoWidth);
+        body.append('video_height', adFormData.videoHeight);
+      }
       body.append('expiry_date', expiryDate);
       if (adFormData.linkUrl) body.append('link_url', adFormData.linkUrl);
 
@@ -194,14 +219,60 @@ export default function AdsBroadcast() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ads'] });
-      setIsCreatingAd(false);
-      setAdStep(1);
-      setAdFormData({ name: '', city: 'all', audience: 'all', startDate: '', endDate: '', untilPaused: false, imageUrl: '', videoUrl: '', linkUrl: '' });
-      setAdImageFile(null);
-      setAdVideoFile(null);
-      setAdSubmitError('');
+      resetAdForm();
     },
     onError: (err: any) => setAdSubmitError(err.message || 'Failed to create ad'),
+  });
+
+  // Edit reuses the same create wizard/state — backend's updateAd accepts
+  // all fields as optional, so a new image/video is only sent if the admin
+  // actually picked a replacement; otherwise the existing file stays as-is.
+  const updateAdMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingAdId) throw new Error('No ad selected to update.');
+
+      const expiryDate = adFormData.untilPaused
+        ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+        : adFormData.endDate;
+
+      if (adFormData.linkUrl && !/^https?:\/\/.+/i.test(adFormData.linkUrl)) {
+        throw new Error('Destination link must start with http:// or https://');
+      }
+
+      if (adVideoFile && (!adFormData.videoWidth || !adFormData.videoHeight)) {
+        throw new Error('Video width and height are required when a video is attached.');
+      }
+
+      const body = new FormData();
+      if (adImageFile) body.append('ad_image', adImageFile);
+      if (adVideoFile) {
+        body.append('ad_video', adVideoFile);
+        body.append('video_width', adFormData.videoWidth);
+        body.append('video_height', adFormData.videoHeight);
+      } else if (adFormData.videoWidth && adFormData.videoHeight) {
+        // Dimensions edited without swapping the video file itself.
+        body.append('video_width', adFormData.videoWidth);
+        body.append('video_height', adFormData.videoHeight);
+      }
+      if (expiryDate) body.append('expiry_date', expiryDate);
+      body.append('link_url', adFormData.linkUrl || '');
+
+      const res = await fetch(`${API_BASE}/ads/update/${editingAdId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.message?.[0] || json?.message || 'Failed to update ad');
+      }
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ads'] });
+      resetAdForm();
+    },
+    onError: (err: any) => setAdSubmitError(err.message || 'Failed to update ad'),
   });
 
   const deleteAdMutation = useMutation({
@@ -219,6 +290,27 @@ export default function AdsBroadcast() {
     },
   });
 
+  const openEditAd = (ad: any) => {
+    setEditingAdId(ad._id || ad.id);
+    setAdFormData({
+      name: '', city: 'all', audience: 'all',
+      startDate: '',
+      endDate: ad.expiry_date ? new Date(ad.expiry_date).toISOString().slice(0, 10) : '',
+      untilPaused: false,
+      imageUrl: adAssetUrl(ad.ad_image),
+      videoUrl: ad.ad_video ? adAssetUrl(ad.ad_video) : '',
+      linkUrl: ad.link_url || '',
+      videoWidth: ad.video_width ? String(ad.video_width) : '',
+      videoHeight: ad.video_height ? String(ad.video_height) : '',
+    });
+    setAdImageFile(null);
+    setAdVideoFile(null);
+    setAdSubmitError('');
+    setAdStep(1);
+    setOpenMenuId(null);
+    setIsCreatingAd(true);
+  };
+
   const { data: events } = useQuery({
     queryKey: ['events'],
     queryFn: async () => {
@@ -233,9 +325,9 @@ export default function AdsBroadcast() {
     mutationFn: async (data: { city: string; eventId: string; duration: number }) => {
       const res = await fetch(`${API_BASE}/events/feature`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify(data)
       });
@@ -250,9 +342,9 @@ export default function AdsBroadcast() {
     mutationFn: async (broadcast: any) => {
       const res = await fetch(`${API_BASE}/broadcasts`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify(broadcast)
       });
@@ -277,10 +369,27 @@ export default function AdsBroadcast() {
 
   // Export was reading fields (title, city, ctr, progress) that don't exist
   // anywhere on the real Ads model, so every exported row came out blank.
-  // Now exports the real fields, respects the status filter above, and
-  // offers a CSV or JSON download format.
-  const exportData = (format: 'csv' | 'json' = 'csv') => {
-    const rows = filteredAds.map((ad: any) => {
+  // FIXED (filters-before-download): export now has its own filter step
+  // (status + expiry date range), set explicitly in a dialog before the
+  // download happens, independent of whatever the table's live filter
+  // happens to be set to.
+  const exportData = () => {
+    const fromTime = exportDateFrom ? new Date(exportDateFrom).getTime() : null;
+    const toTime = exportDateTo ? new Date(exportDateTo).getTime() + 24 * 60 * 60 * 1000 - 1 : null; // inclusive end of day
+
+    const rows = (Array.isArray(ads) ? ads : []).filter((ad: any) => {
+      const isExpired = ad.expiry_date ? new Date(ad.expiry_date).getTime() < Date.now() : false;
+      const status = isExpired ? 'EXPIRED' : 'ACTIVE';
+      if (exportStatus !== 'ALL' && status !== exportStatus) return false;
+
+      if (fromTime || toTime) {
+        const expiryTime = ad.expiry_date ? new Date(ad.expiry_date).getTime() : null;
+        if (expiryTime === null) return false;
+        if (fromTime && expiryTime < fromTime) return false;
+        if (toTime && expiryTime > toTime) return false;
+      }
+      return true;
+    }).map((ad: any) => {
       const isExpired = ad.expiry_date ? new Date(ad.expiry_date).getTime() < Date.now() : false;
       return {
         id: ad._id || ad.id,
@@ -295,7 +404,7 @@ export default function AdsBroadcast() {
 
     let blob: Blob;
     let filename: string;
-    if (format === 'json') {
+    if (exportFormat === 'json') {
       blob = new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json' });
       filename = `ads-${new Date().toISOString().slice(0, 10)}.json`;
     } else {
@@ -309,6 +418,7 @@ export default function AdsBroadcast() {
     const a = document.createElement('a');
     a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
+    setIsExportingAds(false);
   };
 
   return (
@@ -316,16 +426,13 @@ export default function AdsBroadcast() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-xl font-black text-white tracking-tight uppercase">Ad Campaigns & <span className="text-primary neon-text">Broadcasts</span></h2>
         <div className="flex items-center gap-3">
-          <div className="relative group/export">
-            <button className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2">
-              <Download className="w-4 h-4" />
-              Export Data
-            </button>
-            <div className="absolute right-0 top-full mt-1 w-40 bg-card border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 opacity-0 invisible group-hover/export:opacity-100 group-hover/export:visible transition-all">
-              <button onClick={() => exportData('csv')} className="w-full text-left px-4 py-2.5 text-xs font-bold text-white hover:bg-white/5 transition-colors">Download as CSV</button>
-              <button onClick={() => exportData('json')} className="w-full text-left px-4 py-2.5 text-xs font-bold text-white hover:bg-white/5 transition-colors">Download as JSON</button>
-            </div>
-          </div>
+          <button
+            onClick={() => { setExportStatus('ALL'); setExportDateFrom(''); setExportDateTo(''); setExportFormat('csv'); setIsExportingAds(true); }}
+            className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Export Data
+          </button>
           <div className="flex items-center gap-1 p-1 rounded-xl bg-white/5 border border-white/10">
             <button
               onClick={() => setActiveTab('ads')}
@@ -370,10 +477,10 @@ export default function AdsBroadcast() {
             {/* Ads Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               {[
-                { label: 'Total Ads', value: Array.isArray(ads) ? ads.length : '0', icon: Megaphone, color: 'text-blue-400', bg: 'bg-blue-400/10' },
-                { label: 'Active Ads', value: (Array.isArray(ads) ? ads : []).filter((a: any) => !a.expiry_date || new Date(a.expiry_date).getTime() >= Date.now()).length || '0', icon: Zap, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-                { label: 'With Video', value: (Array.isArray(ads) ? ads : []).filter((a: any) => a.ad_video).length || '0', icon: Video, color: 'text-purple-400', bg: 'bg-purple-400/10' },
-                { label: 'With Link', value: (Array.isArray(ads) ? ads : []).filter((a: any) => a.link_url).length || '0', icon: LinkIcon, color: 'text-amber-400', bg: 'bg-amber-400/10' },
+                { label: 'Total Ads', value: filteredAds.length, icon: Megaphone, color: 'text-blue-400', bg: 'bg-blue-400/10' },
+                { label: 'Active Ads', value: filteredAds.filter((a: any) => !a.expiry_date || new Date(a.expiry_date).getTime() >= Date.now()).length, icon: Zap, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+                { label: 'With Video', value: filteredAds.filter((a: any) => a.ad_video).length, icon: Video, color: 'text-purple-400', bg: 'bg-purple-400/10' },
+                { label: 'With Link', value: filteredAds.filter((a: any) => a.link_url).length, icon: LinkIcon, color: 'text-amber-400', bg: 'bg-amber-400/10' },
               ].map((stat) => (
                 <div key={stat.label} className="glass-card p-6 rounded-2xl border border-white/10 flex items-center gap-4">
                   <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", stat.bg)}>
@@ -496,6 +603,12 @@ export default function AdsBroadcast() {
                               >
                                 <div className="p-1">
                                   <button
+                                    onClick={() => openEditAd(ad)}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-white hover:bg-white/5 rounded-lg transition-colors"
+                                  >
+                                    <Edit className="w-3.5 h-3.5" /> Edit Ad
+                                  </button>
+                                  <button
                                     onClick={() => deleteAdMutation.mutate(adId)}
                                     disabled={deleteAdMutation.isPending}
                                     className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-400/10 rounded-lg transition-colors disabled:opacity-50"
@@ -534,7 +647,7 @@ export default function AdsBroadcast() {
                         onChange={setFilterCity}
                         options={[
                           { label: 'All Cities', value: 'ALL' },
-                          ...((Array.isArray(cities) ? cities : []).map((c: any) => ({ label: c.city_name, value: c.city_name }))),
+                          ...((Array.isArray(cities) ? cities : []).slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((c: any) => ({ label: c.city_name, value: c.city_name }))),
                         ]}
                       />
                     </div>
@@ -676,7 +789,7 @@ export default function AdsBroadcast() {
                       className="w-full bg-[#09090B] border border-white/5 rounded-[24px] px-8 py-6 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 appearance-none font-medium"
                     >
                       <option value="ALL">All Hubs</option>
-                      {(Array.isArray(cities) ? cities : []).map((city: any) => (
+                      {(Array.isArray(cities) ? cities : []).slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((city: any) => (
                         <option key={city._id || city.id} value={city.city_name}>{city.city_name}</option>
                       ))}
                     </select>
@@ -783,13 +896,13 @@ export default function AdsBroadcast() {
                   </div>
                   <div>
                     <h3 className="text-xl font-black text-white tracking-tight leading-none uppercase">
-                      Create <span className="text-primary neon-text">Ad Campaign</span>
+                      {editingAdId ? <>Edit <span className="text-primary neon-text">Ad Campaign</span></> : <>Create <span className="text-primary neon-text">Ad Campaign</span></>}
                     </h3>
                     <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mt-1">Step {adStep} of 3</p>
                   </div>
                 </div>
                 <button
-                  onClick={() => { setIsCreatingAd(false); setAdStep(1); }}
+                  onClick={resetAdForm}
                   className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all text-muted-foreground hover:text-white"
                 >
                   <X className="w-6 h-6" />
@@ -836,7 +949,7 @@ export default function AdsBroadcast() {
                             className="w-full bg-[#09090B] border border-white/5 rounded-[24px] px-8 py-6 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 appearance-none font-medium"
                           >
                             <option value="all">All Cities</option>
-                            {(Array.isArray(cities) ? cities : []).map((city: any) => (
+                            {(Array.isArray(cities) ? cities : []).slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((city: any) => (
                               <option key={city._id || city.id} value={city.city_name}>{city.city_name}</option>
                             ))}
                           </select>
@@ -894,6 +1007,50 @@ export default function AdsBroadcast() {
 
                     <FormSection title="Video (Optional — in addition to the image/GIF above)" icon={<Video className="w-4 h-4" />}>
                       <div className="space-y-4 text-center">
+                        <div className="max-w-2xl mx-auto">
+                          <p className="text-[9px] font-bold text-amber-400/80 uppercase tracking-[0.2em] text-left ml-1">
+                            If you add a video, exact pixel width &amp; height are required (not just recommended) — the app reserves that exact space before the video loads. Design/export your video to a known fixed size before uploading, then enter that size below.
+                          </p>
+                        </div>
+
+                        <div className="max-w-2xl mx-auto flex flex-wrap items-center gap-2">
+                          <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest mr-1">Quick presets:</span>
+                          {[
+                            { label: 'Portrait 1080×1920', w: 1080, h: 1920 },
+                            { label: 'Portrait 720×1280', w: 720, h: 1280 },
+                            { label: 'Square 1080×1080', w: 1080, h: 1080 },
+                            { label: 'Landscape 1920×1080', w: 1920, h: 1080 },
+                          ].map((preset) => (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => setAdFormData((prev: any) => ({ ...prev, videoWidth: String(preset.w), videoHeight: String(preset.h) }))}
+                              className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[9px] font-bold text-white/60 uppercase tracking-wider hover:bg-primary/20 hover:border-primary/30 hover:text-white transition-all"
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="max-w-2xl mx-auto grid grid-cols-2 gap-4">
+                          <RefinedField
+                            label="Video Width (px)"
+                            name="videoWidth"
+                            type="number"
+                            value={adFormData.videoWidth}
+                            onChange={(e: any) => setAdFormData({ ...adFormData, videoWidth: e.target.value })}
+                            placeholder="e.g. 1920"
+                          />
+                          <RefinedField
+                            label="Video Height (px)"
+                            name="videoHeight"
+                            type="number"
+                            value={adFormData.videoHeight}
+                            onChange={(e: any) => setAdFormData({ ...adFormData, videoHeight: e.target.value })}
+                            placeholder="e.g. 1080"
+                          />
+                        </div>
+
                         <label className="w-full max-w-2xl mx-auto rounded-[32px] bg-[#09090B] border-2 border-dashed border-white/5 flex items-center justify-center gap-4 px-8 py-6 cursor-pointer hover:bg-white/[0.04] hover:border-primary/30 transition-all group relative overflow-hidden">
                           <input
                             type="file"
@@ -916,10 +1073,11 @@ export default function AdsBroadcast() {
                             <span className="text-[8px] font-bold text-white/10 uppercase tracking-[0.2em]">Shown instead of / alongside the image where supported</span>
                           </div>
                         </label>
+
                         {adVideoFile && (
                           <button
                             type="button"
-                            onClick={() => { setAdVideoFile(null); setAdFormData((prev) => ({ ...prev, videoUrl: '' })); }}
+                            onClick={() => { setAdVideoFile(null); setAdFormData((prev) => ({ ...prev, videoUrl: '', videoWidth: '', videoHeight: '' })); }}
                             className="text-[10px] font-bold text-red-400 uppercase tracking-widest hover:text-red-300"
                           >
                             Remove video
@@ -1041,12 +1199,7 @@ export default function AdsBroadcast() {
                     if (adStep > 1) {
                       setAdStep(adStep - 1);
                     } else {
-                      setIsCreatingAd(false);
-                      setAdStep(1);
-                      setAdFormData({ name: '', city: 'all', audience: 'all', startDate: '', endDate: '', untilPaused: false, imageUrl: '', videoUrl: '', linkUrl: '' });
-                      setAdImageFile(null);
-                      setAdVideoFile(null);
-                      setAdSubmitError('');
+                      resetAdForm();
                     }
                   }}
                   className="px-10 py-5 rounded-[24px] bg-white/5 border border-white/10 text-[11px] font-black uppercase tracking-[0.2em] text-white/60 hover:text-white hover:bg-white/10 transition-all flex items-center gap-3"
@@ -1060,17 +1213,19 @@ export default function AdsBroadcast() {
                     setAdSubmitError('');
                     if (adStep < 3) {
                       setAdStep(adStep + 1);
+                    } else if (editingAdId) {
+                      updateAdMutation.mutate();
                     } else {
                       createAdMutation.mutate();
                     }
                   }}
-                  disabled={createAdMutation.isPending}
+                  disabled={createAdMutation.isPending || updateAdMutation.isPending}
                   className="px-12 py-5 rounded-[24px] bg-primary text-white text-[11px] font-black uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(255,45,154,0.3)] hover:bg-primary/90 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-3 group disabled:opacity-50 disabled:hover:scale-100"
                 >
-                  {createAdMutation.isPending ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Creating...</>
+                  {(createAdMutation.isPending || updateAdMutation.isPending) ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> {editingAdId ? 'Saving...' : 'Creating...'}</>
                   ) : (
-                    <>{adStep < 3 ? 'Next Step' : 'Create Campaign'} <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></>
+                    <>{adStep < 3 ? 'Next Step' : (editingAdId ? 'Save Changes' : 'Create Campaign')} <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></>
                   )}
                 </button>
               </div>
@@ -1087,6 +1242,87 @@ export default function AdsBroadcast() {
           await featureEventMutation.mutateAsync(data);
         }}
       />
+
+      <AnimatePresence>
+        {isExportingAds && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-card w-full max-w-md rounded-3xl border border-white/10 overflow-hidden shadow-2xl p-8 space-y-6"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-black text-white uppercase tracking-tight">Export Ads</h3>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">Set filters, then download</p>
+                </div>
+                <button onClick={() => setIsExportingAds(false)} className="p-2 rounded-xl hover:bg-white/10 text-muted-foreground hover:text-white transition-all">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Status</label>
+                  <FilterDropdown
+                    value={exportStatus}
+                    onChange={setExportStatus}
+                    options={[
+                      { label: 'All', value: 'ALL' },
+                      { label: 'Active', value: 'ACTIVE' },
+                      { label: 'Expired', value: 'EXPIRED' },
+                    ]}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Expiry Date Range (optional)</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="date"
+                      value={exportDateFrom}
+                      onChange={(e) => setExportDateFrom(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50"
+                    />
+                    <input
+                      type="date"
+                      value={exportDateTo}
+                      onChange={(e) => setExportDateTo(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Format</label>
+                  <div className="flex items-center gap-1 p-1 rounded-xl bg-white/5 border border-white/10">
+                    <button
+                      onClick={() => setExportFormat('csv')}
+                      className={cn('flex-1 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all', exportFormat === 'csv' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-muted-foreground hover:text-white')}
+                    >
+                      CSV
+                    </button>
+                    <button
+                      onClick={() => setExportFormat('json')}
+                      className={cn('flex-1 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all', exportFormat === 'json' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-muted-foreground hover:text-white')}
+                    >
+                      JSON
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={exportData}
+                className="w-full py-3.5 rounded-2xl bg-primary text-white text-[11px] font-black uppercase tracking-widest hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
+              >
+                <Download className="w-4 h-4" /> Download
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

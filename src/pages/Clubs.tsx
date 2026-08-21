@@ -28,6 +28,7 @@ import {
   ChevronRight,
   Shield,
   Activity,
+  ShieldCheck,
   ArrowRight,
   Database,
   Lock,
@@ -78,6 +79,16 @@ import ClubProfilePreview from '../components/ClubProfilePreview';
 import EventProfilePreview from '../components/EventProfilePreview';
 
 import { API_BASE } from '../lib/apiConfig';
+
+// Same fix as AdsBroadcast.tsx: `hii.life/app/server` is the actual mounted
+// app root, so uploaded files (venue images) live under `/app/server/uploads/`,
+// not stripped to the domain root.
+const UPLOADS_BASE = API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads');
+const adAssetUrlForClub = (filename?: string | null) => {
+  if (!filename) return '';
+  if (/^https?:\/\//i.test(filename)) return filename;
+  return `${UPLOADS_BASE}/${filename}`;
+};
 const statusColors: any = {
   'ACTIVE': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   'PENDING': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
@@ -121,12 +132,13 @@ export default function Clubs() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedClub, setSelectedClub] = useState<any>(null);
   const [isCreatingClub, setIsCreatingClub] = useState(false);
+  const [isEditingVenue, setIsEditingVenue] = useState(false);
   const [isViewingVenue, setIsViewingVenue] = useState(false);
 
   const [venueStep, setVenueStep] = useState(1);
   const [venueFormData, setVenueFormData] = useState<any>({
     name: '', type: '', email: '', capacity: '', contactName: '',
-    phone: '', description: '', city: '', address: '',
+    phone: '', description: '', city: '', address: '', vendor_id: '',
     landscape_urls: [''], portrait_url: '',
   });
   const [workingHours, setWorkingHours] = useState<any[]>([
@@ -157,6 +169,7 @@ export default function Clubs() {
   const [eventFormData, setEventFormData] = useState<any>({
     title: '', city: '', venue_id: '', genre: [], event_type: [],
     date: '', start_time: '', end_time: '', description: '',
+    address: '', latitude: '', longitude: '',
     poster_url: '', landscape_urls: [''], ticketing_link: '',
   });
 
@@ -229,12 +242,48 @@ export default function Clubs() {
   const resetVenueForm = () => {
     setVenueFormData({
       name: '', type: '', email: '', capacity: '', contactName: '',
-      phone: '', description: '', city: '', address: '',
+      phone: '', description: '', city: '', address: '', vendor_id: '',
       landscape_urls: [''], portrait_url: '',
     });
     setVenueLandscapeFiles([null]); setVenueLandscapePreviews(['']);
     setVenuePortraitFile(null); setVenuePortraitPreview('');
+    setWorkingHours((prev) => prev.map((h) => ({ ...h, active: false })));
     setVenueStep(1);
+    setIsEditingVenue(false);
+  };
+
+  // Was previously nowhere in the UI — both the grid card and table row
+  // "..." buttons had no onClick, and the read-only ClubProfilePreview had
+  // no Edit action either, so there was no way to edit an existing venue
+  // at all (only create new ones via "+ Add Club").
+  const openEditVenue = (club: any) => {
+    setVenueFormData({
+      name: club.name || '',
+      type: Array.isArray(club.category_ids) ? (club.category_ids[0]?._id || club.category_ids[0] || '') : '',
+      email: club.email || '',
+      capacity: club.capacity || '',
+      contactName: club.contactName || '',
+      phone: club.phone || club.phone_number || '',
+      description: club.about || club.description || '',
+      city: typeof club.city_id === 'object' ? club.city_id?._id || '' : club.city_id || '',
+      address: club.address || '',
+      vendor_id: typeof club.vendor_id === 'object' ? club.vendor_id?._id || '' : club.vendor_id || '',
+      landscape_urls: Array.isArray(club.gallery_images) ? club.gallery_images : [''],
+      portrait_url: club.venue_image ? adAssetUrlForClub(club.venue_image) : (club.portrait_url || ''),
+    });
+    setVenueLandscapeFiles((Array.isArray(club.gallery_images) ? club.gallery_images : ['']).map(() => null));
+    setVenueLandscapePreviews(Array.isArray(club.gallery_images) && club.gallery_images.length ? club.gallery_images.map((g: string) => adAssetUrlForClub(g)) : ['']);
+    setVenuePortraitFile(null);
+    setVenuePortraitPreview(club.venue_image ? adAssetUrlForClub(club.venue_image) : (club.portrait_url || ''));
+    if (Array.isArray(club.open_days) && club.open_days.length) {
+      const timeStr = `${club.start_time || '10:00 PM'} - ${club.end_time || '04:00 AM'}`;
+      setWorkingHours((prev) => prev.map((h) => ({ ...h, active: club.open_days.includes(h.day), time: club.open_days.includes(h.day) ? timeStr : h.time })));
+    }
+    setSelectedClub(club);
+    setIsEditingVenue(true);
+    setVenueStep(1);
+    setIsViewingVenue(false);
+    setIsCreatingClub(true);
   };
 
   const handleEditEvent = (event: any) => {
@@ -261,106 +310,120 @@ export default function Clubs() {
     setSelectedEvent(null);
   };
 
-  // TODO: BROKEN - see uploadFile() note above and eventRoute.js. The real
-  // backend expects POST /events/create_event (multipart, fields: venue_image,
-  // artist_images, gallery_images, event_layout_images) and
-  // PUT /events/update_event/:id, not POST/PUT /events or /events/:id with a
-  // JSON body of pre-uploaded URLs. This handler needs a rewrite to build
-  // FormData directly from posterFile/bannerFile before it will work.
+  // FIXED: same rewrite as Events.tsx's create/update mutations — real paths
+  // are POST `/events/create_event` and PUT `/events/update_event/:id`
+  // (multipart form-data with venue_name/city_id/category_ids/address/
+  // latitude/longitude/venue_image), not JSON to `/events` or `/events/:id`.
   const handleSubmitEvent = async () => {
     try {
       setIsSubmitting(true);
-      let poster_url     = eventFormData.poster_url;
-      let landscape_urls = [...eventFormData.landscape_urls];
 
-      if (posterFile) {
-        poster_url = await uploadFile(posterFile, token!);
-      }
-      if (bannerFile) {
-        landscape_urls[0] = await uploadFile(bannerFile, token!);
-      }
+      const vendorId = clubData?._id || clubData?.id;
+      if (!vendorId) throw new Error('No club found for your account — set up your club profile first.');
 
-      const payload = {
-        ...eventFormData,
-        poster_url,
-        landscape_urls,
-        venue_id: eventFormData.venue_id || clubData?.id,
-        city:     eventFormData.city     || clubData?.city,
-      };
+      const cityId = eventFormData.city || (typeof clubData?.city === 'object' ? clubData?.city?._id : clubData?.city);
+      if (!cityId) throw new Error('Select a city');
+      if (!eventFormData.title) throw new Error('Enter an event title');
+      if (!eventFormData.date) throw new Error('Set an event date');
+      if (!eventFormData.address) throw new Error('Enter an address');
+      if (!eventFormData.latitude || !eventFormData.longitude) throw new Error('Enter latitude and longitude');
+      if (!isEditingEvent && !posterFile) throw new Error('Upload a poster image');
 
-      // TODO: real paths are `${API_BASE}/events/create_event` (POST) and
-      // `${API_BASE}/events/update_event/${selectedEvent?.id}` (PUT), and they
-      // expect multipart form-data, not JSON.
-      const url    = isEditingEvent ? `${API_BASE}/events/${selectedEvent?.id}` : `${API_BASE}/events`;
+      const body = new FormData();
+      body.append('venue_name', eventFormData.title);
+      body.append('city_id', cityId);
+      body.append('category_ids', JSON.stringify(eventFormData.event_type || []));
+      body.append('start_time', eventFormData.start_time || '');
+      body.append('end_time', eventFormData.end_time || '');
+      body.append('address', eventFormData.address);
+      body.append('start_date', eventFormData.date);
+      body.append('is_multi_day', 'false');
+      body.append('about', eventFormData.description || '');
+      body.append('latitude', eventFormData.latitude);
+      body.append('longitude', eventFormData.longitude);
+      if (!isEditingEvent) body.append('vendor_id', vendorId);
+      if (posterFile) body.append('venue_image', posterFile);
+      if (bannerFile) body.append('event_layout_images', bannerFile);
+
+      const url    = isEditingEvent ? `${API_BASE}/events/update_event/${selectedEvent?._id || selectedEvent?.id}` : `${API_BASE}/events/create_event`;
       const method = isEditingEvent ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(payload),
+        headers: { Authorization: `Bearer ${token}` },
+        body,
       });
 
-      if (!res.ok) throw new Error('Failed to save event');
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.message?.[0] || json?.message || 'Failed to save event');
+      }
 
       queryClient.invalidateQueries({ queryKey: ['events-admin'] });
       setIsCreatingEvent(false);
       resetEventForm();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to save event. Please try again.');
+      alert(err.message || 'Failed to save event. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // TODO: BROKEN - see uploadFile() note above and vendorRoute.js. The real
-  // backend expects POST /vendor/add_vendor (multipart, field: business_image)
-  // and PUT /vendor/update_vendor/:id, not POST/PUT /mongo/vendors with a JSON
-  // body of pre-uploaded URLs. This handler needs a rewrite to build FormData
-  // directly from venuePortraitFile/venueLandscapeFiles before it will work.
+  // FIXED: the real backend paths are POST `/venue/create_venue` and PUT
+  // `/venue/update_venue/:id` (multipart form-data) — this was posting a
+  // JSON body of pre-uploaded URLs to a `/mongo/vendors` endpoint that
+  // doesn't exist (that TODO also pointed at the wrong model entirely —
+  // "venues" are their own `Venue` documents, not `Vendor` accounts).
   const handleSubmitVenue = async () => {
     try {
       setIsSubmitting(true);
 
-      const landscape_urls = await Promise.all(
-        venueLandscapeFiles.map(async (file, i) => {
-          if (file) return uploadFile(file, token!);
-          return venueFormData.landscape_urls[i] || '';
-        })
-      );
-
-      let portrait_url = venueFormData.portrait_url;
-      if (venuePortraitFile) {
-        portrait_url = await uploadFile(venuePortraitFile, token!);
+      const activeDays = workingHours.filter((h) => h.active);
+      if (activeDays.length === 0) {
+        throw new Error('Select at least one open day');
       }
+      const [start_time, end_time] = activeDays[0].time.split(' - ').map((s: string) => s.trim());
 
-      const payload = {
-        ...venueFormData,
-        landscape_urls,
-        portrait_url,
-        working_hours: workingHours.filter(h => h.active),
-      };
+      const vendorId = selectedClub ? (selectedClub.vendor_id || selectedClub._id) : venueFormData.vendor_id;
+      if (!vendorId) throw new Error('Select a vendor/organiser for this venue');
+      if (!venueFormData.city) throw new Error('Select a city');
+      if (!venueFormData.type) throw new Error('Select a category');
+      if (!venuePortraitFile && !venueFormData.portrait_url) throw new Error('Upload a venue image');
 
-      // TODO: real paths are `${API_BASE}/vendor/add_vendor` (POST) and
-      // `${API_BASE}/vendor/update_vendor/${selectedClub._id}` (PUT), and they
-      // expect multipart form-data, not JSON.
-      const url    = selectedClub ? `${API_BASE}/mongo/vendors/${selectedClub._id}` : `${API_BASE}/mongo/vendors`;
-      const method = selectedClub ? 'PUT' : 'POST';
+      const body = new FormData();
+      body.append('venue_name', venueFormData.name);
+      body.append('city_id', venueFormData.city);
+      body.append('category_ids', JSON.stringify([venueFormData.type]));
+      body.append('open_days', JSON.stringify(activeDays.map((h) => h.day)));
+      body.append('start_time', start_time || '');
+      body.append('end_time', end_time || '');
+      body.append('address', venueFormData.address || '');
+      body.append('about', venueFormData.description || '');
+      if (!isEditingVenue) body.append('vendor_id', vendorId);
+      if (venuePortraitFile) body.append('venue_image', venuePortraitFile);
+      venueLandscapeFiles.forEach((f) => { if (f) body.append('gallery_images', f); });
+
+      const url    = isEditingVenue && selectedClub ? `${API_BASE}/venue/update_venue/${selectedClub._id}` : `${API_BASE}/venue/create_venue`;
+      const method = isEditingVenue && selectedClub ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(payload),
+        headers: { Authorization: `Bearer ${token}` },
+        body,
       });
 
-      if (!res.ok) throw new Error('Failed to save venue');
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.message?.[0] || json?.message || 'Failed to save venue');
+      }
 
       queryClient.invalidateQueries({ queryKey: ['clubs'] });
       setIsCreatingClub(false);
       resetVenueForm();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to save venue. Please try again.');
+      alert(err.message || 'Failed to save venue. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -377,6 +440,40 @@ export default function Clubs() {
       return json.data ?? [];
     },
   });
+
+  // The `clubs` list above is Vendor (organiser account) data only — name,
+  // email, city, verification status. It has none of the actual venue
+  // details (image, description, categories, schedule, address) since
+  // those live on a separate Venue document. Fetching venues too and
+  // merging by vendor_id is what makes both the preview and the Edit form
+  // pre-fill correctly instead of showing blanks for everything venue-specific.
+  const { data: venues } = useQuery({
+    queryKey: ['venues-for-clubs'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/venue/get_all_venues`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      return json.data ?? [];
+    },
+  });
+
+  const getVenueForVendor = (vendorId: string) => {
+    if (!Array.isArray(venues)) return null;
+    return venues.find((v: any) => {
+      const vid = typeof v.vendor_id === 'object' ? v.vendor_id?._id : v.vendor_id;
+      return vid === vendorId;
+    }) || null;
+  };
+
+  // Merges the vendor (account) record with its matching venue (listing)
+  // record, so components downstream have both in one object instead of
+  // silently missing every venue-specific field.
+  const withVenueData = (club: any) => {
+    if (!club) return club;
+    const venue = getVenueForVendor(club._id || club.id);
+    return venue ? { ...club, ...venue, _id: club._id, vendor_id: club._id, venue_id: venue._id } : club;
+  };
 
   const clubData = Array.isArray(clubs) ? clubs.find((c: any) => c.name === user?.organisation) : null;
 
@@ -414,31 +511,53 @@ export default function Clubs() {
     },
   });
 
-  // TODO: no eventTypeRoute.js exists on the backend yet - disabled until a
-  // real endpoint is added. Dropdown will show no options until then.
+  // FIXED: there was no eventTypeRoute.js on the backend — "event types" are
+  // actually Category documents with category_type: 1 (2 = Venue), same fix
+  // applied in ManageFilters.tsx, ClubOnboarding.tsx, and Events.tsx.
   const { data: eventTypes } = useQuery({
     queryKey: ['eventTypes'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/eventTypes`, {
+      const res = await fetch(`${API_BASE}/category/get_category`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      return res.json();
+      const json = await res.json();
+      const list = Array.isArray(json.data) ? json.data : [];
+      return list.filter((c: any) => c.category_type === 1);
     },
-    enabled: false,
   });
 
-  // TODO: no venueTypeRoute.js exists on the backend yet - disabled until a
-  // real endpoint is added. Dropdown will show no options until then.
+  // FIXED: there was no venueTypeRoute.js on the backend — "venue types" are
+  // actually Category documents with category_type: 2 (1 = Event), same fix
+  // applied in ManageFilters.tsx, ClubOnboarding.tsx, and Events.tsx.
   const { data: venueTypes } = useQuery({
     queryKey: ['venueTypes'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/venueTypes`, {
+      const res = await fetch(`${API_BASE}/category/get_category`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      return res.json();
+      const json = await res.json();
+      const list = Array.isArray(json.data) ? json.data : [];
+      return list.filter((c: any) => c.category_type === 2);
     },
-    enabled: false,
   });
+
+  // Needed so an admin creating/editing a venue can pick which club/vendor
+  // it belongs to (Venue.vendor_id is required on the backend).
+  const { data: vendorsForVenue } = useQuery({
+    queryKey: ['mongo-vendors'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return json.data ?? [];
+    },
+  });
+  const vendorListForVenue = Array.isArray(vendorsForVenue) ? vendorsForVenue : [];
+
+  // CLUB_ADMIN accounts should only ever create/edit their own venue —
+  // same fix as Events.tsx's EVENT_ADMIN handling. Super/Normal Admin
+  // still get the full vendor picker.
+  const isClubAdmin = user?.role === 'CLUB_ADMIN';
+  const ownVendorForVenue = isClubAdmin ? vendorListForVenue.find((v: any) => v.name === user?.organisation) : null;
 
   const clubEvents = Array.isArray(events)
     ? events.filter((e: any) => e.club_id === clubData?.id || e.club_id === clubData?._id || e.venue === clubData?.name)
@@ -753,7 +872,7 @@ export default function Clubs() {
                               <div className="space-y-4 group/field">
                                 <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Event Type</label>
                                 <MultiSelectDropdown
-                                  options={eventTypes?.map((t: any) => ({ label: t.name, value: t.name })) || []}
+                                  options={eventTypes?.map((t: any) => ({ label: t.category_name, value: t._id })) || []}
                                   value={eventFormData.event_type}
                                   onChange={(v) => setEventFormData({ ...eventFormData, event_type: v })}
                                   placeholder="Select event types"
@@ -769,6 +888,35 @@ export default function Clubs() {
                                 onChange={(e: any) => setEventFormData({ ...eventFormData, start_time: e.target.value })}
                                 icon={<Clock className="w-4 h-4" />}
                               />
+                              <RefinedField
+                                label="End Time" name="end_time" type="time" value={eventFormData.end_time}
+                                onChange={(e: any) => setEventFormData({ ...eventFormData, end_time: e.target.value })}
+                                icon={<Clock className="w-4 h-4" />}
+                              />
+                            </div>
+                          </FormSection>
+                          <FormSection title="Location" icon={<MapPin className="w-4 h-4" />}>
+                            <div className="space-y-8">
+                              <RefinedField
+                                label="Address" name="address" value={eventFormData.address}
+                                onChange={(e: any) => setEventFormData({ ...eventFormData, address: e.target.value })}
+                                placeholder="Street address / venue location"
+                                icon={<MapPin className="w-4 h-4" />}
+                              />
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                <RefinedField
+                                  label="Latitude" name="latitude" type="number" value={eventFormData.latitude}
+                                  onChange={(e: any) => setEventFormData({ ...eventFormData, latitude: e.target.value })}
+                                  placeholder="e.g. 19.0760"
+                                  icon={<MapPin className="w-4 h-4" />}
+                                />
+                                <RefinedField
+                                  label="Longitude" name="longitude" type="number" value={eventFormData.longitude}
+                                  onChange={(e: any) => setEventFormData({ ...eventFormData, longitude: e.target.value })}
+                                  placeholder="e.g. 72.8777"
+                                  icon={<MapPin className="w-4 h-4" />}
+                                />
+                              </div>
                             </div>
                           </FormSection>
                           <FormSection title="Description" icon={<FileText className="w-4 h-4" />}>
@@ -951,7 +1099,7 @@ export default function Clubs() {
                           <h2 className="text-4xl font-black text-white tracking-tight leading-none">{selectedEvent.title}</h2>
                           <div className="flex gap-3">
                             <span className="px-4 py-1.5 rounded-full bg-[#FF2D9A]/10 text-[#FF2D9A] text-[10px] font-black uppercase border border-[#FF2D9A]/20 tracking-widest whitespace-nowrap">{selectedEvent.category || 'Techno'}</span>
-                            <span className="px-4 py-1.5 rounded-full bg-white/5 text-white/50 text-[10px] font-black uppercase border border-white/10 tracking-widest whitespace-nowrap">{selectedEvent.city || clubData?.city || 'Mumbai'}</span>
+                            <span className="px-4 py-1.5 rounded-full bg-white/5 text-white/50 text-[10px] font-black uppercase border border-white/10 tracking-widest whitespace-nowrap">{selectedEvent.city || (typeof clubData?.city === 'object' ? clubData?.city?.city_name : clubData?.city) || 'Mumbai'}</span>
                           </div>
                           <p className="text-sm text-white/40 leading-relaxed font-medium">{selectedEvent.description || 'Get ready for a night of bass heavy beats and neon lights.'}</p>
                         </div>
@@ -1031,7 +1179,7 @@ export default function Clubs() {
             <Download className="w-3.5 h-3.5" /> Export Data
           </button>
           <button
-            onClick={() => { setSelectedClub(null); resetVenueForm(); setIsCreatingClub(true); }}
+            onClick={() => { setSelectedClub(null); resetVenueForm(); setVenueFormData((prev: any) => ({ ...prev, vendor_id: ownVendorForVenue?._id || '' })); setIsCreatingClub(true); }}
             className="px-6 py-3 rounded-2xl bg-gradient-to-br from-primary to-purple-600 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
           >
             <Plus className="w-4 h-4" /> Add New Club
@@ -1040,15 +1188,27 @@ export default function Clubs() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
-        {[
-          { label: 'Total Clubs',    value: Array.isArray(clubs) ? clubs.length : 0, icon: Building2, color: 'text-blue-400',    bg: 'bg-blue-400/10' },
-          { label: 'Active Clubs',   value: (Array.isArray(clubs) ? clubs : []).filter((c: any) => c.status === 'ACTIVE').length, icon: Activity, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-          { label: 'Avg Rating',     value: '4.8/5',  icon: Star,     color: 'text-amber-400',  bg: 'bg-amber-400/10' },
-          { label: 'New Users',      value: '+1.2k',  icon: Users,    color: 'text-purple-400', bg: 'bg-purple-400/10' },
-          { label: 'Total Followers',value: '24.5k',  icon: Database, color: 'text-cyan-400',   bg: 'bg-cyan-400/10' },
-          { label: 'Club Staff',     value: '480',    icon: Shield,   color: 'text-zinc-400',   bg: 'bg-zinc-400/10' },
-          { label: 'Total Revenue',  value: '$128k',  icon: Wallet,   color: 'text-pink-400',   bg: 'bg-pink-400/10' },
-        ].map((stat) => (
+        {(() => {
+          // Was showing Total/Active Clubs from the full unfiltered `clubs`
+          // array (didn't match the filtered table below), and the other 5
+          // cards (Avg Rating, New Users, Total Followers, Club Staff, Total
+          // Revenue) were entirely hardcoded fake values with zero connection
+          // to any real data — genuinely risky to have fabricated revenue/
+          // rating numbers on a real admin dashboard. Replaced with real,
+          // computable stats from the same data the table below uses.
+          const cityName = (c: any) => typeof c.city === 'object' ? c.city?.city_name : c.city;
+          const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+          const stats = [
+            { label: 'Total Clubs',      value: filteredClubs.length, icon: Building2, color: 'text-blue-400',    bg: 'bg-blue-400/10' },
+            { label: 'Active Clubs',     value: filteredClubs.filter((c: any) => c.status === 'ACTIVE' || c.is_active).length, icon: Activity, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+            { label: 'Inactive',         value: filteredClubs.filter((c: any) => c.status !== 'ACTIVE' && !c.is_active).length, icon: XCircle, color: 'text-zinc-400', bg: 'bg-zinc-400/10' },
+            { label: 'Verified',         value: filteredClubs.filter((c: any) => c.is_verified).length, icon: ShieldCheck, color: 'text-purple-400', bg: 'bg-purple-400/10' },
+            { label: 'Pending Approval', value: filteredClubs.filter((c: any) => !c.is_verified).length, icon: Clock, color: 'text-amber-400', bg: 'bg-amber-400/10' },
+            { label: 'Cities',           value: new Set(filteredClubs.map(cityName).filter(Boolean)).size, icon: MapPin, color: 'text-pink-400', bg: 'bg-pink-400/10' },
+            { label: 'New (30 Days)',    value: filteredClubs.filter((c: any) => c.createdAt && new Date(c.createdAt).getTime() >= thirtyDaysAgo).length, icon: Users, color: 'text-cyan-400', bg: 'bg-cyan-400/10' },
+          ];
+          return stats;
+        })().map((stat) => (
           <div key={stat.label} className="glass-card p-5 rounded-[2rem] border border-white/10 flex flex-col gap-3 hover:border-white/20 transition-all group">
             <div className={cn('w-10 h-10 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110', stat.bg)}>
               <stat.icon className={cn('w-5 h-5', stat.color)} />
@@ -1100,7 +1260,7 @@ export default function Clubs() {
                   // Was a hardcoded 4-city list (Mumbai/Delhi/Bangalore/Goa)
                   // instead of the real cities already fetched above — venues
                   // in any other active city couldn't be filtered at all.
-                  ...((Array.isArray(cities) ? cities : []).map((c: any) => ({ label: c.city_name, value: c.city_name }))),
+                  ...((Array.isArray(cities) ? cities : []).slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((c: any) => ({ label: c.city_name, value: c.city_name }))),
                 ]} />
               </div>
               <div className="space-y-1">
@@ -1127,7 +1287,7 @@ export default function Clubs() {
               <motion.div
                 key={club._id || club.id} whileHover={{ y: -5 }}
                 className="glass-card rounded-2xl border border-white/10 overflow-hidden group cursor-pointer"
-                onClick={() => { setSelectedClub(club); setIsViewingVenue(true); }}
+                onClick={() => { setSelectedClub(withVenueData(club)); setIsViewingVenue(true); }}
               >
                 <div className="aspect-video relative overflow-hidden">
                   {club.landscape_urls?.[0] ? (
@@ -1164,8 +1324,8 @@ export default function Clubs() {
                   </div>
                   <div className="flex items-center justify-between pt-4 border-t border-white/5">
                     <span className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-[10px] font-bold text-muted-foreground uppercase">{club.type || club.venue_type || 'Type not set'}</span>
-                    <button className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-white transition-all">
-                      <MoreHorizontal className="w-4 h-4" />
+                    <button onClick={(e) => { e.stopPropagation(); openEditVenue(withVenueData(club)); }} className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-white transition-all" title="Edit venue">
+                      <Edit2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -1197,7 +1357,7 @@ export default function Clubs() {
                   ) : filteredClubs.length === 0 ? (
                     <tr><td colSpan={5} className="px-6 py-12 text-center text-xs text-muted-foreground">No clubs found.</td></tr>
                   ) : filteredClubs.map((club: any) => (
-                    <tr key={club._id || club.id} className="group hover:bg-white/5 transition-colors cursor-pointer" onClick={() => { setSelectedClub(club); setIsViewingVenue(true); }}>
+                    <tr key={club._id || club.id} className="group hover:bg-white/5 transition-colors cursor-pointer" onClick={() => { setSelectedClub(withVenueData(club)); setIsViewingVenue(true); }}>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center">
@@ -1233,8 +1393,8 @@ export default function Clubs() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition-colors">
-                          <MoreHorizontal className="w-4 h-4" />
+                        <button onClick={(e) => { e.stopPropagation(); openEditVenue(withVenueData(club)); }} className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition-colors" title="Edit venue">
+                          <Edit2 className="w-4 h-4" />
                         </button>
                       </td>
                     </tr>
@@ -1249,13 +1409,147 @@ export default function Clubs() {
       <AnimatePresence>
         {isViewingVenue && selectedClub && (
           <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsViewingVenue(false)} className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110]" />
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsViewingVenue(false)}
+              className="fixed inset-0 bg-black/90 backdrop-blur-md z-[110]"
+            />
+
+            {/* Main preview card — matches the centered style used for Event
+                previews (was previously a right-side sliding drawer here,
+                inconsistent with Events, and with no visible Edit action).
+                `lg:pr-[440px]` leaves room for the "app view" sidebar panel
+                on the right, same as the Events preview does. */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 24 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 24 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+              className="fixed inset-0 z-[120] flex items-center justify-center p-4 lg:pr-[440px] pointer-events-none"
+            >
+              <div className="w-full max-w-2xl pointer-events-auto flex flex-col gap-0 rounded-[2.5rem] overflow-hidden border border-white/10 shadow-[0_0_120px_rgba(0,0,0,0.8)]">
+
+                {/* Hero image */}
+                <div className="relative" style={{ aspectRatio: '16/8' }}>
+                  {selectedClub.venue_image || selectedClub.business_image ? (
+                    <img
+                      src={adAssetUrlForClub(selectedClub.venue_image || selectedClub.business_image)}
+                      alt={selectedClub.venue_name || selectedClub.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div
+                      className="w-full h-full flex items-center justify-center"
+                      style={{ background: 'linear-gradient(135deg, #1a0a2e 0%, #0d0d1a 50%, #1a0a10 100%)' }}
+                    >
+                      <div className="text-center space-y-3 opacity-30">
+                        <Building2 className="w-16 h-16 mx-auto text-primary" />
+                        <p className="text-xs font-black uppercase tracking-widest text-white">No Image</p>
+                      </div>
+                    </div>
+                  )}
+                  <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.3) 40%, rgba(9,9,11,0.98) 100%)' }} />
+
+                  {/* Top bar: status + city + close */}
+                  <div className="absolute top-5 left-6 right-6 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={cn('px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border backdrop-blur-md', selectedClub.is_active !== false ? statusColors.ACTIVE : statusColors.INACTIVE)}>
+                        {selectedClub.is_active !== false ? 'ACTIVE' : 'INACTIVE'}
+                      </span>
+                      {(typeof selectedClub.city === 'object' ? selectedClub.city?.city_name : selectedClub.city) && (
+                        <span className="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/20 backdrop-blur-md bg-black/30 text-white/70 flex items-center gap-1.5">
+                          <MapPin className="w-3 h-3" />{typeof selectedClub.city === 'object' ? selectedClub.city?.city_name : selectedClub.city}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setIsViewingVenue(false)}
+                      className="w-9 h-9 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/60 hover:text-white hover:bg-black/70 transition-all"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Bottom overlay: name + about */}
+                  <div className="absolute bottom-0 left-0 right-0 p-7">
+                    <h2 className="text-3xl font-black text-white uppercase tracking-tight leading-none">
+                      {selectedClub.venue_name || selectedClub.name}
+                    </h2>
+                    {(selectedClub.about || selectedClub.description) && (
+                      <p className="text-sm text-white/50 mt-2 leading-relaxed line-clamp-2">
+                        {selectedClub.about || selectedClub.description}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Info bar */}
+                <div className="bg-[#0d0d12] border-t border-white/5 px-7 py-5 grid grid-cols-3 gap-4">
+                  {[
+                    {
+                      icon: Clock, color: '#2D9AFF', label: 'Open Hours',
+                      value: selectedClub.start_time ? `${selectedClub.start_time}${selectedClub.end_time ? ` – ${selectedClub.end_time}` : ''}` : 'Not set',
+                    },
+                    {
+                      icon: Calendar, color: '#FF2D9A', label: 'Open Days',
+                      value: Array.isArray(selectedClub.open_days) && selectedClub.open_days.length ? `${selectedClub.open_days.length} days/week` : 'Not set',
+                    },
+                    {
+                      icon: MapPin, color: '#2DFF9A', label: 'Address',
+                      value: selectedClub.address || 'Not set',
+                    },
+                  ].map(({ icon: Icon, color, label, value }) => (
+                    <div key={label} className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${color}18` }}>
+                        <Icon className="w-4 h-4" style={{ color }} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[9px] font-black text-white/30 uppercase tracking-widest">{label}</p>
+                        <p className="text-xs font-bold text-white truncate">{value}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Verification + actions */}
+                <div className="bg-[#0a0a0f] px-7 py-5 flex items-center justify-between gap-4 border-t border-white/5">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/5 border border-white/10">
+                      <ShieldCheck className={cn('w-4 h-4', selectedClub.is_verified ? 'text-emerald-400' : 'text-amber-400')} />
+                      <div>
+                        <p className="text-[9px] text-white/30 font-black uppercase tracking-widest">Verification</p>
+                        <p className="text-base font-black text-white leading-none">{selectedClub.is_verified ? 'Verified' : 'Pending'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => { setIsViewingVenue(false); openEditVenue(selectedClub); }}
+                      className="px-6 py-2.5 rounded-2xl bg-primary text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:bg-primary/90 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" /> Edit Venue
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Right sidebar "app view" — same pattern as the Events
+                preview: a passive mobile-app-styled mockup of how this
+                venue actually looks to end users, shown alongside the
+                edit-focused main card. Was missing entirely here before. */}
             <motion.div
               initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="fixed inset-y-0 right-0 h-full w-full max-w-[420px] bg-black z-[111] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.8)] border-l border-white/5"
+              className="fixed inset-y-0 right-0 w-full max-w-[420px] bg-[#08080c] z-[130] shadow-[0_0_100px_rgba(0,0,0,0.8)] border-l border-white/5 overflow-hidden"
             >
-              <ClubProfilePreview onClose={() => setIsViewingVenue(false)} club={selectedClub} />
+              <ClubProfilePreview
+                club={selectedClub}
+                onClose={() => setIsViewingVenue(false)}
+                hideCloseButton
+              />
             </motion.div>
           </>
         )}
@@ -1311,10 +1605,25 @@ export default function Clubs() {
                               <RefinedField label="Club Name" name="name" value={venueFormData.name} onChange={(e: any) => setVenueFormData({ ...venueFormData, name: e.target.value })} placeholder="e.g. The Quantum Vault" icon={<Building2 className="w-4 h-4" />} />
                             </div>
                             <div className="space-y-4 group/field">
+                              <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Vendor / Organiser</label>
+                              {isClubAdmin ? (
+                                <div className="flex items-center gap-3 w-full bg-[#09090B] border border-white/5 rounded-[24px] px-8 py-5 text-sm text-white/60">
+                                  <span className="truncate">{ownVendorForVenue?.name || user?.organisation || 'Your organisation'}</span>
+                                  <span className="ml-auto text-[9px] font-black uppercase tracking-widest text-white/20 shrink-0">Locked to your account</span>
+                                </div>
+                              ) : (
+                                <select value={venueFormData.vendor_id} onChange={(e) => setVenueFormData({ ...venueFormData, vendor_id: e.target.value })} className="w-full bg-[#09090B] border border-white/5 rounded-[24px] px-8 py-5 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 appearance-none font-medium">
+                                  <option value="">Select vendor...</option>
+                                  {vendorListForVenue.map((v: any) => <option key={v._id || v.id} value={v._id || v.id}>{v.name}</option>)}
+                                </select>
+                              )}
+                              <p className="text-[9px] text-white/20 ml-1">Note: each vendor can only have one venue on the backend.</p>
+                            </div>
+                            <div className="space-y-4 group/field">
                               <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Category</label>
                               <select value={venueFormData.type} onChange={(e) => setVenueFormData({ ...venueFormData, type: e.target.value })} className="w-full bg-[#09090B] border border-white/5 rounded-[24px] px-8 py-5 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 appearance-none font-medium">
                                 <option value="">Select Category...</option>
-                                {venueTypes?.map((type: any) => <option key={type._id || type.id} value={type.name}>{type.name}</option>)}
+                                {venueTypes?.slice().sort((a: any, b: any) => (a.category_name || '').localeCompare(b.category_name || '')).map((type: any) => <option key={type._id} value={type._id}>{type.category_name}</option>)}
                               </select>
                             </div>
                             <RefinedField label="Contact Email" name="email" type="email" value={venueFormData.email} onChange={(e: any) => setVenueFormData({ ...venueFormData, email: e.target.value })} placeholder="ops@venue.com" icon={<Mail className="w-4 h-4" />} />
@@ -1339,7 +1648,7 @@ export default function Clubs() {
                               <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">City</label>
                               <select value={venueFormData.city} onChange={(e) => setVenueFormData({ ...venueFormData, city: e.target.value })} className="w-full bg-[#09090B] border border-white/5 rounded-[24px] px-8 py-5 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 appearance-none font-medium">
                                 <option value="">Select City...</option>
-                                {(Array.isArray(cities) ? cities : []).map((city: any) => <option key={city._id || city.id} value={city.city_name}>{city.city_name}</option>)}
+                                {(Array.isArray(cities) ? cities : []).slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((city: any) => <option key={city._id} value={city._id}>{city.city_name}</option>)}
                               </select>
                             </div>
                             <div className="col-span-1 md:col-span-2">

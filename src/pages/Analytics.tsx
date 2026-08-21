@@ -58,27 +58,40 @@ export default function Analytics() {
   const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/users`, { headers: { Authorization: `Bearer ${token}` } });
-      return res.json();
+      // NOTE: was hitting the bare `${API_BASE}/users` (404, no unwrap) —
+      // same fix already applied on the Users and Dashboard pages.
+      const res = await fetch(`${API_BASE}/users/get_all_user`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return json.data?.users ?? [];
     },
     enabled: user?.role === 'SUPER_ADMIN',
   });
 
-  // ── Scaffolded query — disabled until a real endpoint exists ─────────────────
-  // TODO: replace `${API_BASE}/TODO_ANALYTICS_STATS` with the real source for revenue,
-  // earnings, bookings, engagement rate, and avg session time. Field names below
-  // (revenue/earnings/bookings/engagementRate/avgSessionTime) are guesses —
-  // adjust once the real response shape is known. If these actually live on
-  // separate endpoints rather than one, this should split into separate queries.
+  // Resolves "my own organisation's" vendor record for CLUB_ADMIN/EVENT_ADMIN,
+  // same pattern used on Events.tsx and Clubs.tsx.
+  const ownVendorForAnalytics = Array.isArray(clubs) ? clubs.find((c: any) => c.name === user?.organisation) : null;
+
+  // FIXED: was hitting a literal placeholder URL (`/TODO_ANALYTICS_STATS`)
+  // that never existed — every Revenue/Earnings/Bookings/Engagement Rate
+  // card permanently showed "—". Real endpoint computes these from actual
+  // Earning/Booking records. Scoped to the admin's own vendor for
+  // CLUB_ADMIN/EVENT_ADMIN; platform-wide (no vendor_id) for Super/Normal
+  // Admin. There's deliberately no "avg session time" — nothing in this
+  // backend tracks real user sessions, so that card is removed below
+  // rather than showing a made-up number.
   const { data: extendedStats } = useQuery({
-    queryKey: ['analytics-extended', timeRange],
+    queryKey: ['analytics-extended', timeRange, ownVendorForAnalytics?._id],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/TODO_ANALYTICS_STATS?range=${timeRange}`, {
+      const rangeParam = timeRange === '24h' ? '7d' : timeRange; // backend supports 7d/30d/90d/all
+      const params = new URLSearchParams({ range: rangeParam });
+      if (ownVendorForAnalytics?._id) params.set('vendor_id', ownVendorForAnalytics._id);
+      const res = await fetch(`${API_BASE}/analytics/extended?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return res.json();
+      const json = await res.json();
+      return json.data ?? null;
     },
-    enabled: false, // flip on once the endpoint exists
+    enabled: user?.role !== 'CLUB_ADMIN' && user?.role !== 'EVENT_ADMIN' ? true : Boolean(ownVendorForAnalytics),
   });
 
   const eventList = Array.isArray(events) ? events : [];
@@ -116,14 +129,17 @@ export default function Analytics() {
   const clubsByCityData = topCities.map(c => ({ city: c.label, Clubs: c.count }));
 
   const kpiCards = [
-    { label: 'Total Revenue',      value: extendedStats?.revenue != null ? extendedStats.revenue.toLocaleString() : '—', icon: Activity,   color: 'text-emerald-400', bg: 'bg-emerald-400/10', roles: ['SUPER_ADMIN', 'CLUB_ADMIN', 'EVENT_ADMIN'] },
+    { label: 'Total Revenue',      value: extendedStats?.revenue != null ? `₹${extendedStats.revenue.toLocaleString()}` : '—', icon: Activity,   color: 'text-emerald-400', bg: 'bg-emerald-400/10', roles: ['SUPER_ADMIN', 'CLUB_ADMIN', 'EVENT_ADMIN'] },
     { label: 'Total Users',        value: totalUsers || 0,                                                              icon: Users,       color: 'text-blue-400',    bg: 'bg-blue-400/10',    roles: ['SUPER_ADMIN'] },
     { label: 'Total Events',       value: totalEvents || 0,                                                             icon: Calendar,    color: 'text-purple-400',  bg: 'bg-purple-400/10',  roles: ['SUPER_ADMIN', 'EVENT_ADMIN'] },
     { label: 'Total Clubs',        value: totalClubs || 0,                                                              icon: Building2,   color: 'text-amber-400',   bg: 'bg-amber-400/10',   roles: ['SUPER_ADMIN', 'CLUB_ADMIN'] },
-    { label: 'Earnings',           value: extendedStats?.earnings ?? '—',                                               icon: Wallet,      color: 'text-pink-400',    bg: 'bg-pink-400/10',    roles: ['CLUB_ADMIN'] },
-    { label: 'Bookings',           value: extendedStats?.bookings ?? '—',                                               icon: Zap,         color: 'text-orange-400',  bg: 'bg-orange-400/10',  roles: ['CLUB_ADMIN'] },
+    { label: 'Your Earnings',      value: extendedStats?.earnings != null ? `₹${extendedStats.earnings.toLocaleString()}` : '—', icon: Wallet, color: 'text-pink-400',    bg: 'bg-pink-400/10',    roles: ['CLUB_ADMIN', 'EVENT_ADMIN'] },
+    { label: 'Bookings',           value: extendedStats?.bookings ?? '—',                                               icon: Zap,         color: 'text-orange-400',  bg: 'bg-orange-400/10',  roles: ['CLUB_ADMIN', 'EVENT_ADMIN'] },
     { label: 'Engagement Rate',    value: extendedStats?.engagementRate != null ? `${extendedStats.engagementRate}%` : '—', icon: TrendingUp, color: 'text-cyan-400', bg: 'bg-cyan-400/10', roles: ['SUPER_ADMIN', 'EVENT_ADMIN', 'CLUB_ADMIN'] },
-    { label: 'Avg Session Time',   value: extendedStats?.avgSessionTime ?? '—',                                         icon: Clock,       color: 'text-rose-400',    bg: 'bg-rose-400/10',    roles: ['SUPER_ADMIN', 'EVENT_ADMIN', 'CLUB_ADMIN'] },
+    // "Avg Session Time" removed — nothing in this backend tracks real user
+    // sessions, so it was always a fake placeholder. Showing an honestly
+    // real, slightly smaller set of KPIs beats padding the row with a made-up
+    // number.
   ];
 
   return (

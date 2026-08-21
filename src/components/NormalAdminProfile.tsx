@@ -81,7 +81,14 @@ export default function NormalAdminProfile() {
   const pollList    = Array.isArray(polls)    ? polls    : [];
   const contestList = Array.isArray(contests) ? contests : [];
 
-  const recentEvents    = eventList.slice(0, 3);
+  // "Latest Events" was just the first 3 items in whatever order the API
+  // happened to return (usually insertion order), not actually sorted by
+  // recency — so the label didn't match reality. Now genuinely sorted by
+  // date, soonest/most-recent first.
+  const recentEvents    = eventList
+    .slice()
+    .sort((a: any, b: any) => new Date(b.date || b.createdAt || 0).getTime() - new Date(a.date || a.createdAt || 0).getTime())
+    .slice(0, 3);
   const accessibleClubs = clubList.slice(0, 4);
 
   const recentItems = [
@@ -215,6 +222,10 @@ export default function NormalAdminProfile() {
               <h2 className="text-sm font-black text-white uppercase tracking-[0.2em] flex items-center gap-3">
                 <Calendar className="w-4 h-4 text-primary" />
                 Latest Events
+                {/* Makes the connection to the "Total Events" count above
+                    explicit — was previously just an unlabeled "latest 3",
+                    with no visible link to the total shown up top. */}
+                <span className="text-[10px] font-bold text-white/30 normal-case tracking-normal">({recentEvents.length} of {totalEvents})</span>
               </h2>
               {/* ✅ View All wired to /events route */}
               <button
@@ -311,6 +322,7 @@ export default function NormalAdminProfile() {
               <h2 className="text-sm font-black text-white uppercase tracking-[0.2em] flex items-center gap-3">
                 <Building2 className="w-4 h-4 text-primary" />
                 Clubs & Venues
+                <span className="text-[10px] font-bold text-white/30 normal-case tracking-normal">({accessibleClubs.length} of {clubList.length})</span>
               </h2>
               {/* ✅ View All wired to /clubs route */}
               <button
@@ -340,7 +352,7 @@ export default function NormalAdminProfile() {
                         {club.name}
                       </h4>
                       <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter mt-1">
-                        {club.city || '—'}
+                        {(typeof club.city === 'object' ? club.city?.city_name : club.city) || '—'}
                       </p>
                       {club.type && (
                         <p className="text-[8px] font-bold text-primary/70 uppercase tracking-tighter mt-0.5">

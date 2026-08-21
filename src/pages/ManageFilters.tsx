@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { Plus, Trash2, Loader2, MapPin, Music, Calendar, Building2, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Loader2, MapPin, Music, Calendar, Building2, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { FilterDropdown } from '../components/FilterDropdown';
 
@@ -29,13 +29,19 @@ const TAB_CONFIG: Record<TabId, {
   listUrl: string;
   createUrl: string;
   deleteUrl: (id: string) => string;
+  toggleUrl?: (id: string) => string;
   nameField: string;
   categoryType?: number;
 }> = {
   cities: {
-    listUrl: `${API_BASE}/city/get_all_cities`,
+    // Shows ALL cities (active + inactive) — the whole point of this tab is
+    // to let the admin control which cities are active for the rest of the
+    // app's filters, so it needs to include inactive ones too or there'd be
+    // no way to see/reactivate a deactivated city.
+    listUrl: `${API_BASE}/city/get_all_cities?include_inactive=true`,
     createUrl: `${API_BASE}/city/create_city`,
     deleteUrl: (id) => `${API_BASE}/city/delete_city/${id}`,
+    toggleUrl: (id) => `${API_BASE}/city/toggle_status/${id}`,
     nameField: 'city_name',
   },
   genres: {
@@ -65,6 +71,8 @@ export default function ManageFilters() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabId>('cities');
   const [newItemName, setNewItemName] = useState('');
+  const [itemSearch, setItemSearch] = useState('');
+  const [statusView, setStatusView] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [newItemState, setNewItemState] = useState('');
   const [newItemLat, setNewItemLat] = useState('');
   const [newItemLng, setNewItemLng] = useState('');
@@ -87,12 +95,13 @@ export default function ManageFilters() {
       });
       const json = await res.json();
       const list = Array.isArray(json?.data) ? json.data : [];
+      const sorted = list.slice().sort((a: any, b: any) => (a[config.nameField] || '').localeCompare(b[config.nameField] || ''));
       // Categories power both Event Types and Venue Types tabs from the
       // same list — split by category_type client-side.
       if (activeTab === 'eventTypes' || activeTab === 'venueTypes') {
-        return list.filter((c: any) => c.category_type === config.categoryType);
+        return sorted.filter((c: any) => c.category_type === config.categoryType);
       }
-      return list;
+      return sorted;
     },
   });
 
@@ -171,6 +180,25 @@ export default function ManageFilters() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to delete item');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['manage-filters', activeTab] });
+    },
+  });
+
+  // Cities-only: activate/deactivate without deleting. This is what should
+  // be used to curate which cities show up in Featured Events / Events /
+  // Venues filters (only active cities show there) — Delete is destructive
+  // and removes the city entirely, which usually isn't what's wanted here.
+  const toggleItemMutation = useMutation({
+    mutationFn: async (id: string) => {
+      if (!config.toggleUrl) throw new Error('Toggle not supported for this tab');
+      const res = await fetch(config.toggleUrl(id), {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to update status');
       return res.json();
     },
     onSuccess: () => {
@@ -280,29 +308,103 @@ export default function ManageFilters() {
             )}
           </form>
 
+          {/* Search + status filter + summary — was a single unfiltered
+              alphabetical grid of every item (100+ for Cities), making it
+              genuinely hard to tell "is this actually restricted to just 4
+              cities?" without scrolling through the whole list. Now you can
+              filter to "Active" alone to see exactly what's live at a glance,
+              and the count up top confirms it without any scrolling. */}
+          {activeTab === 'cities' && Array.isArray(items) && items.length > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 -mt-2">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  value={itemSearch}
+                  onChange={(e) => setItemSearch(e.target.value)}
+                  placeholder="Search cities..."
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-white/20"
+                />
+              </div>
+              <div className="flex items-center gap-1 p-1 rounded-xl bg-white/5 border border-white/10 shrink-0">
+                {(['ALL', 'ACTIVE', 'INACTIVE'] as const).map((v) => {
+                  const count = v === 'ALL' ? items.length : items.filter((i: any) => (v === 'ACTIVE' ? i.is_active : !i.is_active)).length;
+                  return (
+                    <button
+                      key={v}
+                      onClick={() => setStatusView(v)}
+                      className={cn(
+                        'px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all',
+                        statusView === v ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-muted-foreground hover:text-white'
+                      )}
+                    >
+                      {v === 'ALL' ? 'All' : v === 'ACTIVE' ? 'Active' : 'Inactive'} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {isLoading ? (
-              <div className="col-span-full py-12 flex justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              </div>
-            ) : !items || items.length === 0 ? (
-              <div className="col-span-full py-12 text-center text-muted-foreground text-[10px] font-black uppercase tracking-widest leading-none">
-                No items found. Add one above.
-              </div>
-            ) : (
-              items.map((item: any) => (
-                <div key={item._id || item.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 group hover:bg-white/10 transition-colors">
-                  <span className="text-sm font-bold text-white">{item[config.nameField]}</span>
-                  <button
-                    onClick={() => deleteItemMutation.mutate(item._id || item.id)}
-                    disabled={deleteItemMutation.isPending}
-                    className="p-2 rounded-lg hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+            {(() => {
+              const visibleItems = activeTab === 'cities'
+                ? (Array.isArray(items) ? items : [])
+                    .filter((item: any) => statusView === 'ALL' || (statusView === 'ACTIVE' ? item.is_active : !item.is_active))
+                    .filter((item: any) => item[config.nameField]?.toLowerCase().includes(itemSearch.toLowerCase()))
+                : items;
+
+              if (isLoading) {
+                return (
+                  <div className="col-span-full py-12 flex justify-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  </div>
+                );
+              }
+              if (!visibleItems || visibleItems.length === 0) {
+                return (
+                  <div className="col-span-full py-12 text-center text-muted-foreground text-[10px] font-black uppercase tracking-widest leading-none">
+                    {activeTab === 'cities' && (itemSearch || statusView !== 'ALL') ? 'No cities match this search/filter.' : 'No items found. Add one above.'}
+                  </div>
+                );
+              }
+              return visibleItems.map((item: any) => (
+                <div key={item._id || item.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 group hover:bg-white/10 transition-colors gap-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="text-sm font-bold text-white truncate min-w-0 flex-1">{item[config.nameField]}</span>
+                    {activeTab === 'cities' && (
+                      <span className={cn(
+                        'shrink-0 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-widest border',
+                        item.is_active ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
+                      )}>
+                        {item.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {activeTab === 'cities' && (
+                      <button
+                        onClick={() => toggleItemMutation.mutate(item._id || item.id)}
+                        disabled={toggleItemMutation.isPending}
+                        title={item.is_active ? 'Deactivate (hide from Events/Venues/Ads filters)' : 'Activate (show in Events/Venues/Ads filters)'}
+                        className={cn(
+                          'p-2 rounded-lg transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50',
+                          item.is_active ? 'hover:bg-zinc-500/20 text-muted-foreground hover:text-zinc-300' : 'hover:bg-emerald-500/20 text-muted-foreground hover:text-emerald-400'
+                        )}
+                      >
+                        {item.is_active ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => deleteItemMutation.mutate(item._id || item.id)}
+                      disabled={deleteItemMutation.isPending}
+                      className="p-2 rounded-lg hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-              ))
-            )}
+              ));
+            })()}
           </div>
         </div>
       </div>

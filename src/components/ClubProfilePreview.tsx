@@ -18,9 +18,11 @@ import {
 interface ClubProfilePreviewProps {
   club: any;
   onClose?: () => void;
+  onEdit?: () => void;
+  hideCloseButton?: boolean;
 }
 
-export default function ClubProfilePreview({ club, onClose }: ClubProfilePreviewProps) {
+export default function ClubProfilePreview({ club, onClose, onEdit, hideCloseButton }: ClubProfilePreviewProps) {
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
 
   const data = React.useMemo(() => {
@@ -54,21 +56,36 @@ export default function ClubProfilePreview({ club, onClose }: ClubProfilePreview
 
   return (
     <div className="flex flex-col h-full bg-black text-white relative select-none font-sans overflow-hidden">
-      {/* Top Header Bar */}
+      {/* Top Header Bar — hidden when shown as the secondary "app view"
+          sidebar alongside the main centered card (Clubs.tsx), since that
+          card already has its own close (X) and Edit Venue controls;
+          showing a second set here would just be redundant/confusing. */}
+      {!hideCloseButton && (
       <div className="absolute top-0 inset-x-0 h-20 z-50 flex items-center justify-between px-6 pointer-events-none">
-        <button 
+        <button
           onClick={onClose}
           className="w-12 h-12 bg-black/40 backdrop-blur-xl rounded-2xl flex items-center justify-center pointer-events-auto border border-white/5 hover:bg-black/60 transition-all active:scale-95 group"
         >
           <ChevronLeftIcon className="w-6 h-6 text-white group-hover:-translate-x-0.5 transition-transform" />
         </button>
-        <button 
-          onClick={onClose}
-          className="w-12 h-12 bg-black/40 backdrop-blur-xl rounded-2xl flex items-center justify-center pointer-events-auto border border-white/5 hover:bg-black/60 transition-all active:scale-95"
-        >
-          <X className="w-5 h-5 text-white" />
-        </button>
+        <div className="flex items-center gap-3 pointer-events-auto">
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              className="h-12 px-5 bg-primary/90 backdrop-blur-xl rounded-2xl flex items-center gap-2 border border-primary/20 hover:bg-primary transition-all active:scale-95 text-white text-xs font-black uppercase tracking-widest"
+            >
+              Edit
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="w-12 h-12 bg-black/40 backdrop-blur-xl rounded-2xl flex items-center justify-center pointer-events-auto border border-white/5 hover:bg-black/60 transition-all active:scale-95"
+          >
+            <X className="w-5 h-5 text-white" />
+          </button>
+        </div>
       </div>
+      )}
 
       <div className="flex-1 overflow-y-auto scrollbar-hide">
         {/* Cover Image Section */}
@@ -81,7 +98,7 @@ export default function ClubProfilePreview({ club, onClose }: ClubProfilePreview
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-          
+
           {/* Featured Badge */}
           <div className="absolute bottom-12 left-6 right-6 flex items-end justify-between">
             <div className="space-y-4">
@@ -96,7 +113,7 @@ export default function ClubProfilePreview({ club, onClose }: ClubProfilePreview
                 {data.name}
               </h1>
             </div>
-            
+
             <div className="flex flex-col items-center gap-2 mb-2">
               <div className="w-14 h-14 rounded-full bg-[#FF2D9A]/20 backdrop-blur-xl border border-[#FF2D9A]/30 flex items-center justify-center shadow-xl group cursor-pointer active:scale-90 transition-transform">
                 <Heart className="w-6 h-6 text-[#FF2D9A] fill-[#FF2D9A]" />
@@ -108,7 +125,7 @@ export default function ClubProfilePreview({ club, onClose }: ClubProfilePreview
 
         {/* Info Section */}
         <div className="px-6 py-8 space-y-10">
-          
+
           {/* Vital Stats Cards */}
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-white/[0.03] border border-white/5 rounded-3xl p-5 flex flex-col gap-3">
@@ -192,8 +209,8 @@ export default function ClubProfilePreview({ club, onClose }: ClubProfilePreview
             </div>
             <div className="grid grid-cols-1 gap-3">
               {data.pastEvents.map((event: any, i: number) => (
-                <div 
-                  key={i} 
+                <div
+                  key={i}
                   onClick={() => setSelectedEvent(event)}
                   className="flex items-center justify-between p-3 rounded-3xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors group cursor-pointer"
                 >
@@ -237,7 +254,7 @@ export default function ClubProfilePreview({ club, onClose }: ClubProfilePreview
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
               className="fixed inset-y-0 right-0 w-full max-w-[420px] bg-black z-[111] shadow-[0_0_100px_rgba(0,0,0,0.8)] overflow-hidden border-l border-white/5"
             >
-              <EventProfilePreview 
+              <EventProfilePreview
                 eventData={selectedEvent}
                 onClose={() => setSelectedEvent(null)}
               />
