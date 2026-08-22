@@ -573,9 +573,18 @@ export default function Clubs() {
   });
 
   const filteredClubs = (Array.isArray(clubs) ? clubs : []).filter((c: any) => {
-    const matchesSearch  = c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || c.city?.toLowerCase().includes(searchTerm.toLowerCase());
+    // FIXED: c.city is a populated {_id, city_name} object for most
+    // vendors, not a plain string — `c.city?.toLowerCase()` only guards
+    // against null/undefined, not against city being an object, so this
+    // crashed the entire page (not just search) the instant any vendor
+    // had a real populated city, which is now the normal case. The city
+    // filter dropdown below had the same issue — comparing an object
+    // against a filterCity string always evaluated to false, so that
+    // filter never actually worked either.
+    const cityName = typeof c.city === 'object' ? c.city?.city_name : c.city;
+    const matchesSearch  = c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || cityName?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus  = filterStatus === 'ALL' || c.status === filterStatus;
-    const matchesCity    = filterCity   === 'ALL' || c.city === filterCity;
+    const matchesCity    = filterCity   === 'ALL' || cityName === filterCity;
     return matchesSearch && matchesStatus && matchesCity;
   }).sort((a: any, b: any) => {
     let aValue = a[sortField];

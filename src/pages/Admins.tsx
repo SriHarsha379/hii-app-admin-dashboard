@@ -89,7 +89,7 @@ export default function Admins() {
   const [selectedAdmin, setSelectedAdmin] = useState<any>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [newAdmin, setNewAdmin] = useState({ name: '', email: '', role: 'ADMIN', password: '' });
+  const [newAdmin, setNewAdmin] = useState({ name: '', email: '', role: 'NORMAL_ADMIN', password: '' });
 
   const { data: admins, isLoading } = useQuery({
     queryKey: ['admins'],
@@ -105,9 +105,9 @@ export default function Admins() {
     mutationFn: async (admin: any) => {
       const res = await fetch(`${API_BASE}/admins`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify(admin)
       });
@@ -117,7 +117,7 @@ export default function Admins() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admins'] });
       setIsAddModalOpen(false);
-      setNewAdmin({ name: '', email: '', role: 'ADMIN', password: '' });
+      setNewAdmin({ name: '', email: '', role: 'NORMAL_ADMIN', password: '' });
     }
   });
 
@@ -210,7 +210,9 @@ export default function Admins() {
                   options={[
                     { label: 'All Roles', value: 'ALL' },
                     { label: 'Super Admin', value: 'SUPER_ADMIN' },
-                    { label: 'Admin', value: 'ADMIN' },
+                    { label: 'Admin', value: 'NORMAL_ADMIN' },
+                    { label: 'Club Admin', value: 'CLUB_ADMIN' },
+                    { label: 'Event Admin', value: 'EVENT_ADMIN' },
                   ]}
                 />
               </div>
@@ -357,7 +359,16 @@ export default function Admins() {
                   onChange={(e) => setNewAdmin({ ...newAdmin, role: e.target.value })}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50 appearance-none"
                 >
-                  <option value="ADMIN">Admin</option>
+                  {/* FIXED: this dropdown only ever offered "Admin" and
+                      "Super Admin" — there was no way to create a Club
+                      Admin or Event Admin account through this UI at all,
+                      despite both roles being fully supported by the
+                      backend schema. The "Admin" option's value was also
+                      "ADMIN", which doesn't match the real enum
+                      (NORMAL_ADMIN) at all. */}
+                  <option value="NORMAL_ADMIN">Admin</option>
+                  <option value="CLUB_ADMIN">Club Admin</option>
+                  <option value="EVENT_ADMIN">Event Admin</option>
                   <option value="SUPER_ADMIN">Super Admin</option>
                 </select>
               </div>
