@@ -29,6 +29,7 @@ import { cn, groupByDate, countBy } from '../lib/utils';
 import { motion } from 'motion/react';
 import { GlowCard } from '../components/ui/spotlight-card';
 import NormalAdminProfile from '../components/NormalAdminProfile';
+import ClubAdminProfile from '../components/ClubAdminProfile';
 
 import { API_BASE } from '../lib/apiConfig';
 function MetricCard({ title, value, change, trend, icon: Icon, updateText }: any) {
@@ -163,6 +164,12 @@ export default function Dashboard() {
 
   // ── Early return for NORMAL_ADMIN ────────────────────────────────────────────
   if (user?.role === 'NORMAL_ADMIN') return <NormalAdminProfile />;
+
+  // ── Early return for CLUB_ADMIN — was missing entirely, so "Overview" fell
+  // through to the generic dashboard below (fake "Awaiting endpoint"
+  // placeholder cards), while the real, redesigned Club Admin overview only
+  // existed at the separate /club-profile route and was never actually seen. ──
+  if (user?.role === 'CLUB_ADMIN') return <ClubAdminProfile />;
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700">

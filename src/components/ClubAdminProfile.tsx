@@ -20,7 +20,8 @@ import {
   TrendingUp,
   Ticket
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { cn, groupByDate } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { GlowCard } from './ui/spotlight-card';
 import ClubProfilePreview from './ClubProfilePreview';
@@ -54,9 +55,30 @@ export default function ClubAdminProfile() {
     }
   });
 
+  // Overview stat cards (Upcoming/Past/Featured Events, Followers, Live
+  // Tickets, Tickets Sold) — was a row of entirely fake hardcoded numbers
+  // ("24.8k Profile Followers", "152k Monthly Traffic", "4.8 Global
+  // Score"), now backed by a real endpoint. "Profile Views" has no
+  // backing anywhere in this app (no view-tracking model exists at all)
+  // so it's shown honestly as "—", not invented. Live Tickets / Tickets
+  // Sold show "Coming Soon" per explicit instruction, since ticketing
+  // isn't live yet — not because the data can't be computed (it can, the
+  // backend already supports it), just not surfaced here yet.
+  const { data: overviewStats } = useQuery({
+    queryKey: ['club-overview-stats', clubData?._id],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/analytics/club-overview?vendor_id=${clubData._id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json();
+      return json.data ?? null;
+    },
+    enabled: Boolean(clubData?._id),
+  });
+
   const eventList = Array.isArray(events) ? events : [];
   const clubEvents = eventList.filter(e => e.club_id === clubData?.id || e.venue === clubData?.name);
-  
+
   const liveEvents = clubEvents.filter(e => e.status === 'LIVE' || e.status === 'ACTIVE');
   const upcomingEvents = clubEvents.filter(e => {
     const now = new Date();
@@ -69,6 +91,11 @@ export default function ClubAdminProfile() {
     return eventDate < now;
   });
 
+  // Growth chart data — built from this venue's own events only, grouped
+  // by real createdAt dates over the last 14 days.
+  const eventGrowthBuckets = groupByDate(clubEvents, (e: any) => e.createdAt, 14, 'day');
+  const eventGrowthChartData = eventGrowthBuckets.map((bucket) => ({ date: bucket.label, Events: bucket.count }));
+
   return (
     <div className="space-y-12 animate-in fade-in duration-700 pb-20">
       {/* Club Profile Header */}
@@ -76,13 +103,13 @@ export default function ClubAdminProfile() {
         <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:scale-110 transition-transform duration-1000 grayscale">
           <Building2 className="w-80 h-80" />
         </div>
-        
+
         <div className="flex flex-col md:flex-row gap-10 items-start relative z-10">
           <div className="relative shrink-0">
             <div className="w-48 h-64 rounded-[40px] overflow-hidden border-2 border-primary/20 group-hover:border-primary transition-all duration-700 shadow-2xl bg-black/40">
-              <img 
-                src={clubData?.portrait_url || clubData?.logo || `https://api.dicebear.com/7.x/identicon/svg?seed=${clubData?.name || 'Club'}`} 
-                alt={clubData?.name} 
+              <img
+                src={clubData?.portrait_url || clubData?.logo || `https://api.dicebear.com/7.x/identicon/svg?seed=${clubData?.name || 'Club'}`}
+                alt={clubData?.name}
                 className="w-full h-full object-cover"
               />
             </div>
@@ -96,47 +123,81 @@ export default function ClubAdminProfile() {
               <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter uppercase leading-none">{clubData?.name || 'Venue Name'}</h1>
                 <div className="flex gap-2">
-                  <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[9px] font-black tracking-widest uppercase">Verified Venue</span>
-                  <span className="px-3 py-1 rounded-full bg-primary/20 text-primary border border-primary/20 text-[9px] font-black tracking-widest uppercase">Top Rated</span>
+                  {/* Was hardcoded "Verified Venue" + "Top Rated" regardless
+                      of actual status — now reflects the real is_verified
+                      flag; "Top Rated" removed since there's no rating
+                      system anywhere in this backend to back that claim. */}
+                  <span className={cn(
+                    'px-3 py-1 rounded-full border text-[9px] font-black tracking-widest uppercase',
+                    clubData?.is_verified ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/20 text-amber-400 border-amber-500/20'
+                  )}>
+                    {clubData?.is_verified ? 'Verified Venue' : 'Pending Verification'}
+                  </span>
                 </div>
               </div>
               <p className="text-muted-foreground text-sm font-medium leading-relaxed max-w-2xl">
-                {clubData?.description || 'The city\'s most iconic nightlife destination. Specializing in state-of-the-art sound systems and world-class luxury experiences. A multi-level sensory journey designed for the elite.'}
+                {clubData?.about || clubData?.description || 'No description added yet.'}
               </p>
-              
-              <div className="flex flex-wrap gap-3">
-                {['Techno', 'Deep House', 'Luxury', 'VVIP'].map(tag => (
-                   <span key={tag} className="px-4 py-1.5 rounded-full border border-white/10 text-[10px] font-bold text-white/40 uppercase tracking-widest bg-white/5">
-                     {tag}
-                   </span>
-                ))}
-              </div>
 
               <div className="flex flex-wrap gap-6 pt-2">
                 <div className="flex items-center gap-2.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
                   <MapPin className="w-4 h-4 text-primary" />
-                  {clubData?.city || 'Mumbai'}, {clubData?.address?.split(',').pop() || 'India'}
-                </div>
-                <div className="flex items-center gap-2.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
-                  <Users2 className="w-4 h-4 text-emerald-400" />
-                  {clubData?.capacity || '1.2k'} Max Capacity
+                  {(typeof clubData?.city === 'object' ? clubData?.city?.city_name : clubData?.city) || 'City not set'}
                 </div>
                 <div className="flex items-center gap-2.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
                   <Clock className="w-4 h-4 text-amber-400" />
-                  10:00 PM - 04:00 AM
+                  {clubData?.start_time && clubData?.end_time ? `${clubData.start_time} - ${clubData.end_time}` : 'Hours not set'}
                 </div>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-4 pt-4 border-t border-white/5">
-              <StatBlock label="Profile Followers" value="24.8k" />
-              <StatBlock label="Monthly Traffic" value="152k" />
-              <StatBlock label="Events Hosted" value={clubEvents.length.toString()} />
-              <StatBlock label="Global Score" value="4.8" />
+              <StatBlock label="Upcoming Events" value={String(overviewStats?.upcomingEvents ?? '—')} />
+              <StatBlock label="Past Events" value={String(pastEvents.length)} />
+              <StatBlock label="Featured Events" value={String(overviewStats?.featuredEvents ?? '—')} />
+              <StatBlock label="Followers" value={String(overviewStats?.followers ?? '—')} />
+              <StatBlock label="Profile Views" value="—" />
+              <StatBlock label="Live Tickets" value="Coming Soon" />
+              <StatBlock label="Tickets Sold" value="Coming Soon" />
             </div>
           </div>
         </div>
       </GlowCard>
+
+      {/* Growth Overview — was missing entirely. Built from the same real
+          events data already fetched above, grouped by actual createdAt
+          dates over the last 14 days, same pattern used on the Super
+          Admin dashboard. */}
+      <div className="glass-card p-6 rounded-2xl">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-sm font-black text-white uppercase tracking-wider">Growth Overview</h3>
+            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mt-1">
+              New events — last 14 days
+            </p>
+          </div>
+        </div>
+        <div className="h-[260px]">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+            <AreaChart data={eventGrowthChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="colorClubEvents" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#A855F7" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#A855F7" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+              <XAxis dataKey="date" stroke="rgba(255,255,255,0.2)" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis stroke="rgba(255,255,255,0.2)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+              <Tooltip
+                contentStyle={{ backgroundColor: '#12121A', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                itemStyle={{ color: '#fff' }}
+              />
+              <Area type="monotone" dataKey="Events" stroke="#A855F7" strokeWidth={2} fillOpacity={1} fill="url(#colorClubEvents)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         {/* Left Column: Gallery & About */}
@@ -211,8 +272,8 @@ export default function ClubAdminProfile() {
                   onClick={() => setActiveTab(tab)}
                   className={cn(
                     "px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                    activeTab === tab 
-                      ? "bg-primary text-white shadow-lg shadow-primary/20" 
+                    activeTab === tab
+                      ? "bg-primary text-white shadow-lg shadow-primary/20"
                       : "text-white/40 hover:text-white"
                   )}
                 >
@@ -403,8 +464,8 @@ export default function ClubAdminProfile() {
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className="fixed inset-y-0 right-0 w-full max-w-md bg-black z-[101] shadow-2xl overflow-hidden border-l border-white/5"
             >
-              <EventProfilePreview 
-                eventData={selectedEvent} 
+              <EventProfilePreview
+                eventData={selectedEvent}
                 onClose={() => setSelectedEvent(null)}
               />
             </motion.div>
@@ -423,4 +484,3 @@ function StatBlock({ label, value }: { label: string, value: string }) {
     </div>
   );
 }
-

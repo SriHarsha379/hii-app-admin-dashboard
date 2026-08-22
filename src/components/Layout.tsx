@@ -435,6 +435,7 @@ export default function Layout() {
                 {user?.role === 'CLUB_ADMIN' ? 'Event Listings' : 'Clubs & Venues'}
               </NavLink>
             )}
+            {user?.role === 'CLUB_ADMIN' && <NavLink to="/bookings" icon={Ticket}>Bookings</NavLink>}
             {(user?.role === 'SUPER_ADMIN' || user?.role === 'NORMAL_ADMIN') && <NavLink to="/polls-contests" icon={Vote}>Polls & Contests</NavLink>}
             {(user?.role === 'SUPER_ADMIN' || user?.role === 'NORMAL_ADMIN') && <NavLink to="/recommendations" icon={Sparkles}>Recommendations</NavLink>}
           </nav>

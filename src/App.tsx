@@ -33,6 +33,7 @@ import ClubOnboarding from './pages/ClubOnboarding';
 import EventAdminOnboarding from './pages/EventAdminOnboarding';
 import OrganiserRequests from './pages/OrganiserRequests';
 import PendingApproval from './pages/PendingApproval';
+import Bookings from './pages/Bookings';
 
 const ProtectedRoute = ({
   children,
@@ -134,6 +135,7 @@ export default function App() {
               <Route path="recommendations" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'NORMAL_ADMIN']}><Recommendations /></ProtectedRoute>} />
               <Route path="admins" element={<ProtectedRoute requireSuperAdmin><Admins /></ProtectedRoute>} />
               <Route path="account-settings" element={<ProtectedRoute allowedRoles={['CLUB_ADMIN']}><AccountSettings /></ProtectedRoute>} />
+              <Route path="bookings" element={<ProtectedRoute allowedRoles={['CLUB_ADMIN']}><Bookings /></ProtectedRoute>} />
               <Route path="event-account-settings" element={<ProtectedRoute allowedRoles={['EVENT_ADMIN']}><EventAccountSettings /></ProtectedRoute>} />
               <Route path="event-profile" element={<ProtectedRoute allowedRoles={['EVENT_ADMIN']}><EventAdminProfilePage /></ProtectedRoute>} />
               <Route path="club-profile" element={<ProtectedRoute allowedRoles={['CLUB_ADMIN']}><ClubProfilePage /></ProtectedRoute>} />

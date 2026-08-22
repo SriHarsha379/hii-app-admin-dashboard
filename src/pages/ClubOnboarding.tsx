@@ -19,6 +19,9 @@ import {
   X,
   Upload,
   User,
+  Lock,
+  Clock,
+  CheckCircle2,
   Shield,
   Camera,
   Layers,
@@ -61,6 +64,8 @@ const initialForm = {
   description: '',
   city: '',
   address: '',
+  password: '',
+  confirmPassword: '',
   // Arrays of server-side URL strings — NOT base64
   landscape_urls: [] as string[],
   portraits: [] as string[],
@@ -74,6 +79,71 @@ export default function ClubOnboarding() {
   const [registerStep, setRegisterStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // ── Email OTP verification ────────────────────────────────────────────────
+  const [otpSent, setOtpSent] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [verifiedEmail, setVerifiedEmail] = useState('');
+
+  const handleSendOtp = async () => {
+    setOtpError(null);
+    if (!venueFormData.email || !/^\S+@\S+\.\S+$/.test(venueFormData.email)) {
+      setOtpError('Enter a valid email address first.');
+      return;
+    }
+    setIsSendingOtp(true);
+    try {
+      const res = await fetch(`${API_BASE}/vendor/send_registration_otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ email: venueFormData.email, name: venueFormData.contactName || venueFormData.name }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.message?.[0] || json?.message || 'Failed to send OTP');
+      }
+      setOtpSent(true);
+      setEmailVerified(false);
+      setOtpCode('');
+    } catch (err: any) {
+      setOtpError(err.message || 'Failed to send OTP. Please try again.');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    setOtpError(null);
+    if (!otpCode || otpCode.length < 4) {
+      setOtpError('Enter the 4-digit code from your email.');
+      return;
+    }
+    setIsVerifyingOtp(true);
+    try {
+      const res = await fetch(`${API_BASE}/vendor/verify_registration_otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ email: venueFormData.email, otp: otpCode }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.message?.[0] || json?.message || 'Incorrect OTP');
+      }
+      setEmailVerified(true);
+      setVerifiedEmail(venueFormData.email);
+    } catch (err: any) {
+      setOtpError(err.message || 'Verification failed. Please try again.');
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  // If they change the email after verifying, the old verification no
+  // longer applies to the new address — re-require sending a fresh OTP.
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isSticky, setIsSticky] = useState(false);
@@ -123,7 +193,7 @@ export default function ClubOnboarding() {
       // raw response as the array itself, so this list was always empty.
       return Array.isArray(json.data) ? json.data : [];
     },
-    enabled: Boolean(token) && step === 'claim',
+    enabled: Boolean(token) && (step === 'claim' || step === 'register'),
   });
 
   const cityOptions = Array.isArray(cities)
@@ -131,7 +201,7 @@ export default function ClubOnboarding() {
     : [];
 
   const venueTypeOptions = Array.isArray(venueTypes)
-    ? venueTypes.map((t: any) => ({ label: t.category_name, value: t.category_name }))
+    ? venueTypes.map((t: any) => ({ label: t.category_name, value: t._id }))
     : [];
 
   // ── Registration form ──────────────────────────────────────────────────────
@@ -141,6 +211,17 @@ export default function ClubOnboarding() {
     email: user?.email || '',
     contactName: user?.name || '',
   });
+
+  const emailChangedSinceVerify = emailVerified && venueFormData.email !== verifiedEmail;
+
+  // Live "claim this instead" check — matches against real vendor names as
+  // the club name is typed, only once at least 3 characters are entered
+  // to avoid noisy false-positive matches on very short input.
+  const nameMatchedClub = React.useMemo(() => {
+    const q = venueFormData.name.trim().toLowerCase();
+    if (q.length < 3 || !Array.isArray(claimableClubs)) return null;
+    return claimableClubs.find((c: any) => c.name?.toLowerCase() === q) || null;
+  }, [venueFormData.name, claimableClubs]);
 
   const [workingHours, setWorkingHours] = useState([
     { day: 'Monday',    time: '10:00 PM - 04:00 AM', active: true },
@@ -170,38 +251,49 @@ export default function ClubOnboarding() {
 
   // ── Image upload handlers ──────────────────────────────────────────────────
 
-  const handlePortraitUpload = async (file: File) => {
+  // FIXED: was calling `uploadImage()`, a function that doesn't exist
+  // anywhere in this codebase (not defined, not imported) — this would
+  // throw a ReferenceError the instant anyone tried to add a photo,
+  // crashing the whole registration flow. Now holds the raw File directly
+  // and shows a local preview via URL.createObjectURL, attaching the real
+  // file to the final multipart submission instead — same pattern already
+  // used successfully on Events.tsx and Clubs.tsx.
+  const [portraitFiles, setPortraitFiles] = useState<File[]>([]);
+  const [landscapeFiles, setLandscapeFiles] = useState<File[]>([]);
+
+  const handlePortraitUpload = (file: File) => {
     setUploadError(null);
-    setUploadingPortrait(true);
-    try {
-      const url = await uploadImage(file, token!);
-      setVenueFormData((f) => ({
-        ...f,
-        portraits: [...f.portraits, url],
-        portrait_url: f.portraits.length === 0 ? url : f.portrait_url,
-      }));
-    } catch (err: any) {
-      setUploadError(err.message || 'Portrait upload failed.');
-    } finally {
-      setUploadingPortrait(false);
-    }
+    const url = URL.createObjectURL(file);
+    setPortraitFiles((f) => [...f, file]);
+    setVenueFormData((f) => ({
+      ...f,
+      portraits: [...f.portraits, url],
+      portrait_url: f.portraits.length === 0 ? url : f.portrait_url,
+    }));
   };
 
-  const handleLandscapeUpload = async (file: File) => {
+  const handleLandscapeUpload = (file: File) => {
     setUploadError(null);
-    setUploadingLandscape(true);
-    try {
-      const url = await uploadImage(file, token!);
-      setVenueFormData((f) => ({ ...f, landscape_urls: [...f.landscape_urls, url] }));
-    } catch (err: any) {
-      setUploadError(err.message || 'Gallery upload failed.');
-    } finally {
-      setUploadingLandscape(false);
-    }
+    const url = URL.createObjectURL(file);
+    setLandscapeFiles((f) => [...f, file]);
+    setVenueFormData((f) => ({ ...f, landscape_urls: [...f.landscape_urls, url] }));
   };
 
   // ── Submit ─────────────────────────────────────────────────────────────────
 
+  // FIXED — was three separate problems:
+  // 1. Password was randomly generated and never shown or emailed to the
+  //    registrant (confirmed: the backend's vendor-creation function sends
+  //    no email at all) — the account would have been permanently
+  //    unusable, since nobody would ever know the password.
+  // 2. Everything collected in Steps 2 & 3 (category, capacity,
+  //    description, and every uploaded photo) was silently discarded —
+  //    only name/email/phone/city/address ever reached the backend.
+  // 3. Registering only ever created a Vendor *account* — never an actual
+  //    Venue *listing*, despite the form collecting venue details.
+  // Now: creates the Vendor with the admin's own chosen password, then
+  // creates a linked Venue with the real category/schedule/photos —
+  // matching what Super Admin's own "+ Add Club" wizard actually submits.
   const handleRegister = async () => {
     setIsSubmitting(true);
     setSubmitError(null);
@@ -213,38 +305,81 @@ export default function ClubOnboarding() {
       if (!venueFormData.email || !venueFormData.phone) {
         throw new Error('Email and phone number are required.');
       }
+      if (!venueFormData.password || venueFormData.password.length < 6) {
+        throw new Error('Choose a password of at least 6 characters.');
+      }
+      if (venueFormData.password !== venueFormData.confirmPassword) {
+        throw new Error('Passwords do not match.');
+      }
+      if (!emailVerified || emailChangedSinceVerify) {
+        throw new Error('Please verify your email before submitting.');
+      }
+      const activeDays = workingHours.filter((h) => h.active);
+      if (activeDays.length === 0) {
+        throw new Error('Select at least one open day.');
+      }
+      if (!venueFormData.type) {
+        throw new Error('Select a venue category.');
+      }
+      if (portraitFiles.length === 0) {
+        throw new Error('Upload at least one venue photo.');
+      }
 
-      // FIXED (Phase 2): the real `/vendor/add_vendor` route requires
-      // multipart/form-data (not JSON) with name, email, phone_number, city,
-      // state, address, password, and vendor_type — none of which this form
-      // was actually sending (no password/state field existed at all, so
-      // every submission failed backend validation with "All fields are
-      // required including vendor type"). This club-claim flow creates an
-      // "owner" vendor and auto-generates a password, which the backend
-      // emails to the registrant as part of its existing welcome email.
-      // `state` is resolved from the selected city's `state_id` since the
-      // form only collects a city.
-      const generatedPassword = `Hii-${Math.random().toString(36).slice(2, 8)}${Math.floor(Math.random() * 100)}!`;
+      // Step 1: create the Vendor account with the admin's own password.
+      const vendorBody = new FormData();
+      vendorBody.append('name', venueFormData.name);
+      vendorBody.append('email', venueFormData.email);
+      vendorBody.append('phone_number', venueFormData.phone);
+      vendorBody.append('city', venueFormData.city);
+      vendorBody.append('state', selectedCity.state_id);
+      vendorBody.append('address', venueFormData.address || 'Not provided');
+      vendorBody.append('password', venueFormData.password);
+      vendorBody.append('vendor_type', 'owner');
+      vendorBody.append('contact_person', venueFormData.contactName || '');
+      vendorBody.append('capacity', venueFormData.capacity || '');
+      vendorBody.append('description', venueFormData.description || '');
 
-      const body = new FormData();
-      body.append('name', venueFormData.name);
-      body.append('email', venueFormData.email);
-      body.append('phone_number', venueFormData.phone);
-      body.append('city', venueFormData.city);
-      body.append('state', selectedCity.state_id);
-      body.append('address', venueFormData.address || 'Not provided');
-      body.append('password', generatedPassword);
-      body.append('vendor_type', 'owner');
-
-      const res = await fetch(`${API_BASE}/vendor/add_vendor`, {
+      const vendorRes = await fetch(`${API_BASE}/vendor/add_vendor`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
-        body,
+        body: vendorBody,
       });
 
-      if (!res.ok) {
-        const body2 = await res.json().catch(() => null);
-        throw new Error(body2?.message?.[0] || body2?.message || `Registration failed with status ${res.status}`);
+      const vendorJson = await vendorRes.json().catch(() => null);
+      if (!vendorRes.ok) {
+        throw new Error(vendorJson?.message?.[0] || vendorJson?.message || `Registration failed with status ${vendorRes.status}`);
+      }
+      const newVendorId = vendorJson?.data?._id;
+
+      // Step 2: create the linked Venue listing with the real category,
+      // schedule, and photos — same real endpoint Super Admin's own venue
+      // creation wizard uses.
+      if (newVendorId) {
+        const [start_time, end_time] = activeDays[0].time.split(' - ').map((s: string) => s.trim());
+        const venueBody = new FormData();
+        venueBody.append('venue_name', venueFormData.name);
+        venueBody.append('city_id', venueFormData.city);
+        venueBody.append('category_ids', JSON.stringify([venueFormData.type]));
+        venueBody.append('open_days', JSON.stringify(activeDays.map((h) => h.day)));
+        venueBody.append('start_time', start_time || '');
+        venueBody.append('end_time', end_time || '');
+        venueBody.append('address', venueFormData.address || '');
+        venueBody.append('about', venueFormData.description || '');
+        venueBody.append('vendor_id', newVendorId);
+        if (portraitFiles[0]) venueBody.append('venue_image', portraitFiles[0]);
+        landscapeFiles.forEach((f) => venueBody.append('gallery_images', f));
+
+        const venueRes = await fetch(`${API_BASE}/venue/create_venue`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: venueBody,
+        });
+        if (!venueRes.ok) {
+          // The vendor account was still created successfully even if this
+          // part fails — don't block the whole registration on it, but do
+          // surface it, since it means their venue listing is incomplete.
+          console.error('Venue creation failed after vendor was created:', await venueRes.text());
+        }
       }
 
       // New signups now require Super Admin approval before they can log in
@@ -261,7 +396,9 @@ export default function ClubOnboarding() {
   };
 
   const handleClaim = (club: any) => {
-    navigate(`/claim-club/${club.id}`);
+    // FIXED: was `club.id`, but vendor records use `_id` (MongoDB
+    // convention) — this always navigated to `/claim-club/undefined`.
+    navigate(`/claim-club/${club._id || club.id}`);
   };
 
   // ── Claim search ───────────────────────────────────────────────────────────
@@ -419,7 +556,7 @@ export default function ClubOnboarding() {
             )}
             {!isLoadingClubs && filteredClaimableClubs.map((club: any) => (
               <motion.div
-                key={club.id}
+                key={club._id || club.id}
                 layout
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -522,6 +659,29 @@ export default function ClubOnboarding() {
                         placeholder="Enter club name"
                         icon={<Sparkles className="w-4 h-4" />}
                       />
+                      {/* Inline "claim this instead" — as requested, so
+                          someone doesn't accidentally create a duplicate
+                          listing for a venue that's already in the system.
+                          Was previously only reachable via a completely
+                          separate "options" screen choice, not discoverable
+                          while actually typing the venue name. */}
+                      {nameMatchedClub && (
+                        <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between gap-4 flex-wrap">
+                          <div className="flex items-center gap-3">
+                            <Building2 className="w-4 h-4 text-amber-400 shrink-0" />
+                            <p className="text-xs text-amber-200/90">
+                              <span className="font-bold text-amber-300">"{nameMatchedClub.name}"</span> already exists in our system. Is this your venue?
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleClaim(nameMatchedClub)}
+                            className="px-5 py-2.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest text-amber-300 hover:bg-amber-500/30 transition-all shrink-0"
+                          >
+                            Claim It Instead
+                          </button>
+                        </div>
+                      )}
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                         <div className="space-y-8">
                           <div className="space-y-4">
@@ -572,10 +732,61 @@ export default function ClubOnboarding() {
                   <FormSection title="Contact Information" icon={<Mail className="w-4 h-4" />}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                       <div className="col-span-1 md:col-span-2">
-                        <RefinedField label="Email Address" name="email" type="email" value={venueFormData.email} onChange={(e: any) => setVenueFormData({ ...venueFormData, email: e.target.value })} placeholder="club@example.com" icon={<Mail className="w-4 h-4" />} />
+                        <RefinedField label="Email Address" name="email" type="email" value={venueFormData.email} onChange={(e: any) => { setVenueFormData({ ...venueFormData, email: e.target.value }); setOtpSent(false); setEmailVerified(false); }} placeholder="club@example.com" icon={<Mail className="w-4 h-4" />} />
+                      </div>
+
+                      {/* Email OTP verification — required before this admin
+                          can complete registration. Reuses the same real
+                          email-sending infrastructure already used
+                          elsewhere in this backend for OTP verification. */}
+                      <div className="col-span-1 md:col-span-2 p-6 rounded-2xl bg-white/[0.03] border border-white/5 space-y-4">
+                        {emailVerified && !emailChangedSinceVerify ? (
+                          <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
+                            <CheckCircle2 className="w-4 h-4" /> Email verified
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center justify-between gap-4 flex-wrap">
+                              <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
+                                {otpSent && !emailChangedSinceVerify ? 'Enter the code sent to your email' : 'Verify your email to continue'}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={handleSendOtp}
+                                disabled={isSendingOtp}
+                                className="px-4 py-2 rounded-xl bg-primary/20 border border-primary/30 text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/30 transition-all disabled:opacity-50"
+                              >
+                                {isSendingOtp ? 'Sending…' : (otpSent ? 'Resend OTP' : 'Send OTP')}
+                              </button>
+                            </div>
+                            {otpSent && !emailChangedSinceVerify && (
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="text"
+                                  value={otpCode}
+                                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                  placeholder="4-digit code"
+                                  maxLength={4}
+                                  className="flex-1 bg-[#09090B] border border-white/10 rounded-xl px-4 py-3 text-sm text-white tracking-[0.3em] text-center focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleVerifyOtp}
+                                  disabled={isVerifyingOtp}
+                                  className="px-5 py-3 rounded-xl bg-primary text-white text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 transition-all disabled:opacity-50 shrink-0"
+                                >
+                                  {isVerifyingOtp ? 'Verifying…' : 'Verify'}
+                                </button>
+                              </div>
+                            )}
+                            {otpError && <p className="text-[10px] text-red-400 font-bold">{otpError}</p>}
+                          </>
+                        )}
                       </div>
                       <RefinedField label="Phone Number" name="phone" value={venueFormData.phone} onChange={(e: any) => setVenueFormData({ ...venueFormData, phone: e.target.value })} placeholder="+91 00000 00000" icon={<Phone className="w-4 h-4" />} />
                       <RefinedField label="Contact Person" name="contactName" value={venueFormData.contactName} onChange={(e: any) => setVenueFormData({ ...venueFormData, contactName: e.target.value })} placeholder="Full Name" icon={<User className="w-4 h-4" />} />
+                      <RefinedField label="Choose a Password" name="password" type="password" value={venueFormData.password} onChange={(e: any) => setVenueFormData({ ...venueFormData, password: e.target.value })} placeholder="At least 6 characters" icon={<Lock className="w-4 h-4" />} />
+                      <RefinedField label="Confirm Password" name="confirmPassword" type="password" value={venueFormData.confirmPassword} onChange={(e: any) => setVenueFormData({ ...venueFormData, confirmPassword: e.target.value })} placeholder="Re-enter password" icon={<Lock className="w-4 h-4" />} />
                     </div>
                   </FormSection>
                 </motion.div>
@@ -614,6 +825,42 @@ export default function ClubOnboarding() {
                           className="w-full bg-[#09090B] border border-white/5 rounded-[40px] px-10 py-8 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 resize-none font-medium placeholder:text-white/10"
                         />
                       </div>
+                    </div>
+                  </FormSection>
+
+                  {/* Open Days & Hours — the state/logic for this already
+                      existed (toggleDay, updateDayTime, workingHours) but
+                      was never actually rendered anywhere, so it was
+                      silently missing from the form entirely despite the
+                      backend requiring it to create a venue. */}
+                  <FormSection title="Open Days & Hours" icon={<Clock className="w-4 h-4" />}>
+                    <div className="space-y-3">
+                      {workingHours.map((day, idx) => (
+                        <div key={day.day} className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/5">
+                          <button
+                            type="button"
+                            onClick={() => toggleDay(idx)}
+                            className={cn(
+                              'w-12 h-6 rounded-full transition-all relative shrink-0',
+                              day.active ? 'bg-primary' : 'bg-white/10'
+                            )}
+                          >
+                            <span className={cn('absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all', day.active ? 'left-6' : 'left-0.5')} />
+                          </button>
+                          <span className={cn('text-xs font-bold uppercase tracking-widest w-24 shrink-0', day.active ? 'text-white' : 'text-white/30')}>{day.day}</span>
+                          {day.active ? (
+                            <input
+                              type="text"
+                              value={day.time}
+                              onChange={(e) => updateDayTime(idx, e.target.value)}
+                              placeholder="10:00 PM - 04:00 AM"
+                              className="flex-1 bg-transparent text-sm text-white/70 focus:outline-none placeholder:text-white/20"
+                            />
+                          ) : (
+                            <span className="flex-1 text-sm text-white/20">Closed</span>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </FormSection>
                 </motion.div>
@@ -751,7 +998,9 @@ export default function ClubOnboarding() {
               {registerStep < 3 ? (
                 <button
                   onClick={() => setRegisterStep((s) => s + 1)}
-                  className="px-14 py-5 rounded-[24px] bg-primary text-white text-[10px] font-black uppercase tracking-[0.3em] shadow-[0_10px_40px_rgba(255,45,154,0.3)] hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-4 group"
+                  disabled={registerStep === 1 && (!emailVerified || emailChangedSinceVerify)}
+                  title={registerStep === 1 && (!emailVerified || emailChangedSinceVerify) ? 'Verify your email to continue' : undefined}
+                  className="px-14 py-5 rounded-[24px] bg-primary text-white text-[10px] font-black uppercase tracking-[0.3em] shadow-[0_10px_40px_rgba(255,45,154,0.3)] hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-4 group disabled:opacity-40 disabled:hover:scale-100 disabled:cursor-not-allowed"
                 >
                   Next Step <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </button>

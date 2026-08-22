@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { useQuery } from '@tanstack/react-query';
-import { 
-  X, 
-  Send, 
-  MapPin, 
-  Mail, 
-  Phone, 
-  User, 
-  Building2, 
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  X,
+  Send,
+  MapPin,
+  Mail,
+  Phone,
+  User,
+  Building2,
   Users2,
   ChevronDown,
   AlertCircle,
@@ -24,7 +24,8 @@ import {
   Eye,
   Lock,
   Layers,
-  Upload
+  Upload,
+  CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/utils';
@@ -61,28 +62,28 @@ export default function AccountSettings() {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Failed to load club');
-      return res.json();
+      const json = await res.json();
+      return json.data ?? [];
     },
     enabled: Boolean(token)
   });
 
+  const myVendor = Array.isArray(clubs) ? clubs.find((item: any) => item.name === user?.organisation) : null;
+
   useEffect(() => {
-    const club = Array.isArray(clubs) ? clubs.find((item: any) => item.name === user?.organisation) : null;
+    const club = myVendor;
     if (!club) return;
-    let contactInfo: any = {};
-    try {
-      contactInfo = typeof club.contact_info === 'string' ? JSON.parse(club.contact_info) : club.contact_info || {};
-    } catch {
-      contactInfo = {};
-    }
     const next = {
       venueName: club.name || '',
-      city: club.city || '',
+      // Same fix as elsewhere: city comes back as a populated
+      // {_id, city_name} object. Store the _id (what the dropdown below
+      // and the backend both need), not the display name.
+      city: (typeof club.city === 'object' ? club.city?._id : club.city) || '',
       address: club.address || '',
-      email: contactInfo.email || user?.email || '',
-      phone: contactInfo.phone || '',
-      contactPerson: contactInfo.contactName || user?.name || '',
-      venueType: club.type || club.venue_type || '',
+      email: club.email || user?.email || '',
+      phone: club.phone_number || '',
+      contactPerson: club.contact_person || user?.name || '',
+      venueType: club.vendor_type || '',
       capacity: club.capacity ? String(club.capacity) : '',
       description: club.description || ''
     };
@@ -90,18 +91,50 @@ export default function AccountSettings() {
     setFormData(next);
   }, [clubs, user]);
 
-  const { data: venueTypes } = useQuery({
-    queryKey: ['venueTypes'],
+  const queryClient = useQueryClient();
+
+  // Real cities list — the City field below was a free-text input, which
+  // would have sent a plain string ("Mumbai") to a field that's actually a
+  // City ObjectId reference on the backend, corrupting it on save.
+  const { data: cities } = useQuery({
+    queryKey: ['cities-account-settings'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/venueTypes`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await fetch(`${API_BASE}/city/get_all_cities`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return json.data ?? [];
+    },
+  });
+
+  // Was completely fake — Box 2's "Save" just flashed a success message for
+  // 3 seconds without ever contacting the backend, and Box 1's "Submit for
+  // Review" button didn't submit anything at all — it just logged the
+  // admin out. Both now genuinely persist via the real vendor update
+  // endpoint. capacity/description/contact_person didn't even have a
+  // field to save into before — added to the Vendor schema so this isn't
+  // just a UI that pretends to work.
+  const updateVendorMutation = useMutation({
+    mutationFn: async (fields: Record<string, any>) => {
+      if (!myVendor?._id) throw new Error('No venue found for your account');
+      const body = new FormData();
+      Object.entries(fields).forEach(([k, v]) => { if (v !== undefined && v !== null) body.append(k, String(v)); });
+      const res = await fetch(`${API_BASE}/vendor/update_vendor/${myVendor._id}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+        body,
       });
-      return res.json();
-    }
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.message?.[0] || json?.message || 'Failed to save changes');
+      }
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clubs-account-settings'] });
+    },
   });
 
   // Check for changes in Box 1 (Venue Details)
-  const hasBox1Changes = 
+  const hasBox1Changes =
     formData.venueName !== initialFormData.venueName ||
     formData.venueType !== initialFormData.venueType ||
     formData.phone !== initialFormData.phone ||
@@ -110,7 +143,7 @@ export default function AccountSettings() {
     formData.address !== initialFormData.address;
 
   // Check for changes in Box 2 (Specifications)
-  const hasBox2Changes = 
+  const hasBox2Changes =
     formData.contactPerson !== initialFormData.contactPerson ||
     formData.capacity !== initialFormData.capacity ||
     formData.description !== initialFormData.description;
@@ -134,14 +167,55 @@ export default function AccountSettings() {
     }
   };
 
-  const handleSaveBox2 = () => {
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3000);
+  // FIXED: was purely local — flashed a "Saved!" message for 3 seconds
+  // without ever contacting the backend, so nothing typed here actually
+  // persisted.
+  const handleSaveBox2 = async () => {
+    try {
+      await updateVendorMutation.mutateAsync({
+        contact_person: formData.contactPerson,
+        capacity: formData.capacity,
+        description: formData.description,
+      });
+      setInitialFormData((prev: any) => ({ ...prev, contactPerson: formData.contactPerson, capacity: formData.capacity, description: formData.description }));
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 3000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to save changes');
+    }
   };
 
   const handleSendApprovalClick = () => {
     if (hasBox1Changes) {
       setShowApprovalDialog(true);
+    }
+  };
+
+  // FIXED: the dialog's "Submit for Review" button previously didn't submit
+  // anything at all — it just logged the admin out, silently discarding
+  // whatever they'd typed. Now genuinely saves the changed fields.
+  const handleConfirmSubmitForReview = async () => {
+    try {
+      await updateVendorMutation.mutateAsync({
+        name: formData.venueName,
+        vendor_type: formData.venueType,
+        phone_number: formData.phone,
+        email: formData.email,
+        city: formData.city,
+        address: formData.address,
+      });
+      setInitialFormData((prev: any) => ({
+        ...prev,
+        venueName: formData.venueName,
+        venueType: formData.venueType,
+        phone: formData.phone,
+        email: formData.email,
+        city: formData.city,
+        address: formData.address,
+      }));
+      setShowApprovalDialog(false);
+    } catch (err: any) {
+      alert(err.message || 'Failed to save changes');
     }
   };
 
@@ -152,16 +226,24 @@ export default function AccountSettings() {
         <div className="space-y-4 relative z-10">
           <div className="flex items-center gap-3 text-primary">
             <Settings2 className="w-5 h-5 animate-spin-slow" />
-            <span className="text-[10px] font-black uppercase tracking-[0.4em]">Venue Settings</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.4em]">Venue Profile</span>
           </div>
-          <h1 className="text-5xl font-black text-white tracking-tighter uppercase leading-none">
-            Account <span className="text-primary neon-text">Settings</span>
-          </h1>
+          <div className="flex items-center gap-4 flex-wrap">
+            <h1 className="text-5xl font-black text-white tracking-tighter uppercase leading-none">
+              Your <span className="text-primary neon-text">Profile</span>
+            </h1>
+            {/* Reaching this page at all confirms the venue is already
+                approved — the approval gate in App.tsx routes anyone not
+                yet verified to /pending-approval instead. */}
+            <span className="px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Approved
+            </span>
+          </div>
           <p className="text-white/40 font-medium text-lg max-w-2xl leading-relaxed">
-            Update your venue details and public information. Some changes may require admin approval.
+            Update your venue details and public information.
           </p>
         </div>
-        
+
         <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full blur-[100px] -mr-32 -mt-32 pointer-events-none" />
       </div>
 
@@ -170,7 +252,7 @@ export default function AccountSettings() {
         {/* Box 1: Account Details */}
         <div className="glass-card rounded-[48px] border border-white/5 p-10 lg:p-16 relative overflow-hidden shadow-2xl">
           <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[100px] -mr-48 -mt-48 pointer-events-none opacity-50" />
-          
+
           <div className="relative z-10 space-y-16">
             <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-8 border-b border-white/5 pb-10">
               <div className="space-y-4 max-w-3xl">
@@ -185,22 +267,22 @@ export default function AccountSettings() {
                   Some details need verification. Changes to these fields will be reviewed by our team.
                 </p>
               </div>
-              
+
               <div className="flex items-center gap-4 shrink-0">
-                <button 
+                <button
                   onClick={handleCancelClick}
                   className="px-8 py-4 rounded-[20px] bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-white/40 hover:text-white hover:bg-white/10 transition-all flex items-center gap-3 active:scale-95"
                 >
                   <X className="w-4 h-4" />
                   Cancel
                 </button>
-                <button 
+                <button
                   onClick={handleSendApprovalClick}
                   disabled={!hasBox1Changes}
                   className={cn(
                     "px-10 py-5 rounded-[20px] text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-2xl flex items-center gap-3 active:scale-95",
-                    hasBox1Changes 
-                      ? "bg-primary text-white hover:bg-primary/90 shadow-primary/30" 
+                    hasBox1Changes
+                      ? "bg-primary text-white hover:bg-primary/90 shadow-primary/30"
                       : "bg-white/5 text-white/10 cursor-not-allowed border border-white/5"
                   )}
                 >
@@ -214,48 +296,62 @@ export default function AccountSettings() {
               <FormSection title="Location & Appearance" icon={<Layers className="w-4 h-4" />}>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
                   <div className="space-y-10">
-                    <RefinedField 
-                      label="Venue Name" 
+                    <RefinedField
+                      label="Venue Name"
                       name="venueName"
                       value={formData.venueName}
                       onChange={handleChange}
                       placeholder="Venue Name"
                       icon={<Building2 className="w-4 h-4" />}
                     />
-                    
+
                     <div className="space-y-4 group/field">
-                      <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Venue Type</label>
+                      <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Account Type</label>
                       <div className="relative">
-                        <select 
+                        <select
                           name="venueType"
                           value={formData.venueType}
                           onChange={handleChange}
                           className="w-full bg-[#09090B] border border-white/10 rounded-[24px] px-8 py-5 text-white hover:border-white/20 focus:border-primary/50 focus:outline-none transition-all appearance-none text-sm font-medium"
                         >
-                          <option value="">Select venue type...</option>
-                          {venueTypes?.map((type: any) => (
-                            <option key={type.id} value={type.name}>{type.name}</option>
-                          ))}
+                          {/* FIXED: was populated from a Category list
+                              (nightclub/lounge/etc.) that has nothing to do
+                              with what this field actually saves to —
+                              `vendor_type` is a strict owner/event_organizer
+                              enum on the backend, and a Category id would
+                              have failed validation outright on save. */}
+                          <option value="owner">Owner</option>
+                          <option value="event_organizer">Event Organizer</option>
                         </select>
                         <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 pointer-events-none group-focus-within/field:rotate-180 transition-transform" />
                       </div>
                     </div>
 
-                    <RefinedField 
-                      label="City" 
-                      name="city"
-                      value={formData.city}
-                      onChange={handleChange}
-                      placeholder="City Name"
-                      icon={<MapPin className="w-4 h-4" />}
-                    />
+                    <div className="space-y-4 group/field">
+                      <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">City</label>
+                      <div className="relative">
+                        <MapPin className="absolute left-6 top-1/2 -translate-y-1/2 text-white/20 w-4 h-4 z-10" />
+                        <select
+                          name="city"
+                          value={formData.city}
+                          onChange={handleChange}
+                          className="w-full bg-[#09090B] border border-white/10 rounded-[24px] pl-14 pr-8 py-5 text-white hover:border-white/20 focus:border-primary/50 focus:outline-none transition-all appearance-none text-sm font-medium"
+                        >
+                          <option value="">Select city...</option>
+                          {(Array.isArray(cities) ? cities : []).slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((c: any) => (
+                            <option key={c._id} value={c._id}>{c.city_name}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 pointer-events-none" />
+                      </div>
+                    </div>
                   </div>
 
                   <div className="space-y-6">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1 text-center block">Exact Location</label>
                     <div className="aspect-video bg-[#09090B] border border-white/5 rounded-[40px] relative overflow-hidden flex items-center justify-center group cursor-pointer shadow-inner">
-                      <img 
-                        src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=2000" 
+                      <img
+                        src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=2000"
                         className="absolute inset-0 w-full h-full object-cover opacity-10 grayscale group-hover:opacity-20 transition-all duration-1000 group-hover:scale-110"
                         alt="Map"
                       />
@@ -277,8 +373,8 @@ export default function AccountSettings() {
               <FormSection title="Contact Details" icon={<Clock className="w-4 h-4" />}>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
                   <div className="col-span-1 md:col-span-2 lg:col-span-1">
-                    <RefinedField 
-                      label="Phone Number" 
+                    <RefinedField
+                      label="Phone Number"
                       name="phone"
                       value={formData.phone}
                       onChange={handleChange}
@@ -287,8 +383,8 @@ export default function AccountSettings() {
                     />
                   </div>
                   <div className="col-span-1 md:col-span-2">
-                    <RefinedField 
-                      label="Email Address" 
+                    <RefinedField
+                      label="Email Address"
                       name="email"
                       type="email"
                       value={formData.email}
@@ -300,7 +396,7 @@ export default function AccountSettings() {
                   <div className="col-span-1 md:col-span-3">
                     <div className="space-y-4 group/field">
                       <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Full Address</label>
-                      <textarea 
+                      <textarea
                         name="address"
                         value={formData.address}
                         onChange={handleChange}
@@ -319,7 +415,7 @@ export default function AccountSettings() {
         {/* Box 2: Public Profile */}
         <div className="glass-card rounded-[48px] border border-white/5 p-10 lg:p-16 relative overflow-hidden shadow-2xl">
           <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[100px] -mr-48 -mt-48 pointer-events-none opacity-50" />
-          
+
           <div className="relative z-10 space-y-16">
             <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-8 border-b border-white/5 pb-10">
               <div className="space-y-4 max-w-3xl">
@@ -334,9 +430,9 @@ export default function AccountSettings() {
                   Changes here will update instantly on your public profile.
                 </p>
               </div>
-              
+
               <div className="flex items-center gap-4 shrink-0">
-                <button 
+                <button
                   onClick={handleDiscardBox2}
                   disabled={!hasBox2Changes}
                   className={cn(
@@ -349,13 +445,13 @@ export default function AccountSettings() {
                   <X className="w-4 h-4" />
                   Discard Changes
                 </button>
-                <button 
+                <button
                   onClick={handleSaveBox2}
                   disabled={!hasBox2Changes}
                   className={cn(
                     "px-10 py-5 rounded-[20px] text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-2xl flex items-center gap-3 min-w-[150px] justify-center active:scale-95",
-                    isSaved 
-                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-emerald-500/10" 
+                    isSaved
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-emerald-500/10"
                       : hasBox2Changes
                         ? "bg-white text-black hover:bg-white/90 shadow-white/10"
                         : "bg-white/5 text-white/10 border border-white/5 cursor-not-allowed shadow-none"
@@ -379,16 +475,16 @@ export default function AccountSettings() {
             <FormSection title="Business Information" icon={<Lock className="w-4 h-4" />}>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
                 <div className="space-y-10">
-                  <RefinedField 
-                    label="Manager Name" 
+                  <RefinedField
+                    label="Manager Name"
                     name="contactPerson"
                     value={formData.contactPerson}
                     onChange={handleChange}
                     placeholder="Primary Contact"
                     icon={<User className="w-4 h-4" />}
                   />
-                  <RefinedField 
-                    label="Guest Capacity" 
+                  <RefinedField
+                    label="Guest Capacity"
                     name="capacity"
                     type="number"
                     value={formData.capacity}
@@ -397,10 +493,10 @@ export default function AccountSettings() {
                     icon={<Users2 className="w-4 h-4" />}
                   />
                 </div>
-                
+
                 <div className="space-y-4 group/field">
                   <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Venue Description</label>
-                  <textarea 
+                  <textarea
                     name="description"
                     value={formData.description}
                     onChange={handleChange}
@@ -420,14 +516,14 @@ export default function AccountSettings() {
         {/* Discard Confirmation Overlay */}
         {showCancelDialog && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 sm:p-12">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowCancelDialog(false)}
               className="absolute inset-0 bg-black/90 backdrop-blur-md"
             />
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 40 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 40 }}
@@ -444,13 +540,13 @@ export default function AccountSettings() {
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row w-full gap-4">
-                  <button 
+                  <button
                     onClick={() => navigate('/')}
                     className="flex-1 py-5 rounded-[24px] bg-white text-black text-[11px] font-black uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-95 transition-all shadow-2xl"
                   >
                     Discard
                   </button>
-                  <button 
+                  <button
                     onClick={() => setShowCancelDialog(false)}
                     className="flex-1 py-5 rounded-[24px] border border-white/10 text-white/40 text-[11px] font-black uppercase tracking-[0.2em] hover:text-white hover:bg-white/5 transition-all"
                   >
@@ -466,14 +562,14 @@ export default function AccountSettings() {
         {/* Review Confirmation Overlay */}
         {showApprovalDialog && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 sm:p-12">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowApprovalDialog(false)}
               className="absolute inset-0 bg-[#050505]/95 backdrop-blur-xl"
             />
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 40 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 40 }}
@@ -486,34 +582,32 @@ export default function AccountSettings() {
                     <Send className="w-14 h-14 text-primary neon-text" />
                   </div>
                 </div>
-                
+
                 <div className="space-y-6">
                   <h3 className="text-4xl font-black text-white uppercase tracking-tighter shadow-primary/20 leading-none">
-                    Submit for <span className="text-primary">Manual Check</span>
+                    Save <span className="text-primary">Business Details?</span>
                   </h3>
                   <div className="p-8 rounded-[32px] bg-primary/5 border border-primary/10 space-y-4">
                     <p className="text-white/60 text-lg leading-relaxed font-medium">
-                      Account Review
+                      These changes will be saved to your venue's public profile right away.
                     </p>
-                    <div className="flex items-center justify-center gap-3 text-red-500/80 animate-pulse">
-                      <Lock className="w-4 h-4" />
-                      <span className="text-[10px] font-black uppercase tracking-[0.2em]">Requires Approval</span>
+                    <div className="flex items-center justify-center gap-3 text-emerald-400/80">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em]">No re-approval needed</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="flex flex-col sm:flex-row w-full gap-6">
-                  <button 
-                    onClick={() => {
-                      logout();
-                      navigate('/login');
-                    }}
-                    className="flex-[2] py-6 rounded-[28px] bg-primary text-white text-[12px] font-black uppercase tracking-[0.3em] hover:scale-[1.03] active:scale-95 transition-all shadow-[0_20px_60px_rgba(255,45,154,0.4)] flex items-center justify-center gap-4 group"
+                  <button
+                    onClick={handleConfirmSubmitForReview}
+                    disabled={updateVendorMutation.isPending}
+                    className="flex-[2] py-6 rounded-[28px] bg-primary text-white text-[12px] font-black uppercase tracking-[0.3em] hover:scale-[1.03] active:scale-95 transition-all shadow-[0_20px_60px_rgba(255,45,154,0.4)] flex items-center justify-center gap-4 group disabled:opacity-50"
                   >
-                    Submit for Review
-                    <LogOut className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    {updateVendorMutation.isPending ? 'Saving...' : 'Save Changes'}
+                    <Send className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </button>
-                  <button 
+                  <button
                     onClick={() => setShowApprovalDialog(false)}
                     className="flex-1 py-6 rounded-[28px] border border-white/10 text-white/30 text-[12px] font-black uppercase tracking-[0.2em] hover:text-white hover:bg-white/10 transition-all font-mono"
                   >
