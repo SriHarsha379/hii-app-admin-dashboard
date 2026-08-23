@@ -166,6 +166,24 @@ export default function ClubAdminProfile() {
         </div>
       </GlowCard>
 
+      {/* Shown only while the vendor record behind this profile hasn't
+          been verified yet — same messaging as the old dedicated
+          Pending Approval page, now surfaced right on the profile
+          itself since that's where onboarding now lands the admin. */}
+      {clubData && !clubData?.is_verified && (
+        <div className="flex items-start gap-4 p-6 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+            <Clock className="w-5 h-5 text-amber-400" />
+          </div>
+          <div>
+            <p className="text-amber-300 text-xs font-black uppercase tracking-widest mb-1">Pending Verification</p>
+            <p className="text-amber-200/70 text-sm leading-relaxed">
+              Your venue has been submitted for review. A Super Admin needs to approve your account before some features unlock — you'll be notified once that happens.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Growth Overview — was missing entirely. Built from the same real
           events data already fetched above, grouped by actual createdAt
           dates over the last 14 days, same pattern used on the Super

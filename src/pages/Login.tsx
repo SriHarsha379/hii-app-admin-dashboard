@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Lock, Mail, Zap, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -221,6 +221,11 @@ navigate('/');
             </motion.button>
           </form>
           )}
+
+          <div className="mt-10 text-center relative z-10">
+            <span className="text-[11px] text-white/30 font-medium">New club or event organiser? </span>
+            <Link to="/signup" className="text-[11px] font-black text-primary hover:underline uppercase tracking-wider">Register Here</Link>
+          </div>
 
           <div className="mt-12 flex items-center justify-center gap-2 text-white/20 relative z-10">
             <ShieldCheck className="w-4 h-4" />

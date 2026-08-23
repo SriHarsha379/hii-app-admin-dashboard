@@ -71,6 +71,12 @@ export default function EventAdminProfile() {
 
   const associatedClubs = (Array.isArray(clubs) ? clubs : []).slice(0, 4);
 
+  // The event organiser's own vendor record — same lookup pattern as
+  // ClubAdminProfile — used to show real verification status instead of
+  // assuming the admin is already approved just because they have a
+  // dashboard session.
+  const ownVendorData = (Array.isArray(clubs) ? clubs : []).find((c: any) => c.name === user?.organisation) || null;
+
   return (
     <div className="space-y-12 animate-in fade-in duration-700 pb-20">
       {/* Company Profile Header */}
@@ -91,10 +97,16 @@ export default function EventAdminProfile() {
 
           <div className="space-y-6 flex-1">
             <div className="space-y-2">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-4xl font-black text-white tracking-tighter uppercase leading-none">
                   {user?.organisation || user?.name || 'Event Admin'}
                 </h1>
+                <span className={cn(
+                  'px-3 py-1 rounded-full border text-[9px] font-black tracking-widest uppercase',
+                  ownVendorData?.is_verified ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/20 text-amber-400 border-amber-500/20'
+                )}>
+                  {ownVendorData?.is_verified ? 'Verified' : 'Pending Verification'}
+                </span>
               </div>
               <p className="text-muted-foreground text-sm font-medium leading-relaxed max-w-xl">
                 Event management profile
@@ -114,6 +126,24 @@ export default function EventAdminProfile() {
           </div>
         </div>
       </GlowCard>
+
+      {/* Shown only while the vendor record behind this profile hasn't
+          been verified yet — same messaging as the old dedicated
+          Pending Approval page, now surfaced right on the profile
+          itself since that's where onboarding now lands the admin. */}
+      {ownVendorData && !ownVendorData?.is_verified && (
+        <div className="flex items-start gap-4 p-6 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+            <Clock className="w-5 h-5 text-amber-400" />
+          </div>
+          <div>
+            <p className="text-amber-300 text-xs font-black uppercase tracking-widest mb-1">Pending Verification</p>
+            <p className="text-amber-200/70 text-sm leading-relaxed">
+              Your details have been submitted for review. A Super Admin needs to approve your account before some features unlock — you'll be notified once that happens.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-12">
         {/* Events Section with Tabs */}

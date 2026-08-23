@@ -34,6 +34,7 @@ import EventAdminOnboarding from './pages/EventAdminOnboarding';
 import OrganiserRequests from './pages/OrganiserRequests';
 import PendingApproval from './pages/PendingApproval';
 import Bookings from './pages/Bookings';
+import Signup from './pages/Signup';
 
 const ProtectedRoute = ({
   children,
@@ -84,18 +85,24 @@ const ProtectedRoute = ({
 
   // Approval gate for CLUB_ADMIN and EVENT_ADMIN — organisation is set,
   // but the vendor behind it isn't verified yet. Don't gate the
-  // onboarding/claim pages themselves, or the pending-approval page, to
-  // avoid a redirect loop.
+  // onboarding/claim pages themselves, the pending-approval page, or the
+  // admin's own profile page (they land there straight after onboarding
+  // now, with a "pending verification" badge/banner instead of a
+  // separate blank holding page), to avoid a redirect loop / dead end.
   const isPendingApprovalPage = window.location.pathname === '/pending-approval';
   const isOwnOnboardingPage =
     (user.role === 'CLUB_ADMIN' && window.location.pathname === '/club-onboarding') ||
     (user.role === 'EVENT_ADMIN' && window.location.pathname === '/event-onboarding');
+  const isOwnProfilePage =
+    (user.role === 'CLUB_ADMIN' && window.location.pathname === '/club-profile') ||
+    (user.role === 'EVENT_ADMIN' && window.location.pathname === '/event-profile');
   if (
     (user.role === 'CLUB_ADMIN' || user.role === 'EVENT_ADMIN') &&
     user.organisation &&
     !isClaiming &&
     !isOwnOnboardingPage &&
-    !isPendingApprovalPage
+    !isPendingApprovalPage &&
+    !isOwnProfilePage
   ) {
     if (vendorCheckLoading) {
       return <div className="min-h-screen flex items-center justify-center bg-[#0B0B0F] text-white font-bold uppercase tracking-widest text-xs">Loading...</div>;
@@ -124,6 +131,7 @@ export default function App() {
         <BrowserRouter basename="/app/admin">
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
             <Route path="/club-onboarding" element={<ProtectedRoute><ClubOnboarding /></ProtectedRoute>} />
             <Route path="/event-onboarding" element={<ProtectedRoute><EventAdminOnboarding /></ProtectedRoute>} />
             <Route path="/claim-club/:clubId" element={<ProtectedRoute><ClaimClubForm /></ProtectedRoute>} />

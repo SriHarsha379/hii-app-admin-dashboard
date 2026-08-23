@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { FormSection, RefinedField } from '../components/RefinedForm';
@@ -503,6 +503,17 @@ export default function ClubOnboarding() {
 
   // ── Success screen ─────────────────────────────────────────────────────────
 
+  // Auto-advance to the Pending Approval page a few seconds after a
+  // successful submit, instead of leaving the admin stranded on this
+  // screen until they notice and click "View Status" themselves.
+  // The button below still works immediately for anyone who doesn't
+  // want to wait.
+  useEffect(() => {
+    if (!isSuccess) return;
+    const timer = setTimeout(() => navigate('/club-profile'), 4000);
+    return () => clearTimeout(timer);
+  }, [isSuccess, navigate]);
+
   if (isSuccess) {
     return (
       <div className="min-h-screen bg-[#0B0B0F] flex flex-col items-center justify-center p-6 text-center space-y-12 relative overflow-hidden">
@@ -555,11 +566,11 @@ export default function ClubOnboarding() {
           )}
           <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }} className="pt-4">
             <button
-              onClick={() => navigate('/pending-approval')}
+              onClick={() => navigate('/club-profile')}
               className="px-12 py-5 rounded-[24px] bg-primary text-white text-xs font-black uppercase tracking-[0.2em] hover:bg-primary/90 transition-all shadow-2xl shadow-primary/30 flex items-center gap-4 mx-auto group relative overflow-hidden"
             >
               <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-              <span className="relative z-10">View Status</span>
+              <span className="relative z-10">View Profile</span>
               <Zap className="w-5 h-5 fill-current relative z-10 group-hover:scale-110 transition-transform" />
             </button>
           </motion.div>

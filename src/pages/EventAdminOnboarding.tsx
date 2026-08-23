@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Building2, 
-  MapPin, 
-  Mail, 
-  Phone, 
+import {
+  Building2,
+  MapPin,
+  Mail,
+  Phone,
   Lock,
   User,
   ChevronLeft,
@@ -13,18 +13,14 @@ import {
   Zap,
   Globe,
   Calendar,
-  ShieldCheck,
   Instagram,
   Linkedin,
   Facebook,
   Youtube,
   Upload,
-  CheckSquare,
-  FileText,
   ChevronDown,
   Sparkles,
   ArrowRight,
-  Clock,
   Layers,
   Plus
 } from 'lucide-react';
@@ -305,6 +301,17 @@ export default function EventAdminOnboarding() {
     }
   };
 
+  // Auto-advance to the Pending Approval page a few seconds after a
+  // successful submit, instead of leaving the admin stranded on this
+  // screen until they notice and click "View Status" themselves.
+  // The button below still works immediately for anyone who doesn't
+  // want to wait.
+  useEffect(() => {
+    if (!isSuccess) return;
+    const timer = setTimeout(() => navigate('/event-profile'), 4000);
+    return () => clearTimeout(timer);
+  }, [isSuccess, navigate]);
+
   if (isSuccess) {
     return (
       <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-6 text-center space-y-16 relative overflow-hidden">
@@ -350,10 +357,10 @@ export default function EventAdminOnboarding() {
             transition={{ delay: 0.4 }}
           >
             <button
-              onClick={() => navigate('/pending-approval')}
+              onClick={() => navigate('/event-profile')}
               className="px-12 py-5 rounded-[24px] bg-primary text-white text-[12px] font-black uppercase tracking-[0.3em] hover:bg-primary/90 transition-all shadow-[0_20px_50px_rgba(255,45,154,0.4)] flex items-center gap-4 mx-auto group active:scale-95"
             >
-              View Status
+              View Profile
               <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
             </button>
           </motion.div>
@@ -559,71 +566,51 @@ export default function EventAdminOnboarding() {
                   )}
                 />
               </div>
-              <RefinedField label="Year Established" name="yearEstablished" value={formData.yearEstablished} onChange={handleChange} readOnly={!isEditing} icon={<Clock className="w-4 h-4" />} />
               <RefinedField label="Website" name="website" value={formData.website} onChange={handleChange} readOnly={!isEditing} icon={<Globe className="w-4 h-4" />} />
             </div>
           </FormSection>
 
           <FormSection title="Location" icon={<MapPin className="w-4 h-4" />}>
-            <div className="flex flex-col lg:flex-row gap-12">
-              <div className="flex-1 space-y-10">
-                {/* FIXED: was a free-text input — city needs to be a real
-                    City reference (ObjectId), not a typed string, same
-                    fix already applied everywhere else in this app. */}
-                <div className="space-y-4">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] ml-1">City</label>
-                  <div className="relative">
-                    <MapPin className="absolute left-8 top-1/2 -translate-y-1/2 text-white/10 w-5 h-5 z-10" />
-                    <select
-                      name="city"
-                      value={formData.city}
-                      onChange={handleChange}
-                      disabled={!isEditing}
-                      className={cn(
-                        "w-full bg-transparent border rounded-[24px] pl-16 pr-8 py-6 text-white focus:outline-none transition-all appearance-none",
-                        !isEditing ? "border-white/5 text-white/20 cursor-not-allowed" : "border-white/10 hover:border-white/20 focus:border-primary/50"
-                      )}
-                    >
-                      <option value="">Select city...</option>
-                      {(Array.isArray(cities) ? cities : []).slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((c: any) => (
-                        <option key={c._id} value={c._id}>{c.city_name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] ml-1">Full Address</label>
-                  <div className="relative">
-                    <MapPin className="absolute left-8 top-8 text-white/10 w-5 h-5" />
-                    <textarea
-                      name="address"
-                      value={formData.address}
-                      onChange={handleChange}
-                      readOnly={!isEditing}
-                      rows={6}
-                      className={cn(
-                        "w-full bg-[#09090B] border rounded-[40px] pl-16 pr-8 py-8 text-white focus:outline-none transition-all text-sm font-medium leading-relaxed resize-none",
-                        !isEditing ? "border-white/5 text-white/20" : "border-white/10 hover:border-white/20 focus:border-primary"
-                      )}
-                    />
-                  </div>
+            <div className="space-y-10">
+              {/* FIXED: was a free-text input — city needs to be a real
+                  City reference (ObjectId), not a typed string, same
+                  fix already applied everywhere else in this app. */}
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] ml-1">City</label>
+                <div className="relative">
+                  <MapPin className="absolute left-8 top-1/2 -translate-y-1/2 text-white/10 w-5 h-5 z-10" />
+                  <select
+                    name="city"
+                    value={formData.city}
+                    onChange={handleChange}
+                    disabled={!isEditing}
+                    className={cn(
+                      "w-full bg-transparent border rounded-[24px] pl-16 pr-8 py-6 text-white focus:outline-none transition-all appearance-none",
+                      !isEditing ? "border-white/5 text-white/20 cursor-not-allowed" : "border-white/10 hover:border-white/20 focus:border-primary/50"
+                    )}
+                  >
+                    <option value="">Select city...</option>
+                    {(Array.isArray(cities) ? cities : []).slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((c: any) => (
+                      <option key={c._id} value={c._id}>{c.city_name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
-              <div className="lg:w-[450px] flex flex-col space-y-4">
-                <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] ml-1">Map View</label>
-                <div className="flex-1 min-h-[350px] rounded-[48px] overflow-hidden border border-white/5 bg-[#09090B]/50 relative group/map p-2">
-                  <div className="w-full h-full rounded-[40px] overflow-hidden relative">
-                    <iframe
-                      width="100%"
-                      height="100%"
-                      frameBorder="0"
-                      style={{ border: 0, filter: 'grayscale(1) invert(1) contrast(1.2) opacity(0.2)' }}
-                      src={`https://www.google.com/maps?q=${encodeURIComponent(formData.address)}&output=embed`}
-                      allowFullScreen
-                      title="Map"
-                    ></iframe>
-                    <div className="absolute inset-0 bg-primary/5 pointer-events-none" />
-                  </div>
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] ml-1">Full Address</label>
+                <div className="relative">
+                  <MapPin className="absolute left-8 top-8 text-white/10 w-5 h-5" />
+                  <textarea
+                    name="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    readOnly={!isEditing}
+                    rows={6}
+                    className={cn(
+                      "w-full bg-[#09090B] border rounded-[40px] pl-16 pr-8 py-8 text-white focus:outline-none transition-all text-sm font-medium leading-relaxed resize-none",
+                      !isEditing ? "border-white/5 text-white/20" : "border-white/10 hover:border-white/20 focus:border-primary"
+                    )}
+                  />
                 </div>
               </div>
             </div>
@@ -695,19 +682,6 @@ export default function EventAdminOnboarding() {
                   <RefinedField label="Facebook" name="socialLinks.facebook" value={formData.socialLinks.facebook} onChange={handleChange} readOnly={!isEditing} icon={<Facebook className="w-4 h-4" />} />
                   <RefinedField label="YouTube" name="socialLinks.youtube" value={formData.socialLinks.youtube} onChange={handleChange} readOnly={!isEditing} icon={<Youtube className="w-4 h-4" />} />
                 </div>
-              </div>
-            </div>
-          </FormSection>
-
-          <FormSection title="Verification" icon={<ShieldCheck className="w-4 h-4" />}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-              <RefinedField label="Registration Number" name="registrationNumber" value={formData.registrationNumber} onChange={handleChange} readOnly={!isEditing} icon={<FileText className="w-4 h-4" />} />
-              <RefinedField label="Tax/VAT ID" name="taxId" value={formData.taxId} onChange={handleChange} readOnly={!isEditing} icon={<CheckSquare className="w-4 h-4" />} />
-              <div className="md:col-span-2 p-8 rounded-[32px] border border-white/5 bg-white/[0.01] flex items-center gap-4">
-                <Upload className="w-5 h-5 text-white/20 shrink-0" />
-                <p className="text-xs text-white/30 font-medium">
-                  Document upload isn't available yet. This will be added in a future update — for now, Registration Number and Tax ID above are saved with your account.
-                </p>
               </div>
             </div>
           </FormSection>
