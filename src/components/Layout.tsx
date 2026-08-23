@@ -403,15 +403,18 @@ export default function Layout() {
       >
         <div className={cn("p-6 flex items-center shrink-0 overflow-hidden", isLeftSidebarOpen ? "gap-3" : "justify-center")}>
           <div className="w-8 h-8 rounded-lg overflow-hidden shadow-lg shadow-primary/20 shrink-0 flex items-center justify-center bg-gradient-to-br from-primary to-purple-600">
-            {/* FIXED: was "./hii-logo.png" — a relative path, which
-                resolves against whatever the browser thinks the current
-                URL is. On a single-page app with client-side routing,
-                this can point to the wrong location depending on the
-                route or how the page was loaded (fresh load vs.
-                client-side navigation), causing the logo to intermittently
-                fail and fall back to the container's plain gradient
-                background. Absolute path always resolves correctly. */}
-            <img src="/hii-logo.png" alt="Hii" className="w-full h-full object-cover" />
+            {/* FIXED (properly this time): my earlier fix used "/hii-logo.png"
+                (absolute from domain root), which broke differently — this
+                app is deployed inside a subdirectory (/app/admin/), not at
+                the domain root, so an absolute "/" path resolved to
+                hii.life/hii-logo.png instead of the real location at
+                hii.life/app/admin/hii-logo.png. Vite's base:'./' config
+                (see vite.config.ts) exists specifically to support
+                deploying to any subdirectory — import.meta.env.BASE_URL is
+                the correct, deployment-aware way to reference a public/
+                asset, resolved correctly at build time regardless of both
+                the deployed subdirectory and the current client-side route. */}
+            <img src={`${import.meta.env.BASE_URL}hii-logo.png`} alt="Hii" className="w-full h-full object-cover" />
           </div>
           <AnimatePresence>
             {isLeftSidebarOpen && (

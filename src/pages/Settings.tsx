@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   User,
@@ -102,6 +102,83 @@ export default function Settings() {
       return next;
     });
   };
+
+  // FIXED: "Activate 2FA" had no onClick at all — no backend support
+  // existed for 2FA on admin accounts whatsoever. Built real TOTP-based
+  // 2FA (RFC 6238, compatible with Google Authenticator/Authy/etc).
+  const [twoFaStep, setTwoFaStep] = useState<'idle' | 'setup' | 'disable'>('idle');
+  const [setupSecret, setSetupSecret] = useState('');
+  const [setupCode, setSetupCode] = useState('');
+  const [disablePassword, setDisablePassword] = useState('');
+  const [twoFaError, setTwoFaError] = useState('');
+
+  const { data: adminDetails, refetch: refetchAdminDetails } = useQuery({
+    queryKey: ['admin-details'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/auth/getDetails`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      return json.data ?? null;
+    },
+    enabled: !!token,
+  });
+
+  const isTwoFaEnabled = Boolean(adminDetails?.two_factor_enabled);
+
+  const startTwoFaSetup = async () => {
+    setTwoFaError('');
+    try {
+      const res = await fetch(`${API_BASE}/auth/2fa/setup`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.message || 'Failed to start setup');
+      setSetupSecret(json.data.secret);
+      setTwoFaStep('setup');
+    } catch (err: any) {
+      setTwoFaError(err.message || 'Failed to start setup');
+    }
+  };
+
+  const confirmTwoFaSetup = async () => {
+    setTwoFaError('');
+    try {
+      const res = await fetch(`${API_BASE}/auth/2fa/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ code: setupCode }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.message || 'Invalid code');
+      setTwoFaStep('idle');
+      setSetupCode('');
+      setSetupSecret('');
+      refetchAdminDetails();
+    } catch (err: any) {
+      setTwoFaError(err.message || 'Invalid code');
+    }
+  };
+
+  const confirmDisableTwoFa = async () => {
+    setTwoFaError('');
+    try {
+      const res = await fetch(`${API_BASE}/auth/2fa/disable`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ password: disablePassword }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.message || 'Incorrect password');
+      setTwoFaStep('idle');
+      setDisablePassword('');
+      refetchAdminDetails();
+    } catch (err: any) {
+      setTwoFaError(err.message || 'Incorrect password');
+    }
+  };
+
   const [newCity, setNewCity] = useState('');
 
   const [profile, setProfile] = useState({
@@ -363,17 +440,101 @@ export default function Settings() {
                     </FormSection>
                   </div>
 
-                  <div className="glass-card p-10 rounded-[40px] border border-white/5 flex flex-col md:flex-row items-center justify-between gap-8 group">
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3 text-emerald-500">
-                        <ShieldCheck className="w-5 h-5" />
-                        <h4 className="text-lg font-black text-white uppercase tracking-tight">Multi-Factor Authentication</h4>
+                  <div className="glass-card p-10 rounded-[40px] border border-white/5 flex flex-col gap-8 group">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+                      <div className="space-y-3">
+                        <div className={cn("flex items-center gap-3", isTwoFaEnabled ? "text-emerald-500" : "text-emerald-500")}>
+                          <ShieldCheck className="w-5 h-5" />
+                          <h4 className="text-lg font-black text-white uppercase tracking-tight">Multi-Factor Authentication</h4>
+                        </div>
+                        <p className="text-xs text-white/40 font-medium max-w-md">
+                          {isTwoFaEnabled
+                            ? 'Two-factor authentication is active on your account.'
+                            : 'Add an extra layer of security to your account.'}
+                        </p>
                       </div>
-                      <p className="text-xs text-white/40 font-medium max-w-md">Add an extra layer of security to your account.</p>
+                      {isTwoFaEnabled ? (
+                        <button
+                          onClick={() => { setTwoFaStep('disable'); setTwoFaError(''); }}
+                          className="px-8 py-4 rounded-[20px] bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all"
+                        >
+                          Disable 2FA
+                        </button>
+                      ) : (
+                        <button
+                          onClick={startTwoFaSetup}
+                          className="px-8 py-4 rounded-[20px] bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-emerald-500/20 active:scale-95"
+                        >
+                          Activate 2FA
+                        </button>
+                      )}
                     </div>
-                    <button className="px-8 py-4 rounded-[20px] bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-emerald-500/20 active:scale-95">
-                      Activate 2FA
-                    </button>
+
+                    {twoFaStep === 'setup' && (
+                      <div className="border-t border-white/5 pt-8 space-y-6">
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-widest text-white/60 mb-2">1. Enter this key in your authenticator app</p>
+                          <p className="text-xs text-white/30 mb-3">Google Authenticator, Authy, or any TOTP app — choose "Enter a setup key manually."</p>
+                          <div className="px-6 py-4 rounded-2xl bg-black/40 border border-white/10 font-mono text-sm text-primary tracking-widest break-all">
+                            {setupSecret}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-widest text-white/60 mb-2">2. Enter the 6-digit code it shows</p>
+                          <div className="flex gap-3">
+                            <input
+                              value={setupCode}
+                              onChange={(e) => setSetupCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                              placeholder="000000"
+                              className="w-40 px-6 py-4 rounded-2xl bg-black/40 border border-white/10 text-white text-lg font-mono tracking-[0.3em] text-center focus:outline-none focus:border-primary/50"
+                            />
+                            <button
+                              onClick={confirmTwoFaSetup}
+                              disabled={setupCode.length !== 6}
+                              className="px-8 py-4 rounded-2xl bg-primary text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-40 transition-all"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              onClick={() => { setTwoFaStep('idle'); setSetupCode(''); setSetupSecret(''); setTwoFaError(''); }}
+                              className="px-6 py-4 rounded-2xl bg-white/5 text-white/40 text-[10px] font-black uppercase tracking-widest hover:text-white transition-all"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                        {twoFaError && <p className="text-xs text-red-400 font-bold">{twoFaError}</p>}
+                      </div>
+                    )}
+
+                    {twoFaStep === 'disable' && (
+                      <div className="border-t border-white/5 pt-8 space-y-4">
+                        <p className="text-xs font-black uppercase tracking-widest text-white/60">Confirm your password to disable 2FA</p>
+                        <div className="flex gap-3">
+                          <input
+                            type="password"
+                            value={disablePassword}
+                            onChange={(e) => setDisablePassword(e.target.value)}
+                            placeholder="••••••••"
+                            className="w-64 px-6 py-4 rounded-2xl bg-black/40 border border-white/10 text-white text-sm focus:outline-none focus:border-primary/50"
+                          />
+                          <button
+                            onClick={confirmDisableTwoFa}
+                            disabled={!disablePassword}
+                            className="px-8 py-4 rounded-2xl bg-red-500 text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-40 transition-all"
+                          >
+                            Disable
+                          </button>
+                          <button
+                            onClick={() => { setTwoFaStep('idle'); setDisablePassword(''); setTwoFaError(''); }}
+                            className="px-6 py-4 rounded-2xl bg-white/5 text-white/40 text-[10px] font-black uppercase tracking-widest hover:text-white transition-all"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        {twoFaError && <p className="text-xs text-red-400 font-bold">{twoFaError}</p>}
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}

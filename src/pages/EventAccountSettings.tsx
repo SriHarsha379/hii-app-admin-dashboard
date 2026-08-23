@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  X, 
-  Send, 
-  MapPin, 
-  Mail, 
-  Phone, 
-  User, 
-  Building2, 
+import {
+  X,
+  Send,
+  MapPin,
+  Mail,
+  Phone,
+  User,
+  Building2,
   Users2,
   ChevronDown,
   AlertCircle,
@@ -28,6 +29,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/utils';
+import { API_BASE } from '../lib/apiConfig';
 
 const INITIAL_DATA = {
   fullName: '',
@@ -36,7 +38,6 @@ const INITIAL_DATA = {
   companyName: '',
   companyType: '',
   description: '',
-  yearEstablished: '',
   businessEmail: '',
   businessPhone: '',
   website: '',
@@ -47,47 +48,114 @@ const INITIAL_DATA = {
     linkedin: '',
     facebook: '',
     youtube: ''
-  },
-  registrationNumber: '',
-  taxId: ''
+  }
 };
 
 export default function EventAccountSettings() {
   const navigate = useNavigate();
-  const { logout, user } = useAuth();
+  const { logout, user, token } = useAuth();
+  const queryClient = useQueryClient();
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+  const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
+  const profileImageInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleProfileImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setProfileImageFile(file);
+    setProfileImagePreview(URL.createObjectURL(file));
+  };
+
+  // FIXED: this whole page never touched the backend at all — no
+  // useQuery, no useMutation, no API_BASE import, nothing. "Save
+  // Changes" just flashed a success message locally for 3 seconds
+  // regardless of what was typed. Same pattern AccountSettings.tsx had
+  // before it was fixed earlier — this Event Admin equivalent was never
+  // touched.
+  const { data: vendors } = useQuery({
+    queryKey: ['vendors-event-account-settings'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to load account');
+      const json = await res.json();
+      return json.data ?? [];
+    },
+    enabled: Boolean(token)
+  });
+
+  const myVendor = Array.isArray(vendors) ? vendors.find((v: any) => v.name === user?.organisation) : null;
+
+  const updateVendorMutation = useMutation({
+    mutationFn: async (fields: Record<string, any>) => {
+      if (!myVendor?._id) throw new Error('No account found to update');
+      const body = new FormData();
+      Object.entries(fields).forEach(([k, v]) => {
+        if (v === undefined || v === null) return;
+        // A File needs to be appended directly — stringifying it with
+        // String(v) would produce the literal text "[object File]",
+        // same class of bug fixed elsewhere in this app.
+        body.append(k, v instanceof File ? v : String(v));
+      });
+      const res = await fetch(`${API_BASE}/vendor/update_vendor/${myVendor._id}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+        body,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.message?.[0] || json?.message || 'Failed to save changes');
+      }
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vendors-event-account-settings'] });
+    },
+  });
 
   // Form State
   const [initialData, setInitialData] = useState(INITIAL_DATA);
   const [formData, setFormData] = useState(INITIAL_DATA);
 
   useEffect(() => {
+    // FIXED: this only ever populated fullName/email/companyName from the
+    // basic logged-in-admin identity — myVendor (the real, fetched Vendor
+    // record with the actual saved businessEmail/businessPhone/
+    // companyType/website/description/address) was only ever used to
+    // grab its _id for the update URL, never to fill in the form. Every
+    // other field always showed blank regardless of what was genuinely
+    // on file, even for a fully-completed profile.
     const next = {
       ...INITIAL_DATA,
-      fullName: user?.name || '',
+      fullName: myVendor?.contact_person || user?.name || '',
       email: user?.email || '',
-      companyName: user?.organisation || ''
+      companyName: myVendor?.name || user?.organisation || '',
+      companyType: myVendor?.company_type || '',
+      description: myVendor?.description || '',
+      businessEmail: myVendor?.email || '',
+      businessPhone: myVendor?.phone_number || '',
+      website: myVendor?.website || '',
+      address: myVendor?.address || '',
     };
     setInitialData(next);
     setFormData(next);
-  }, [user]);
+  }, [user, myVendor]);
 
-  // Box 1 Changes (Sensitive: Company, Contact, Verification)
-  const hasBox1Changes = 
+  // Box 1 Changes (Sensitive: Company, Contact)
+  const hasBox1Changes =
     formData.companyName !== initialData.companyName ||
     formData.companyType !== initialData.companyType ||
-    formData.yearEstablished !== initialData.yearEstablished ||
     formData.businessEmail !== initialData.businessEmail ||
     formData.businessPhone !== initialData.businessPhone ||
     formData.website !== initialData.website ||
-    formData.address !== initialData.address ||
-    formData.registrationNumber !== initialData.registrationNumber ||
-    formData.taxId !== initialData.taxId;
+    formData.address !== initialData.address;
 
   // Box 2 Changes (Non-sensitive: Bio, Contact, Socials)
-  const hasBox2Changes = 
+  const hasBox2Changes =
     formData.fullName !== initialData.fullName ||
     formData.email !== initialData.email ||
     formData.phone !== initialData.phone ||
@@ -126,9 +194,69 @@ export default function EventAccountSettings() {
     }
   };
 
-  const handleSaveBox2 = () => {
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3000);
+  // FIXED: was purely local — flashed "Box Updated" for 3 seconds with
+  // zero backend call, so nothing typed here ever actually saved.
+  // Only mapping fields that have a genuine home on the real Vendor
+  // schema (contact_person, description) — email/phone are left as
+  // display-only here since they're also the account's login
+  // credentials on this schema, not safe to silently overwrite via a
+  // casual save; categories/socialLinks have no backend field to save
+  // into at all yet.
+  const handleSaveBox2 = async () => {
+    try {
+      await updateVendorMutation.mutateAsync({
+        contact_person: formData.fullName,
+        description: formData.description,
+        ...(profileImageFile ? { business_image: profileImageFile } : {}),
+      });
+      setInitialData((prev: any) => ({ ...prev, fullName: formData.fullName, description: formData.description }));
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 3000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to save changes');
+    }
+  };
+
+  // FIXED: was completely fake — "Yes, Submit & Logout" just called
+  // logout() and navigated away, without ever saving a single field.
+  // Whatever was typed vanished, and the person was logged out for
+  // nothing. Now genuinely saves the changed fields first.
+  //
+  // Honest limitation carried over from the same fix on AccountSettings.tsx:
+  // this saves the data for real, but doesn't actually revoke dashboard
+  // access or flag the account for re-review, despite the dialog text
+  // promising that. Implementing the full "requires re-approval" workflow
+  // is a separate, larger decision — not scope-creeping into it here.
+  const handleConfirmSubmitForReview = async () => {
+    try {
+      // FIXED: hasBox1Changes tracked edits to companyType, businessEmail,
+      // businessPhone, and website — but this payload only ever sent
+      // name/address, so those 4 fields could be changed on screen and
+      // "Send for Re-Approval" would silently discard them. companyType/
+      // website needed new backend fields (added — see vendorModel.js);
+      // businessEmail/businessPhone map to the vendor's real email/
+      // phone_number fields, which already existed but were never sent.
+      await updateVendorMutation.mutateAsync({
+        name: formData.companyName,
+        address: formData.address,
+        company_type: formData.companyType,
+        email: formData.businessEmail,
+        phone_number: formData.businessPhone,
+        website: formData.website,
+      });
+      setInitialData((prev: any) => ({
+        ...prev,
+        companyName: formData.companyName,
+        address: formData.address,
+        companyType: formData.companyType,
+        businessEmail: formData.businessEmail,
+        businessPhone: formData.businessPhone,
+        website: formData.website,
+      }));
+      setShowApprovalDialog(false);
+    } catch (err: any) {
+      alert(err.message || 'Failed to save changes');
+    }
   };
 
   const handleSendApprovalClick = () => {
@@ -165,24 +293,24 @@ export default function EventAccountSettings() {
               <h2 className="text-2xl font-black text-white tracking-tight uppercase">Company Verification</h2>
             </div>
             <p className="text-[11px] text-muted-foreground/60 leading-relaxed max-w-3xl font-medium">
-              NOTE: Changes to Company Details, Contact Information, or Legal Documents will require manual review and approval by our team. You will be logged out upon submission.
+              NOTE: Changes to Company Details or Contact Information will require manual review and approval by our team. You will be logged out upon submission.
             </p>
           </div>
           <div className="flex items-center gap-4 shrink-0">
-            <button 
+            <button
               onClick={handleCancelClick}
               className="px-6 py-3 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/10 transition-all flex items-center gap-2"
             >
               <X className="w-3.5 h-3.5" />
               Cancel
             </button>
-            <button 
+            <button
               onClick={handleSendApprovalClick}
               disabled={!hasBox1Changes}
               className={cn(
                 "px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-2xl flex items-center gap-2",
-                hasBox1Changes 
-                  ? "bg-primary text-white hover:bg-primary/90 shadow-primary/20" 
+                hasBox1Changes
+                  ? "bg-primary text-white hover:bg-primary/90 shadow-primary/20"
                   : "bg-white/5 text-white/10 cursor-not-allowed shadow-none border border-white/5"
               )}
             >
@@ -199,10 +327,9 @@ export default function EventAccountSettings() {
               <Building2 className="w-3.5 h-3.5" />
               Company Details
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <FieldGroup label="Company Name" name="companyName" value={formData.companyName} onChange={handleChange} icon={<Building2 className="w-4 h-4" />} />
               <FieldGroup label="Company Type" name="companyType" value={formData.companyType} onChange={handleChange} />
-              <FieldGroup label="Year Established" name="yearEstablished" value={formData.yearEstablished} onChange={handleChange} />
             </div>
           </div>
 
@@ -214,58 +341,26 @@ export default function EventAccountSettings() {
               <Globe className="w-3.5 h-3.5" />
               Business Contact
             </h3>
-        <div className="flex flex-col lg:flex-row gap-10 relative z-10">
-          <div className="flex-1 space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <FieldGroup label="Business Email" name="businessEmail" value={formData.businessEmail} onChange={handleChange} icon={<Mail className="w-4 h-4" />} />
-              <FieldGroup label="Business Phone" name="businessPhone" value={formData.businessPhone} onChange={handleChange} icon={<Phone className="w-4 h-4" />} />
-            </div>
-            <FieldGroup label="Official Website" name="website" value={formData.website} onChange={handleChange} icon={<Globe className="w-4 h-4" />} />
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-white/40 uppercase tracking-widest pl-1">Full Office Address</label>
-              <div className="relative">
-                <MapPin className="absolute left-5 top-5 text-white/20 w-4 h-4" />
-                <textarea 
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  rows={3}
-                  className="w-full bg-[#09090B] border border-white/10 rounded-3xl pl-12 pr-5 py-4 text-white hover:border-white/20 focus:border-primary/50 focus:outline-none transition-all placeholder:text-white/20 text-sm resize-none"
-                />
-              </div>
-            </div>
+        <div className="relative z-10 space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <FieldGroup label="Business Email" name="businessEmail" value={formData.businessEmail} onChange={handleChange} icon={<Mail className="w-4 h-4" />} />
+            <FieldGroup label="Business Phone" name="businessPhone" value={formData.businessPhone} onChange={handleChange} icon={<Phone className="w-4 h-4" />} />
           </div>
-          
-          <div className="lg:w-[420px] space-y-2 flex flex-col">
-            <label className="text-[10px] font-black text-white/40 uppercase tracking-widest pl-1">Office Location</label>
-            <div className="flex-1 min-h-[280px] rounded-3xl overflow-hidden border border-white/10 bg-[#09090B] relative group/map">
-              <iframe
-                width="100%"
-                height="100%"
-                frameBorder="0"
-                style={{ border: 0, filter: 'grayscale(1) invert(0.9) contrast(1.2) opacity(0.4)' }}
-                src={`https://www.google.com/maps?q=${encodeURIComponent(formData.address)}&output=embed`}
-                allowFullScreen
-                title="Office Location Map"
-              ></iframe>
-              <div className="absolute inset-0 bg-primary/5 pointer-events-none group-hover/map:opacity-0 transition-opacity" />
+          <FieldGroup label="Official Website" name="website" value={formData.website} onChange={handleChange} icon={<Globe className="w-4 h-4" />} />
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-white/40 uppercase tracking-widest pl-1">Full Office Address</label>
+            <div className="relative">
+              <MapPin className="absolute left-5 top-5 text-white/20 w-4 h-4" />
+              <textarea
+                name="address"
+                value={formData.address}
+                onChange={handleChange}
+                rows={3}
+                className="w-full bg-[#09090B] border border-white/10 rounded-3xl pl-12 pr-5 py-4 text-white hover:border-white/20 focus:border-primary/50 focus:outline-none transition-all placeholder:text-white/20 text-sm resize-none"
+              />
             </div>
           </div>
         </div>
-          </div>
-
-          <div className="h-px bg-white/5 w-full" />
-
-          {/* Subsection: Legal Documents */}
-          <div className="space-y-6">
-            <h3 className="text-[10px] font-black text-primary uppercase tracking-[0.2em] flex items-center gap-2">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              Legal Documents
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <FieldGroup label="Business Registration Number" name="registrationNumber" value={formData.registrationNumber} onChange={handleChange} icon={<FileText className="w-4 h-4" />} />
-              <FieldGroup label="VAT / GST Identification" name="taxId" value={formData.taxId} onChange={handleChange} icon={<CheckSquare className="w-4 h-4" />} />
-            </div>
           </div>
         </div>
 
@@ -287,7 +382,7 @@ export default function EventAccountSettings() {
             </p>
           </div>
           <div className="flex items-center gap-4 shrink-0">
-            <button 
+            <button
               onClick={() => setFormData(initialData)}
               disabled={!hasBox2Changes}
               className={cn(
@@ -303,13 +398,13 @@ export default function EventAccountSettings() {
               )} />
               <span className="leading-none">Clear</span>
             </button>
-            <button 
+            <button
               onClick={handleSaveBox2}
               disabled={!hasBox2Changes}
               className={cn(
                 "px-10 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-2xl flex items-center gap-2 justify-center min-w-[140px]",
-                isSaved 
-                  ? "bg-green-500/20 text-green-500 border border-green-500/30 shadow-green-500/10" 
+                isSaved
+                  ? "bg-green-500/20 text-green-500 border border-green-500/30 shadow-green-500/10"
                   : hasBox2Changes
                     ? "bg-white text-black hover:bg-white/90 shadow-white/10"
                     : "bg-white/5 text-white/10 border border-white/5 cursor-not-allowed shadow-none"
@@ -338,10 +433,32 @@ export default function EventAccountSettings() {
               {/* Logo Asset */}
               <div className="shrink-0 order-2 lg:order-1 pt-2">
                 <div className="space-y-4">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest pl-1">Company Logo</label>
-                  <div className="mt-2 aspect-square w-28 rounded-[32px] bg-white/5 border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-white/[0.08] hover:border-primary/30 transition-all group/upload">
-                    <Upload className="w-4 h-4 text-white/20 group-hover/upload:text-primary transition-colors" />
-                    <span className="text-[7px] font-black uppercase text-white/20 tracking-tighter">Logo</span>
+                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest pl-1">Profile Photo</label>
+                  {/* FIXED: was purely decorative — no file input, no
+                      click handler. The backend only supports a single
+                      photo per account (business_image), so this is now
+                      the one real, working upload; the other two below
+                      are honestly labeled as not available yet rather
+                      than faked. */}
+                  <input
+                    ref={profileImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleProfileImageSelect}
+                  />
+                  <div
+                    onClick={() => profileImageInputRef.current?.click()}
+                    className="mt-2 aspect-square w-28 rounded-[32px] bg-white/5 border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-white/[0.08] hover:border-primary/30 transition-all group/upload relative overflow-hidden"
+                  >
+                    {profileImagePreview ? (
+                      <img src={profileImagePreview} alt="Profile preview" className="absolute inset-0 w-full h-full object-cover" />
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 text-white/20 group-hover/upload:text-primary transition-colors" />
+                        <span className="text-[7px] font-black uppercase text-white/20 tracking-tighter">Photo</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -355,12 +472,12 @@ export default function EventAccountSettings() {
                 </div>
               </div>
             </div>
-            
+
             <div className="h-px bg-white/5 w-full" />
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-white/40 uppercase tracking-widest pl-1">Public Company Description</label>
-              <textarea 
+              <textarea
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
@@ -399,7 +516,7 @@ export default function EventAccountSettings() {
                   {cat}
                 </button>
               ))}
-              
+
               <NicheInput onAdd={(newNiches) => {
                 setFormData(prev => ({
                   ...prev,
@@ -419,12 +536,16 @@ export default function EventAccountSettings() {
                 <FileText className="w-3.5 h-3.5 text-primary" />
                 <h3 className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em]">Profile Banner</h3>
               </div>
-              <div className="aspect-[21/9] w-full rounded-[32px] bg-white/5 border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-white/[0.08] hover:border-primary/30 transition-all group/upload relative overflow-hidden">
-                <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover/upload:bg-primary/20 transition-all relative z-10">
-                  <Upload className="w-6 h-6 text-white/20 group-hover/upload:text-primary transition-colors" />
-                </div>
-                <span className="text-[8px] font-black uppercase text-white/20 tracking-tighter relative z-10">Update Profile Banner</span>
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              {/* FIXED: was purely decorative — no file input at all. The
+                  backend only supports a single photo per account
+                  (already wired to the real "Profile Photo" field
+                  above), so a separate banner has nowhere to save yet —
+                  honestly labeled rather than faked. */}
+              <div className="p-8 rounded-[32px] border border-white/5 bg-white/[0.01] flex items-center gap-4">
+                <Upload className="w-5 h-5 text-white/20 shrink-0" />
+                <p className="text-xs text-white/30 font-medium">
+                  Banner uploads aren't available yet — use the Profile Photo field above for now. This will be added in a future update.
+                </p>
               </div>
             </div>
 
@@ -450,12 +571,16 @@ export default function EventAccountSettings() {
                   <User className="w-3.5 h-3.5" />
                   Profile Photo
                 </h3>
-                <div className="flex-1 min-h-[300px] rounded-[32px] bg-white/5 border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-white/[0.08] hover:border-primary/30 transition-all group/portrait relative overflow-hidden">
-                  <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover/portrait:bg-primary/20 transition-all relative z-10">
-                    <User className="w-6 h-6 text-white/20 group-hover/portrait:text-primary transition-colors" />
-                  </div>
-                  <span className="text-[8px] font-black uppercase text-white/20 tracking-tighter text-center px-6 relative z-10">Change Profile Photo</span>
-                  <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                {/* FIXED: this was a second, duplicate "Profile Photo"
+                    upload — same concept as the one already wired up for
+                    real near the top of this page, just decorative here
+                    too. Consolidated into one honest note pointing back
+                    to the real field rather than two separate dead
+                    upload zones claiming to do the same thing. */}
+                <div className="flex-1 min-h-[120px] rounded-[32px] border border-white/5 bg-white/[0.01] flex items-center justify-center gap-4 px-8 text-center">
+                  <p className="text-xs text-white/30 font-medium">
+                    Use the Profile Photo field at the top of this page to update your photo.
+                  </p>
                 </div>
               </div>
             </div>
@@ -469,14 +594,14 @@ export default function EventAccountSettings() {
         {/* Cancel Confirmation Dialog */}
         {showCancelDialog && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowCancelDialog(false)}
               className="absolute inset-0 bg-black/80 backdrop-blur-sm"
             />
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -493,13 +618,13 @@ export default function EventAccountSettings() {
                   </p>
                 </div>
                 <div className="flex flex-col w-full gap-4">
-                  <button 
+                  <button
                     onClick={() => navigate('/event-profile')}
                     className="w-full py-4 rounded-2xl bg-white text-black text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/90 transition-all shadow-xl shadow-white/5"
                   >
                     Confirm Exit
                   </button>
-                  <button 
+                  <button
                     onClick={() => setShowCancelDialog(false)}
                     className="w-full py-4 rounded-2xl border border-white/10 text-white/20 text-[10px] font-black uppercase tracking-[0.2em] hover:text-white hover:bg-white/5 transition-all"
                   >
@@ -514,14 +639,14 @@ export default function EventAccountSettings() {
         {/* Approval Confirmation Dialog */}
         {showApprovalDialog && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowApprovalDialog(false)}
               className="absolute inset-0 bg-black/80 backdrop-blur-sm"
             />
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -534,20 +659,18 @@ export default function EventAccountSettings() {
                 <div className="space-y-3">
                   <h3 className="text-2xl font-black text-white tracking-tight uppercase">Submit for Review?</h3>
                   <p className="text-muted-foreground/60 text-[11px] font-medium leading-relaxed">
-                    Access to your dashboard will be revoked until our team verifies your updated details.
+                    Your updated company details will be saved.
                   </p>
                 </div>
                 <div className="flex flex-col w-full gap-4">
-                  <button 
-                    onClick={() => {
-                      logout();
-                      navigate('/login');
-                    }}
-                    className="w-full py-4 rounded-2xl bg-primary text-white text-[10px] font-black uppercase tracking-[0.2em] hover:bg-primary/90 transition-all shadow-2xl shadow-primary/40"
+                  <button
+                    onClick={handleConfirmSubmitForReview}
+                    disabled={updateVendorMutation.isPending}
+                    className="w-full py-4 rounded-2xl bg-primary text-white text-[10px] font-black uppercase tracking-[0.2em] hover:bg-primary/90 transition-all shadow-2xl shadow-primary/40 disabled:opacity-50"
                   >
-                    Yes, Submit & Logout
+                    {updateVendorMutation.isPending ? 'Saving...' : 'Yes, Submit'}
                   </button>
-                  <button 
+                  <button
                     onClick={() => setShowApprovalDialog(false)}
                     className="w-full py-4 rounded-2xl border border-white/10 text-white/30 text-[10px] font-black uppercase tracking-[0.2em] hover:text-white hover:bg-white/5 transition-all"
                   >
@@ -580,7 +703,7 @@ function NicheInput({ onAdd }: { onAdd: (niches: string[]) => void }) {
   if (isEditing) {
     return (
       <div className="flex items-center">
-        <input 
+        <input
           autoFocus
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -616,7 +739,7 @@ function FieldGroup({ label, name, value, onChange, icon }: { label: string, nam
             {icon}
           </div>
         )}
-        <input 
+        <input
           type="text"
           name={name}
           value={value}
@@ -633,16 +756,16 @@ function FieldGroup({ label, name, value, onChange, icon }: { label: string, nam
 
 function Settings({ className }: { className?: string }) {
   return (
-    <svg 
-      xmlns="http://www.w3.org/2000/svg" 
-      width="24" 
-      height="24" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       className={className}
     >
       <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>

@@ -76,6 +76,7 @@ export default function EventAdminOnboarding() {
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
   const profileImageInputRef = React.useRef<HTMLInputElement>(null);
 
+
   const handleProfileImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -114,6 +115,76 @@ export default function EventAdminOnboarding() {
     // Admin with a placeholder identity, not the real organiser's actual
     // details, so pre-filling with it is actively misleading.
   }));
+
+  // ── Email OTP verification ────────────────────────────────────────────────
+  // NEW: was entirely missing on this form — anyone could register without
+  // ever proving they control the email address they entered. Reuses the
+  // same real, role-agnostic vendor OTP endpoints already built and
+  // working on Club registration.
+  const [otpSent, setOtpSent] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [verifiedEmail, setVerifiedEmail] = useState('');
+
+  const handleSendOtp = async () => {
+    setOtpError(null);
+    if (!formData.email || !/^\S+@\S+\.\S+$/.test(formData.email)) {
+      setOtpError('Enter a valid email address first.');
+      return;
+    }
+    setIsSendingOtp(true);
+    try {
+      const res = await fetch(`${API_BASE}/vendor/send_registration_otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ email: formData.email, name: formData.fullName || formData.companyName }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.message?.[0] || json?.message || 'Failed to send OTP');
+      }
+      setOtpSent(true);
+      setEmailVerified(false);
+      setOtpCode('');
+    } catch (err: any) {
+      setOtpError(err.message || 'Failed to send OTP. Please try again.');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    setOtpError(null);
+    if (!otpCode || otpCode.length < 4) {
+      setOtpError('Enter the 4-digit code from your email.');
+      return;
+    }
+    setIsVerifyingOtp(true);
+    try {
+      const res = await fetch(`${API_BASE}/vendor/verify_registration_otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ email: formData.email, otp: otpCode }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.message?.[0] || json?.message || 'Incorrect OTP');
+      }
+      setEmailVerified(true);
+      setVerifiedEmail(formData.email);
+    } catch (err: any) {
+      setOtpError(err.message || 'Verification failed. Please try again.');
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  // If they change the email after verifying, the old verification no
+  // longer applies to the new address — re-require sending a fresh OTP.
+  const emailChangedSinceVerify = emailVerified && formData.email !== verifiedEmail;
 
   const nameMatchedOrganiser = React.useMemo(() => {
     const q = formData.companyName.trim().toLowerCase();
@@ -165,6 +236,10 @@ export default function EventAdminOnboarding() {
     setSubmitError(null);
     if (!formData.companyName || !formData.email || !formData.phone) {
       setSubmitError('Company name, email, and phone number are required.');
+      return;
+    }
+    if (!emailVerified || emailChangedSinceVerify) {
+      setSubmitError('Please verify your email before submitting.');
       return;
     }
     if (!formData.city) {
@@ -275,10 +350,10 @@ export default function EventAdminOnboarding() {
             transition={{ delay: 0.4 }}
           >
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/pending-approval')}
               className="px-12 py-5 rounded-[24px] bg-primary text-white text-[12px] font-black uppercase tracking-[0.3em] hover:bg-primary/90 transition-all shadow-[0_20px_50px_rgba(255,45,154,0.4)] flex items-center gap-4 mx-auto group active:scale-95"
             >
-              Go to Dashboard
+              View Status
               <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
             </button>
           </motion.div>
@@ -387,7 +462,56 @@ export default function EventAdminOnboarding() {
                 <RefinedField label="Full Name" name="fullName" value={formData.fullName} onChange={handleChange} readOnly={!isEditing} icon={<User className="w-4 h-4" />} />
                 <RefinedField label="Phone Number" name="phone" value={formData.phone} onChange={handleChange} readOnly={!isEditing} icon={<Phone className="w-4 h-4" />} />
                 <div className="md:col-span-2">
-                  <RefinedField label="Email Address" name="email" value={formData.email} onChange={handleChange} readOnly={!isEditing} icon={<Mail className="w-4 h-4" />} />
+                  <RefinedField label="Email Address" name="email" value={formData.email} onChange={(e: any) => { handleChange(e); setOtpSent(false); setEmailVerified(false); }} readOnly={!isEditing} icon={<Mail className="w-4 h-4" />} />
+
+                  {/* Email OTP verification — required before this admin
+                      can complete registration. Reuses the same real
+                      email-sending infrastructure already used on Club
+                      registration. */}
+                  <div className="md:col-span-2 p-6 rounded-2xl bg-white/[0.03] border border-white/5 space-y-4">
+                    {emailVerified && !emailChangedSinceVerify ? (
+                      <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
+                        <CheckCircle2 className="w-4 h-4" /> Email verified
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between gap-4 flex-wrap">
+                          <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
+                            {otpSent && !emailChangedSinceVerify ? 'Enter the code sent to your email' : 'Verify your email to continue'}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleSendOtp}
+                            disabled={isSendingOtp || !isEditing}
+                            className="px-4 py-2 rounded-xl bg-primary/20 border border-primary/30 text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/30 transition-all disabled:opacity-50"
+                          >
+                            {isSendingOtp ? 'Sending…' : (otpSent ? 'Resend OTP' : 'Send OTP')}
+                          </button>
+                        </div>
+                        {otpSent && !emailChangedSinceVerify && (
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="text"
+                              value={otpCode}
+                              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                              placeholder="4-digit code"
+                              maxLength={4}
+                              className="flex-1 bg-[#09090B] border border-white/10 rounded-xl px-4 py-3 text-sm text-white tracking-[0.3em] text-center focus:outline-none focus:ring-1 focus:ring-primary/50"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleVerifyOtp}
+                              disabled={isVerifyingOtp}
+                              className="px-5 py-3 rounded-xl bg-primary text-white text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 transition-all disabled:opacity-50 shrink-0"
+                            >
+                              {isVerifyingOtp ? 'Verifying…' : 'Verify'}
+                            </button>
+                          </div>
+                        )}
+                        {otpError && <p className="text-[10px] text-red-400 font-bold">{otpError}</p>}
+                      </>
+                    )}
+                  </div>
                 </div>
                 <RefinedField label="Choose a Password" name="password" type="password" value={formData.password} onChange={handleChange} readOnly={!isEditing} placeholder="At least 6 characters" icon={<Lock className="w-4 h-4" />} />
                 <RefinedField label="Confirm Password" name="confirmPassword" type="password" value={formData.confirmPassword} onChange={handleChange} readOnly={!isEditing} placeholder="Re-enter password" icon={<Lock className="w-4 h-4" />} />
@@ -630,7 +754,8 @@ export default function EventAdminOnboarding() {
 
             <button
               onClick={handleSubmit}
-              disabled={isSubmitting}
+              disabled={isSubmitting || !emailVerified || emailChangedSinceVerify}
+              title={!emailVerified || emailChangedSinceVerify ? 'Verify your email to continue' : undefined}
               className="w-full h-24 rounded-[32px] bg-primary text-white text-md font-black uppercase tracking-[0.4em] transition-all shadow-[0_20px_60px_rgba(255,45,154,0.4)] flex items-center justify-center gap-4 relative overflow-hidden group active:scale-95 disabled:grayscale"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />

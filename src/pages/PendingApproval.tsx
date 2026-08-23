@@ -23,7 +23,7 @@ export default function PendingApproval() {
           <h1 className="text-xl font-black text-white uppercase tracking-tight">Pending Approval</h1>
           <p className="text-sm text-white/40 leading-relaxed">
             <span className="text-white font-bold">{user?.organisation}</span> has been submitted for review.
-            A Super Admin needs to approve your venue before you can access your dashboard — you'll be notified once that happens.
+            A Super Admin needs to approve your account before you can access your dashboard — you'll be notified once that happens.
           </p>
         </div>
         <div className="flex flex-col gap-3">

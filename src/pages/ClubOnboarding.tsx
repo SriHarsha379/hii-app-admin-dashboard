@@ -79,6 +79,14 @@ export default function ClubOnboarding() {
   const [registerStep, setRegisterStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // NEW: was only ever a single generic error message shown near the
+  // Submit button at the bottom of this (long, single-page) form — no
+  // indicator on the actual problem field itself, so someone filling in
+  // the top of the form had no way to tell which field down below was
+  // wrong without scrolling and guessing. Now tracks which specific
+  // field has which specific problem, and every relevant field renders
+  // its own inline error right where the problem actually is.
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // ── Email OTP verification ────────────────────────────────────────────────
   const [otpSent, setOtpSent] = useState(false);
@@ -300,35 +308,96 @@ export default function ClubOnboarding() {
   // Now: creates the Vendor with the admin's own chosen password, then
   // creates a linked Venue with the real category/schedule/photos —
   // matching what Super Admin's own "+ Add Club" wizard actually submits.
+  // NEW: "Next Step" previously only checked whether email was verified —
+  // every other field (city, phone, password, category, open days) was
+  // never checked until "Complete Setup" on the final step, meaning a
+  // problem on Step 1 could only ever be discovered after clicking
+  // through to Step 3. Validates whichever step is currently showing,
+  // so a missing field gets flagged on the actual step it lives on.
+  const validateStep = (stepNum: number): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (stepNum === 1) {
+      const selectedCity = (Array.isArray(cities) ? cities : []).find((c: any) => c._id === venueFormData.city);
+      if (!selectedCity) errors.city = 'Select a city.';
+      if (!venueFormData.email) errors.email = 'Email is required.';
+      if (!venueFormData.phone) errors.phone = 'Phone number is required.';
+      if (!venueFormData.password || venueFormData.password.length < 6) errors.password = 'At least 6 characters required.';
+      if (venueFormData.password !== venueFormData.confirmPassword) errors.confirmPassword = 'Passwords do not match.';
+      if (!emailVerified || emailChangedSinceVerify) errors.email = errors.email || 'Please verify your email before continuing.';
+    }
+
+    if (stepNum === 2) {
+      if (!venueFormData.type) errors.venueType = 'Select a venue category.';
+      const activeDays = workingHours.filter((h) => h.active);
+      if (activeDays.length === 0) errors.openDays = 'Select at least one open day.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      const firstErrorField = document.querySelector('[data-field-error="true"]');
+      firstErrorField?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return false;
+    }
+    setFieldErrors({});
+    return true;
+  };
+
+  const goToNextStep = () => {
+    if (!validateStep(registerStep)) return;
+    setRegisterStep((s) => s + 1);
+  };
+
   const handleRegister = async () => {
     setIsSubmitting(true);
     setSubmitError(null);
+    setFieldErrors({});
     try {
+      // Collect every problem at once — rather than the old
+      // throw-on-first-issue pattern, which meant clicking Submit
+      // repeatedly only revealed one new problem at a time.
+      const errors: Record<string, string> = {};
+
       const selectedCity = (Array.isArray(cities) ? cities : []).find((c: any) => c._id === venueFormData.city);
       if (!selectedCity) {
-        throw new Error('Select a city before submitting.');
+        errors.city = 'Select a city.';
       }
-      if (!venueFormData.email || !venueFormData.phone) {
-        throw new Error('Email and phone number are required.');
+      if (!venueFormData.email) {
+        errors.email = 'Email is required.';
+      }
+      if (!venueFormData.phone) {
+        errors.phone = 'Phone number is required.';
       }
       if (!venueFormData.password || venueFormData.password.length < 6) {
-        throw new Error('Choose a password of at least 6 characters.');
+        errors.password = 'At least 6 characters required.';
       }
       if (venueFormData.password !== venueFormData.confirmPassword) {
-        throw new Error('Passwords do not match.');
+        errors.confirmPassword = 'Passwords do not match.';
       }
       if (!emailVerified || emailChangedSinceVerify) {
-        throw new Error('Please verify your email before submitting.');
+        errors.email = errors.email || 'Please verify your email before submitting.';
       }
       const activeDays = workingHours.filter((h) => h.active);
       if (activeDays.length === 0) {
-        throw new Error('Select at least one open day.');
+        errors.openDays = 'Select at least one open day.';
       }
       if (!venueFormData.type) {
-        throw new Error('Select a venue category.');
+        errors.venueType = 'Select a venue category.';
       }
       if (portraitFiles.length === 0) {
-        throw new Error('Upload at least one venue photo.');
+        errors.photos = 'Upload at least one venue photo.';
+      }
+
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors);
+        setSubmitError('Please fix the highlighted fields above before submitting.');
+        // Scroll to whichever field is highest up on the page, so the
+        // person lands directly on a real problem rather than having to
+        // hunt for it.
+        const firstErrorField = document.querySelector('[data-field-error="true"]');
+        firstErrorField?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setIsSubmitting(false);
+        return;
       }
 
       // Step 1: create the Vendor account with the admin's own password.
@@ -486,11 +555,11 @@ export default function ClubOnboarding() {
           )}
           <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }} className="pt-4">
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/pending-approval')}
               className="px-12 py-5 rounded-[24px] bg-primary text-white text-xs font-black uppercase tracking-[0.2em] hover:bg-primary/90 transition-all shadow-2xl shadow-primary/30 flex items-center gap-4 mx-auto group relative overflow-hidden"
             >
               <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-              <span className="relative z-10">Go to Dashboard</span>
+              <span className="relative z-10">View Status</span>
               <Zap className="w-5 h-5 fill-current relative z-10 group-hover:scale-110 transition-transform" />
             </button>
           </motion.div>
@@ -726,7 +795,7 @@ export default function ClubOnboarding() {
                       )}
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                         <div className="space-y-8">
-                          <div className="space-y-4">
+                          <div className="space-y-4" data-field-error={fieldErrors.city ? "true" : undefined}>
                             <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Select City</label>
                             {loadingCities ? (
                               <div className="flex items-center gap-2 text-muted-foreground text-xs py-6 px-10">
@@ -737,11 +806,14 @@ export default function ClubOnboarding() {
                             ) : (
                               <FilterDropdown
                                 value={venueFormData.city}
-                                onChange={(val) => setVenueFormData({ ...venueFormData, city: val })}
+                                onChange={(val) => { setVenueFormData({ ...venueFormData, city: val }); setFieldErrors((prev) => ({ ...prev, city: '' })); }}
                                 options={cityOptions}
                                 placeholder="Select city"
-                                buttonClassName="py-6 px-10 rounded-[28px] text-sm bg-[#09090B] border border-white/5 hover:border-white/10 transition-all text-white font-medium"
+                                buttonClassName={cn("py-6 px-10 rounded-[28px] text-sm bg-[#09090B] border transition-all text-white font-medium", fieldErrors.city ? "border-red-500/50" : "border-white/5 hover:border-white/10")}
                               />
+                            )}
+                            {fieldErrors.city && (
+                              <p className="text-[10px] text-red-500/80 font-bold uppercase tracking-widest ml-1">{fieldErrors.city}</p>
                             )}
                           </div>
                           <div className="space-y-4">
@@ -774,7 +846,7 @@ export default function ClubOnboarding() {
                   <FormSection title="Contact Information" icon={<Mail className="w-4 h-4" />}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                       <div className="col-span-1 md:col-span-2">
-                        <RefinedField label="Email Address" name="email" type="email" value={venueFormData.email} onChange={(e: any) => { setVenueFormData({ ...venueFormData, email: e.target.value }); setOtpSent(false); setEmailVerified(false); }} placeholder="club@example.com" icon={<Mail className="w-4 h-4" />} />
+                        <RefinedField label="Email Address" name="email" type="email" value={venueFormData.email} onChange={(e: any) => { setVenueFormData({ ...venueFormData, email: e.target.value }); setOtpSent(false); setEmailVerified(false); setFieldErrors((prev) => ({ ...prev, email: '' })); }} placeholder="club@example.com" icon={<Mail className="w-4 h-4" />} error={fieldErrors.email} />
                       </div>
 
                       {/* Email OTP verification — required before this admin
@@ -825,10 +897,10 @@ export default function ClubOnboarding() {
                           </>
                         )}
                       </div>
-                      <RefinedField label="Phone Number" name="phone" value={venueFormData.phone} onChange={(e: any) => setVenueFormData({ ...venueFormData, phone: e.target.value })} placeholder="+91 00000 00000" icon={<Phone className="w-4 h-4" />} />
+                      <RefinedField label="Phone Number" name="phone" value={venueFormData.phone} onChange={(e: any) => { setVenueFormData({ ...venueFormData, phone: e.target.value }); setFieldErrors((prev) => ({ ...prev, phone: '' })); }} placeholder="+91 00000 00000" icon={<Phone className="w-4 h-4" />} error={fieldErrors.phone} />
                       <RefinedField label="Contact Person" name="contactName" value={venueFormData.contactName} onChange={(e: any) => setVenueFormData({ ...venueFormData, contactName: e.target.value })} placeholder="Full Name" icon={<User className="w-4 h-4" />} />
-                      <RefinedField label="Choose a Password" name="password" type="password" value={venueFormData.password} onChange={(e: any) => setVenueFormData({ ...venueFormData, password: e.target.value })} placeholder="At least 6 characters" icon={<Lock className="w-4 h-4" />} />
-                      <RefinedField label="Confirm Password" name="confirmPassword" type="password" value={venueFormData.confirmPassword} onChange={(e: any) => setVenueFormData({ ...venueFormData, confirmPassword: e.target.value })} placeholder="Re-enter password" icon={<Lock className="w-4 h-4" />} />
+                      <RefinedField label="Choose a Password" name="password" type="password" value={venueFormData.password} onChange={(e: any) => { setVenueFormData({ ...venueFormData, password: e.target.value }); setFieldErrors((prev) => ({ ...prev, password: '' })); }} placeholder="At least 6 characters" icon={<Lock className="w-4 h-4" />} error={fieldErrors.password} />
+                      <RefinedField label="Confirm Password" name="confirmPassword" type="password" value={venueFormData.confirmPassword} onChange={(e: any) => { setVenueFormData({ ...venueFormData, confirmPassword: e.target.value }); setFieldErrors((prev) => ({ ...prev, confirmPassword: '' })); }} placeholder="Re-enter password" icon={<Lock className="w-4 h-4" />} error={fieldErrors.confirmPassword} />
                     </div>
                   </FormSection>
                 </motion.div>
@@ -838,7 +910,7 @@ export default function ClubOnboarding() {
                 <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-12">
                   <FormSection title="Business Profile" icon={<Shield className="w-4 h-4" />}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                      <div className="space-y-4">
+                      <div className="space-y-4" data-field-error={fieldErrors.venueType ? "true" : undefined}>
                         <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Club Category</label>
                         {loadingVenueTypes ? (
                           <div className="flex items-center gap-2 text-muted-foreground text-xs py-6 px-10">
@@ -849,11 +921,14 @@ export default function ClubOnboarding() {
                         ) : (
                           <FilterDropdown
                             value={venueFormData.type}
-                            onChange={(val) => setVenueFormData({ ...venueFormData, type: val })}
+                            onChange={(val) => { setVenueFormData({ ...venueFormData, type: val }); setFieldErrors((prev) => ({ ...prev, venueType: '' })); }}
                             options={venueTypeOptions}
                             placeholder="Select classification"
-                            buttonClassName="py-6 px-10 rounded-[28px] text-sm bg-[#09090B] border border-white/5 hover:border-white/10 transition-all text-white font-medium"
+                            buttonClassName={cn("py-6 px-10 rounded-[28px] text-sm bg-[#09090B] border transition-all text-white font-medium", fieldErrors.venueType ? "border-red-500/50" : "border-white/5 hover:border-white/10")}
                           />
+                        )}
+                        {fieldErrors.venueType && (
+                          <p className="text-[10px] text-red-500/80 font-bold uppercase tracking-widest ml-1">{fieldErrors.venueType}</p>
                         )}
                       </div>
                       <RefinedField label="Max Capacity" name="capacity" type="number" value={venueFormData.capacity} onChange={(e: any) => setVenueFormData({ ...venueFormData, capacity: e.target.value })} placeholder="Max capacity" icon={<Users className="w-4 h-4" />} />
@@ -875,7 +950,8 @@ export default function ClubOnboarding() {
                       was never actually rendered anywhere, so it was
                       silently missing from the form entirely despite the
                       backend requiring it to create a venue. */}
-                  <FormSection title="Open Days & Hours" icon={<Clock className="w-4 h-4" />}>
+                  <div data-field-error={fieldErrors.openDays ? "true" : undefined}>
+                  <FormSection title="Open Days & Hours" icon={<Clock className="w-4 h-4" />} className={fieldErrors.openDays ? "border-red-500/30" : undefined}>
                     <div className="space-y-3">
                       {workingHours.map((day, idx) => (
                         <div key={day.day} className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/5">
@@ -904,7 +980,11 @@ export default function ClubOnboarding() {
                         </div>
                       ))}
                     </div>
+                    {fieldErrors.openDays && (
+                      <p className="text-[10px] text-red-500/80 font-bold uppercase tracking-widest ml-1 mt-2">{fieldErrors.openDays}</p>
+                    )}
                   </FormSection>
+                  </div>
                 </motion.div>
               )}
 
@@ -913,7 +993,8 @@ export default function ClubOnboarding() {
                   {uploadError && (
                     <div className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">{uploadError}</div>
                   )}
-                  <FormSection title="Profile Photos" icon={<Camera className="w-4 h-4" />}>
+                  <div data-field-error={fieldErrors.photos ? "true" : undefined}>
+                  <FormSection title="Profile Photos" icon={<Camera className="w-4 h-4" />} className={fieldErrors.photos ? "border-red-500/30" : undefined}>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                       {venueFormData.portraits.map((url: string, idx: number) => (
                         <motion.div
@@ -980,7 +1061,11 @@ export default function ClubOnboarding() {
                         />
                       </label>
                     </div>
+                    {fieldErrors.photos && (
+                      <p className="text-[10px] text-red-500/80 font-bold uppercase tracking-widest ml-1 mt-2">{fieldErrors.photos}</p>
+                    )}
                   </FormSection>
+                  </div>
 
                   <FormSection title="Gallery Photos" icon={<Layers className="w-4 h-4" />}>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
@@ -1039,7 +1124,7 @@ export default function ClubOnboarding() {
               </button>
               {registerStep < 3 ? (
                 <button
-                  onClick={() => setRegisterStep((s) => s + 1)}
+                  onClick={goToNextStep}
                   disabled={registerStep === 1 && (!emailVerified || emailChangedSinceVerify)}
                   title={registerStep === 1 && (!emailVerified || emailChangedSinceVerify) ? 'Verify your email to continue' : undefined}
                   className="px-14 py-5 rounded-[24px] bg-primary text-white text-[10px] font-black uppercase tracking-[0.3em] shadow-[0_10px_40px_rgba(255,45,154,0.3)] hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-4 group disabled:opacity-40 disabled:hover:scale-100 disabled:cursor-not-allowed"
