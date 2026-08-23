@@ -6,7 +6,8 @@ import {
   MapPin, 
   Mail, 
   Phone, 
-  User, 
+  Lock,
+  User,
   ChevronLeft,
   CheckCircle2,
   Zap,
@@ -30,6 +31,8 @@ import {
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { FormSection, RefinedField } from '../components/RefinedForm';
+import { useQuery } from '@tanstack/react-query';
+import { API_BASE } from '../lib/apiConfig';
 
 const INITIAL_DATA = {
   fullName: '',
@@ -51,22 +54,73 @@ const INITIAL_DATA = {
   },
   registrationNumber: '',
   taxId: '',
+  password: '',
+  confirmPassword: '',
   termsAccepted: false,
   privacyAccepted: false
 };
 
 export default function EventAdminOnboarding() {
   const navigate = useNavigate();
-  const { user, updateUser } = useAuth();
-  const [isEditing, setIsEditing] = useState(false);
+  const { user, token, updateUser } = useAuth();
+  // FIXED: was defaulting to false (read-only) — reasonable for a page
+  // reviewing *existing* data before editing it, but this is a brand-new
+  // registration form with nothing pre-filled yet. Starting read-only
+  // meant every field silently rejected input until someone happened to
+  // find and click "Edit Details" first.
+  const [isEditing, setIsEditing] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+  const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
+  const profileImageInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleProfileImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setProfileImageFile(file);
+    setProfileImagePreview(URL.createObjectURL(file));
+  };
+
+  const { data: cities } = useQuery({
+    queryKey: ['cities-event-onboarding'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/city/get_all_cities`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return json.data ?? [];
+    },
+  });
+
+  // Live "claim this instead" check — matches against real event_organizer
+  // vendor names as the company name is typed, so someone doesn't
+  // accidentally create a duplicate account for a company Super Admin has
+  // already listed. Same pattern already used on Club registration.
+  const { data: claimableOrganisers } = useQuery({
+    queryKey: ['claimable-organisers'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      const list = Array.isArray(json.data) ? json.data : [];
+      return list.filter((v: any) => v.vendor_type === 'event_organizer');
+    },
+  });
+
   const [formData, setFormData] = useState(() => ({
     ...INITIAL_DATA,
-    fullName: user?.name || '',
-    email: user?.email || '',
-    companyName: user?.organisation || ''
+    // FIXED: was pre-filling fullName/email/companyName from the logged-in
+    // admin's own login identity — same issue fixed on the Club
+    // registration wizard. This account was very likely created by Super
+    // Admin with a placeholder identity, not the real organiser's actual
+    // details, so pre-filling with it is actively misleading.
   }));
+
+  const nameMatchedOrganiser = React.useMemo(() => {
+    const q = formData.companyName.trim().toLowerCase();
+    if (q.length < 3 || !Array.isArray(claimableOrganisers)) return null;
+    return claimableOrganisers.find((v: any) => v.name?.toLowerCase() === q) || null;
+  }, [formData.companyName, claimableOrganisers]);
+
   const [isSticky, setIsSticky] = React.useState(false);
 
   React.useEffect(() => {
@@ -101,11 +155,79 @@ export default function EventAdminOnboarding() {
     }));
   };
 
+  // FIXED: was completely fake — didn't touch the backend at all, just set
+  // `organisation` locally and showed a "Setup Complete" screen. No Vendor
+  // account was ever created, no data was ever saved, and — since the
+  // approval gate only ever checked CLUB_ADMIN — this let an Event Admin
+  // straight into the full dashboard with a made-up organisation name and
+  // zero verification of any kind.
   const handleSubmit = async () => {
+    setSubmitError(null);
+    if (!formData.companyName || !formData.email || !formData.phone) {
+      setSubmitError('Company name, email, and phone number are required.');
+      return;
+    }
+    if (!formData.city) {
+      setSubmitError('Select a city.');
+      return;
+    }
+    if (!formData.password || formData.password.length < 6) {
+      setSubmitError('Choose a password of at least 6 characters.');
+      return;
+    }
+    if (formData.password !== formData.confirmPassword) {
+      setSubmitError('Passwords do not match.');
+      return;
+    }
+    if (!formData.termsAccepted || !formData.privacyAccepted) {
+      setSubmitError('Please accept the terms and privacy policy to continue.');
+      return;
+    }
+
     setIsSubmitting(true);
-    updateUser({ organisation: formData.companyName });
-    setIsSubmitting(false);
-    setIsSuccess(true);
+    try {
+      const selectedCity = (Array.isArray(cities) ? cities : []).find((c: any) => c._id === formData.city);
+      if (!selectedCity) throw new Error('Select a valid city.');
+      const stateId = typeof selectedCity.state_id === 'object' ? selectedCity.state_id?._id : selectedCity.state_id;
+      if (!stateId) throw new Error('This city has no linked state on record. Please choose a different city.');
+
+      const body = new FormData();
+      body.append('name', formData.companyName);
+      body.append('email', formData.email);
+      body.append('phone_number', formData.phone);
+      body.append('city', formData.city);
+      body.append('state', stateId);
+      body.append('address', formData.address || 'Not provided');
+      body.append('password', formData.password);
+      body.append('vendor_type', 'event_organizer');
+      body.append('contact_person', formData.fullName || '');
+      body.append('description', formData.description || '');
+      body.append('registration_number', formData.registrationNumber || '');
+      body.append('tax_id', formData.taxId || '');
+      // FIXED: was never sending the selected file at all — the backend
+      // accepts it as "business_image" (a single-file field, same as
+      // Club registration's photo).
+      if (profileImageFile) body.append('business_image', profileImageFile);
+
+      const res = await fetch(`${API_BASE}/vendor/add_vendor`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.message?.[0] || json?.message || `Registration failed with status ${res.status}`);
+      }
+
+      // New signups require Super Admin approval before they get full
+      // access — see the "Organiser Requests" review page.
+      updateUser({ organisation: formData.companyName });
+      setIsSuccess(true);
+    } catch (err: any) {
+      setSubmitError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isSuccess) {
@@ -127,9 +249,9 @@ export default function EventAdminOnboarding() {
             <div className="absolute inset-0 bg-primary animate-ping opacity-20 rounded-[48px]" />
             <CheckCircle2 className="w-16 h-16 text-white relative z-10" />
           </motion.div>
-          
+
           <div className="space-y-6">
-            <motion.h1 
+            <motion.h1
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.2 }}
@@ -137,7 +259,7 @@ export default function EventAdminOnboarding() {
             >
               Setup <span className="text-primary neon-text">Complete</span>
             </motion.h1>
-            <motion.p 
+            <motion.p
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.3 }}
@@ -152,7 +274,7 @@ export default function EventAdminOnboarding() {
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.4 }}
           >
-            <button 
+            <button
               onClick={() => navigate('/')}
               className="px-12 py-5 rounded-[24px] bg-primary text-white text-[12px] font-black uppercase tracking-[0.3em] hover:bg-primary/90 transition-all shadow-[0_20px_50px_rgba(255,45,154,0.4)] flex items-center gap-4 mx-auto group active:scale-95"
             >
@@ -187,8 +309,8 @@ export default function EventAdminOnboarding() {
               }}
               className={cn(
                 "fixed bottom-8 right-8 z-[100] px-8 py-4 rounded-[20px] shadow-2xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95",
-                isEditing 
-                  ? "bg-primary text-white shadow-primary/30" 
+                isEditing
+                  ? "bg-primary text-white shadow-primary/30"
                   : "bg-white text-black hover:bg-primary hover:text-white"
               )}
             >
@@ -197,7 +319,7 @@ export default function EventAdminOnboarding() {
             </motion.button>
           )}
         </AnimatePresence>
-        
+
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-10">
           <div className="space-y-6">
             <div className="flex items-center gap-3 text-primary">
@@ -211,13 +333,13 @@ export default function EventAdminOnboarding() {
               Complete your profile to start managing your events.
             </p>
           </div>
-          
-          <button 
+
+          <button
             onClick={() => setIsEditing(!isEditing)}
             className={cn(
               "group relative px-8 py-4 rounded-[20px] overflow-hidden transition-all active:scale-95",
-              isEditing 
-                ? "bg-primary text-white shadow-[0_10px_30px_rgba(255,45,154,0.3)]" 
+              isEditing
+                ? "bg-primary text-white shadow-[0_10px_30px_rgba(255,45,154,0.3)]"
                 : "bg-white/[0.03] border border-white/10 text-white/40 hover:text-white hover:bg-white/10"
             )}
           >
@@ -233,12 +355,31 @@ export default function EventAdminOnboarding() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-12 items-start">
               <div className="md:col-span-1 space-y-4">
                 <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] ml-1">Profile Photo</label>
-                <div className="aspect-square w-full rounded-[48px] bg-white/[0.02] border-2 border-dashed border-white/5 flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-white/[0.05] hover:border-primary/30 transition-all group/upload relative overflow-hidden">
-                  <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover/upload:bg-primary/20 transition-all">
-                    <Upload className="w-6 h-6 text-white/10 group-hover/upload:text-primary transition-colors" />
-                  </div>
-                  <span className="text-[8px] font-black uppercase text-white/10 tracking-[0.2em] group-hover/upload:text-primary transition-colors">Upload Photo</span>
-                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                {/* FIXED: was a purely decorative div — no file input, no
+                    click handler, no way to actually select or upload
+                    anything. Now genuinely wired to a real file input. */}
+                <input
+                  ref={profileImageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleProfileImageSelect}
+                />
+                <div
+                  onClick={() => profileImageInputRef.current?.click()}
+                  className="aspect-square w-full rounded-[48px] bg-white/[0.02] border-2 border-dashed border-white/5 flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-white/[0.05] hover:border-primary/30 transition-all group/upload relative overflow-hidden"
+                >
+                  {profileImagePreview ? (
+                    <img src={profileImagePreview} alt="Profile preview" className="absolute inset-0 w-full h-full object-cover" />
+                  ) : (
+                    <>
+                      <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover/upload:bg-primary/20 transition-all">
+                        <Upload className="w-6 h-6 text-white/10 group-hover/upload:text-primary transition-colors" />
+                      </div>
+                      <span className="text-[8px] font-black uppercase text-white/10 tracking-[0.2em] group-hover/upload:text-primary transition-colors">Upload Photo</span>
+                    </>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                 </div>
               </div>
 
@@ -248,6 +389,8 @@ export default function EventAdminOnboarding() {
                 <div className="md:col-span-2">
                   <RefinedField label="Email Address" name="email" value={formData.email} onChange={handleChange} readOnly={!isEditing} icon={<Mail className="w-4 h-4" />} />
                 </div>
+                <RefinedField label="Choose a Password" name="password" type="password" value={formData.password} onChange={handleChange} readOnly={!isEditing} placeholder="At least 6 characters" icon={<Lock className="w-4 h-4" />} />
+                <RefinedField label="Confirm Password" name="confirmPassword" type="password" value={formData.confirmPassword} onChange={handleChange} readOnly={!isEditing} placeholder="Re-enter password" icon={<Lock className="w-4 h-4" />} />
               </div>
             </div>
           </FormSection>
@@ -255,11 +398,32 @@ export default function EventAdminOnboarding() {
           <FormSection title="Business Information" icon={<Building2 className="w-4 h-4" />}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
               <RefinedField label="Company Name" name="companyName" value={formData.companyName} onChange={handleChange} readOnly={!isEditing} icon={<Building2 className="w-4 h-4" />} />
+              {/* Inline "claim this instead" — mirrors the same feature on
+                  Club registration, so someone doesn't accidentally
+                  create a duplicate account for a company Super Admin has
+                  already listed. */}
+              {nameMatchedOrganiser && (
+                <div className="md:col-span-2 p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <Building2 className="w-4 h-4 text-amber-400 shrink-0" />
+                    <p className="text-xs text-amber-200/90">
+                      <span className="font-bold text-amber-300">"{nameMatchedOrganiser.name}"</span> already exists in our system. Is this your company?
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/claim-organiser/${nameMatchedOrganiser._id}`)}
+                    className="px-5 py-2.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest text-amber-300 hover:bg-amber-500/30 transition-all shrink-0"
+                  >
+                    Claim It Instead
+                  </button>
+                </div>
+              )}
               <RefinedField label="Business Type" name="companyType" value={formData.companyType} onChange={handleChange} readOnly={!isEditing} icon={<Layers className="w-4 h-4" />} />
-              
+
               <div className="md:col-span-2 space-y-4">
                 <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] ml-1">Company Description</label>
-                <textarea 
+                <textarea
                   name="description"
                   value={formData.description}
                   onChange={handleChange}
@@ -279,12 +443,35 @@ export default function EventAdminOnboarding() {
           <FormSection title="Location" icon={<MapPin className="w-4 h-4" />}>
             <div className="flex flex-col lg:flex-row gap-12">
               <div className="flex-1 space-y-10">
-                <RefinedField label="City" name="city" value={formData.city} onChange={handleChange} readOnly={!isEditing} icon={<MapPin className="w-4 h-4" />} />
+                {/* FIXED: was a free-text input — city needs to be a real
+                    City reference (ObjectId), not a typed string, same
+                    fix already applied everywhere else in this app. */}
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] ml-1">City</label>
+                  <div className="relative">
+                    <MapPin className="absolute left-8 top-1/2 -translate-y-1/2 text-white/10 w-5 h-5 z-10" />
+                    <select
+                      name="city"
+                      value={formData.city}
+                      onChange={handleChange}
+                      disabled={!isEditing}
+                      className={cn(
+                        "w-full bg-transparent border rounded-[24px] pl-16 pr-8 py-6 text-white focus:outline-none transition-all appearance-none",
+                        !isEditing ? "border-white/5 text-white/20 cursor-not-allowed" : "border-white/10 hover:border-white/20 focus:border-primary/50"
+                      )}
+                    >
+                      <option value="">Select city...</option>
+                      {(Array.isArray(cities) ? cities : []).slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((c: any) => (
+                        <option key={c._id} value={c._id}>{c.city_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
                 <div className="space-y-4">
                   <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] ml-1">Full Address</label>
                   <div className="relative">
                     <MapPin className="absolute left-8 top-8 text-white/10 w-5 h-5" />
-                    <textarea 
+                    <textarea
                       name="address"
                       value={formData.address}
                       onChange={handleChange}
@@ -345,14 +532,14 @@ export default function EventAdminOnboarding() {
               }
               {isEditing && (
                 <div className="flex items-center">
-                  <NicheInput 
+                  <NicheInput
                     isEditingMode={isEditing}
                     onAdd={(newNiches) => {
                       setFormData(prev => ({
                         ...prev,
                         categories: Array.from(new Set([...prev.categories, ...newNiches]))
                       }));
-                    }} 
+                    }}
                   />
                 </div>
               )}
@@ -361,40 +548,28 @@ export default function EventAdminOnboarding() {
 
           <FormSection title="Social Media & Photos" icon={<Upload className="w-4 h-4" />}>
             <div className="space-y-16">
-              <div className="space-y-6">
-                <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] ml-1">Cover Photo</label>
-                <div className="aspect-[24/10] w-full rounded-[48px] bg-white/[0.02] border-2 border-dashed border-white/5 flex flex-col items-center justify-center gap-6 cursor-pointer hover:bg-white/[0.05] hover:border-primary/30 transition-all group/banner relative overflow-hidden">
-                  <div className="w-20 h-20 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center group-hover/banner:bg-primary/20 transition-all relative z-10">
-                    <Upload className="w-8 h-8 text-white/10 group-hover/banner:text-primary transition-colors" />
-                  </div>
-                  <div className="space-y-2 text-center relative z-10 px-6">
-                    <span className="text-[10px] font-black uppercase text-white/20 tracking-[0.3em] block group-hover/banner:text-primary transition-colors">Upload Cover Photo</span>
-                    <span className="text-[8px] font-medium text-white/10 uppercase tracking-widest block">Recommended: 1920x820 | Max 5MB</span>
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-tr from-primary/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
-                </div>
+              {/* FIXED: this "Cover Photo" upload and the duplicate
+                  "Profile Picture" upload further down were both purely
+                  decorative — no file input, no click handler, and even if
+                  wired up, the backend has no field to receive either of
+                  them (only a single business_image upload exists, which
+                  is now wired to the real Profile Photo field above). Left
+                  as an honest "not available yet" note rather than
+                  building something that looks functional but has nowhere
+                  to actually save. */}
+              <div className="p-8 rounded-[32px] border border-white/5 bg-white/[0.01] flex items-center gap-4">
+                <Upload className="w-5 h-5 text-white/20 shrink-0" />
+                <p className="text-xs text-white/30 font-medium">
+                  Cover photo uploads aren't available yet — use the Profile Photo field above for now. This will be added in a future update.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 xl:grid-cols-12 gap-16 items-end">
-                <div className="xl:col-span-7 grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div className="xl:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-10">
                   <RefinedField label="Instagram" name="socialLinks.instagram" value={formData.socialLinks.instagram} onChange={handleChange} readOnly={!isEditing} icon={<Instagram className="w-4 h-4" />} />
                   <RefinedField label="LinkedIn" name="socialLinks.linkedin" value={formData.socialLinks.linkedin} onChange={handleChange} readOnly={!isEditing} icon={<Linkedin className="w-4 h-4" />} />
                   <RefinedField label="Facebook" name="socialLinks.facebook" value={formData.socialLinks.facebook} onChange={handleChange} readOnly={!isEditing} icon={<Facebook className="w-4 h-4" />} />
                   <RefinedField label="YouTube" name="socialLinks.youtube" value={formData.socialLinks.youtube} onChange={handleChange} readOnly={!isEditing} icon={<Youtube className="w-4 h-4" />} />
-                </div>
-
-                <div className="xl:col-span-5 space-y-6">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] ml-1">Profile Picture</label>
-                  <div className="aspect-square w-full rounded-[48px] bg-white/[0.02] border-2 border-dashed border-white/5 flex flex-col items-center justify-center gap-6 cursor-pointer hover:bg-white/[0.05] hover:border-primary/30 transition-all group/portrait relative overflow-hidden">
-                    <div className="w-20 h-20 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center group-hover/portrait:bg-primary/20 transition-all relative z-10">
-                      <User className="w-8 h-8 text-white/10 group-hover/portrait:text-primary transition-colors" />
-                    </div>
-                    <div className="space-y-2 text-center relative z-10 px-6">
-                      <span className="text-[10px] font-black uppercase text-white/20 tracking-[0.3em] block group-hover/portrait:text-primary transition-colors">Upload Picture</span>
-                      <span className="text-[8px] font-medium text-white/10 uppercase tracking-widest block">Recommended: 800x800</span>
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-bl from-primary/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
-                  </div>
                 </div>
               </div>
             </div>
@@ -404,23 +579,27 @@ export default function EventAdminOnboarding() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
               <RefinedField label="Registration Number" name="registrationNumber" value={formData.registrationNumber} onChange={handleChange} readOnly={!isEditing} icon={<FileText className="w-4 h-4" />} />
               <RefinedField label="Tax/VAT ID" name="taxId" value={formData.taxId} onChange={handleChange} readOnly={!isEditing} icon={<CheckSquare className="w-4 h-4" />} />
-              <div className="md:col-span-2">
-                <div className="p-12 rounded-[48px] border-2 border-dashed border-white/5 bg-white/[0.01] flex flex-col items-center justify-center gap-6 group cursor-pointer hover:bg-white/[0.04] hover:border-primary/30 transition-all">
-                  <div className="w-16 h-16 rounded-3xl bg-white/5 flex items-center justify-center border border-white/5 group-hover:bg-primary/20 transition-all">
-                    <Upload className="w-6 h-6 text-white/10 group-hover:text-primary transition-colors" />
-                  </div>
-                  <div className="text-center space-y-2">
-                    <p className="text-[12px] font-black uppercase tracking-[0.2em] text-white/40 group-hover:text-white transition-colors">Upload Documents</p>
-                    <p className="text-[9px] text-white/10 font-bold uppercase tracking-tighter">PDF | Vector | Raster (5MB Limit)</p>
-                  </div>
-                </div>
+              <div className="md:col-span-2 p-8 rounded-[32px] border border-white/5 bg-white/[0.01] flex items-center gap-4">
+                <Upload className="w-5 h-5 text-white/20 shrink-0" />
+                <p className="text-xs text-white/30 font-medium">
+                  Document upload isn't available yet. This will be added in a future update — for now, Registration Number and Tax ID above are saved with your account.
+                </p>
               </div>
             </div>
           </FormSection>
 
           <footer className="space-y-12">
             <div className="flex flex-col gap-5 p-10 rounded-[32px] bg-white/[0.02] border border-white/5">
-              <label className="flex items-center gap-5 group cursor-pointer">
+              {/* FIXED: these looked like interactive checkboxes (cursor-
+                  pointer, hover styling) but had no onClick handler at
+                  all — clicking them did nothing, so termsAccepted/
+                  privacyAccepted could never become true, which
+                  handleSubmit requires. Nobody could have completed this
+                  form. */}
+              <label
+                onClick={() => setFormData(prev => ({ ...prev, termsAccepted: !prev.termsAccepted }))}
+                className="flex items-center gap-5 group cursor-pointer"
+              >
                 <div className={cn(
                   "w-6 h-6 rounded-[8px] border flex items-center justify-center transition-all",
                   formData.termsAccepted ? "bg-primary border-primary" : "border-white/10 bg-white/5"
@@ -429,7 +608,10 @@ export default function EventAdminOnboarding() {
                 </div>
                 <span className="text-[11px] font-black uppercase tracking-widest text-white/40 group-hover:text-white transition-colors">I accept the Terms and Conditions</span>
               </label>
-              <label className="flex items-center gap-5 group cursor-pointer">
+              <label
+                onClick={() => setFormData(prev => ({ ...prev, privacyAccepted: !prev.privacyAccepted }))}
+                className="flex items-center gap-5 group cursor-pointer"
+              >
                 <div className={cn(
                   "w-6 h-6 rounded-[8px] border flex items-center justify-center transition-all",
                   formData.privacyAccepted ? "bg-primary border-primary" : "border-white/10 bg-white/5"
@@ -440,7 +622,13 @@ export default function EventAdminOnboarding() {
               </label>
             </div>
 
-            <button 
+            {submitError && (
+              <div className="p-5 rounded-2xl bg-red-500/10 border border-red-500/20">
+                <p className="text-red-300 text-sm font-bold">{submitError}</p>
+              </div>
+            )}
+
+            <button
               onClick={handleSubmit}
               disabled={isSubmitting}
               className="w-full h-24 rounded-[32px] bg-primary text-white text-md font-black uppercase tracking-[0.4em] transition-all shadow-[0_20px_60px_rgba(255,45,154,0.4)] flex items-center justify-center gap-4 relative overflow-hidden group active:scale-95 disabled:grayscale"
@@ -479,7 +667,7 @@ function NicheInput({ onAdd, isEditingMode }: { onAdd: (niches: string[]) => voi
   if (isAdding && isEditingMode) {
     return (
       <div className="flex items-center">
-        <input 
+        <input
           autoFocus
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -501,8 +689,8 @@ function NicheInput({ onAdd, isEditingMode }: { onAdd: (niches: string[]) => voi
       disabled={!isEditingMode}
       className={cn(
         "w-14 h-14 rounded-[20px] bg-white/[0.02] border border-dashed flex items-center justify-center transition-all text-2xl font-light",
-        isEditingMode 
-          ? "border-white/10 text-white/20 hover:text-white hover:border-primary hover:bg-primary/5" 
+        isEditingMode
+          ? "border-white/10 text-white/20 hover:text-white hover:border-primary hover:bg-primary/5"
           : "border-white/5 text-white/5 cursor-not-allowed opacity-50"
       )}
     >
@@ -510,4 +698,3 @@ function NicheInput({ onAdd, isEditingMode }: { onAdd: (niches: string[]) => voi
     </button>
   );
 }
-

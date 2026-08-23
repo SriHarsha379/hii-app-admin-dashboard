@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useQuery } from '@tanstack/react-query';
-import { 
-  User, 
-  Mail, 
-  Shield, 
-  MapPin, 
-  Calendar, 
-  Zap, 
-  Building2, 
-  Trophy, 
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  User,
+  Mail,
+  Shield,
+  MapPin,
+  Calendar,
+  Zap,
+  Building2,
+  Trophy,
   ChevronRight,
   TrendingUp,
   Clock,
@@ -29,6 +30,8 @@ import ClubProfilePreview from './ClubProfilePreview';
 
 import { API_BASE } from '../lib/apiConfig';
 export default function EventAdminProfile() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, token } = useAuth();
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [selectedClub, setSelectedClub] = useState<any>(null);
@@ -218,7 +221,7 @@ export default function EventAdminProfile() {
                       </div>
                       <div className="px-2">
                         <h4 className="text-xl font-black text-white uppercase tracking-tight truncate">{event.title}</h4>
-                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1">{event.city}</p>
+                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1">{typeof event.city === 'object' ? event.city?.city_name : event.city}</p>
                       </div>
                     </motion.div>
                   ))}
@@ -456,10 +459,30 @@ export default function EventAdminProfile() {
                       <div className="p-8 rounded-[2.5rem] bg-white/[0.02] border border-white/5 space-y-6">
                         <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Operational Controls</h4>
                         <div className="grid grid-cols-1 gap-3">
-                           <button className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black text-white uppercase tracking-widest hover:bg-white/10 transition-all flex items-center justify-center gap-2">
+                           {/* FIXED: neither of these had an onClick, and
+                               unlike the event-card buttons above, there's
+                               no parent click handler to bubble up to —
+                               these were genuinely dead. "Update Live
+                               Metrics" now triggers a real refetch of the
+                               event/club data on this page. "Emergency
+                               Broadcast" routes to the real broadcast
+                               feature (Ads & Broadcast) rather than
+                               fabricating a separate, undefined system for
+                               it — no spec exists for what a distinct
+                               "emergency" flow should actually do. */}
+                           <button
+                             onClick={() => {
+                               queryClient.invalidateQueries({ queryKey: ['events'] });
+                               queryClient.invalidateQueries({ queryKey: ['clubs'] });
+                             }}
+                             className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black text-white uppercase tracking-widest hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+                           >
                              Update Live Metrics
                            </button>
-                           <button className="w-full py-4 rounded-2xl bg-primary text-white text-[10px] font-black font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all">
+                           <button
+                             onClick={() => navigate('/ads-broadcast')}
+                             className="w-full py-4 rounded-2xl bg-primary text-white text-[10px] font-black font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
+                           >
                              Emergency Broadcast
                            </button>
                         </div>

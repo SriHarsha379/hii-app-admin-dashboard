@@ -235,7 +235,7 @@ onClick={() => {
                             </p>
                             <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase font-bold">
                               <MapPin className="w-3 h-3" />
-                              {event.city}
+                              {typeof event.city === 'object' ? event.city?.city_name : event.city}
                             </div>
                           </div>
                         </button>

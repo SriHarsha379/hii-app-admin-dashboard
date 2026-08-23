@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
-import { 
-  MapPin, 
-  Calendar, 
-  Zap, 
-  Building2, 
+import {
+  MapPin,
+  Calendar,
+  Zap,
+  Building2,
   Clock,
   Activity,
   Star,
@@ -29,6 +30,7 @@ import EventProfilePreview from './EventProfilePreview';
 
 import { API_BASE } from '../lib/apiConfig';
 export default function ClubAdminProfile() {
+  const navigate = useNavigate();
   const { user, token } = useAuth();
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'UPCOMING' | 'PAST' | 'LIVE'>('UPCOMING');
@@ -208,7 +210,15 @@ export default function ClubAdminProfile() {
                 <ImageIcon className="w-4 h-4 text-primary" />
                 Venue Gallery
               </h2>
-              <button className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline">View All</button>
+              {/* FIXED: standalone button, no parent bubbling to save it —
+                  had no onClick at all. Wired to the real Profile page
+                  where the gallery is actually managed. */}
+              <button
+                onClick={() => navigate('/account-settings')}
+                className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
+              >
+                View All
+              </button>
             </div>
             <div className="grid grid-cols-2 gap-4">
               {(clubData?.landscape_urls || clubData?.gallery || []).slice(0, 4).map((url: string, index: number) => (

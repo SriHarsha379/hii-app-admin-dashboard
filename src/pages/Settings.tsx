@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useMutation } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  User, 
-  Lock, 
-  Bell, 
-  Shield, 
-  Globe, 
-  Smartphone, 
-  Mail, 
+import {
+  User,
+  Lock,
+  Bell,
+  Shield,
+  Globe,
+  Smartphone,
+  Mail,
   Save,
   CheckCircle2,
   MapPin,
@@ -26,13 +27,81 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { FormSection, RefinedField } from '../components/RefinedForm';
+import { API_BASE } from '../lib/apiConfig';
+
+const UPLOADS_BASE = API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads');
+const avatarUrl = (filename?: string | null) => {
+  if (!filename) return '';
+  if (/^https?:\/\//i.test(filename)) return filename;
+  return `${UPLOADS_BASE}/${filename}`;
+};
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, token, updateUser } = useAuth();
+  const avatarInputRef = React.useRef<HTMLInputElement>(null);
+
+  // FIXED: "Change Photo" had no file input and no backend support at
+  // all — the Admin schema had a profile_image field but nothing to
+  // actually update it. Added a real endpoint for an admin to update
+  // their own avatar.
+  const updateAvatarMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const body = new FormData();
+      body.append('profile_image', file);
+      const res = await fetch(`${API_BASE}/admins/me/avatar`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+        body,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.message || 'Failed to update photo');
+      return json;
+    },
+    onSuccess: (json) => {
+      const filename = json?.data?.profile_image;
+      if (filename) updateUser({ avatar: avatarUrl(filename) });
+    },
+    onError: (err: any) => alert(err.message || 'Failed to update photo'),
+  });
+
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) updateAvatarMutation.mutate(file);
+  };
+
   const [activeTab, setActiveTab] = useState('profile');
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [cities, setCities] = useState(['Mumbai', 'Delhi', 'Bangalore', 'Goa']);
+
+  // FIXED: these toggles used `defaultChecked` (uncontrolled) with no
+  // onChange at all — they'd visually flip on click but nothing was ever
+  // read or saved anywhere. There's no backend support for per-admin
+  // notification preferences yet, so rather than fake a save that does
+  // nothing, this genuinely persists locally (survives refresh/reopen)
+  // without needing new backend infrastructure for something this
+  // lightweight.
+  const [notificationPrefs, setNotificationPrefs] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('hii_admin_notification_prefs');
+      return saved ? JSON.parse(saved) : {
+        'Email Notifications': true,
+        'Push Notifications': true,
+        'Security Alerts': true,
+        'App Updates': false,
+      };
+    } catch {
+      return { 'Email Notifications': true, 'Push Notifications': true, 'Security Alerts': true, 'App Updates': false };
+    }
+  });
+
+  const toggleNotificationPref = (title: string) => {
+    setNotificationPrefs(prev => {
+      const next = { ...prev, [title]: !prev[title] };
+      localStorage.setItem('hii_admin_notification_prefs', JSON.stringify(next));
+      return next;
+    });
+  };
   const [newCity, setNewCity] = useState('');
 
   const [profile, setProfile] = useState({
@@ -87,8 +156,8 @@ export default function Settings() {
             Manage your personal profile, security, and application preferences.
           </p>
         </div>
-        
-        <button 
+
+        <button
           onClick={handleSave}
           disabled={isSaving}
           className={cn(
@@ -119,8 +188,8 @@ export default function Settings() {
               onClick={() => setActiveTab(tab.id)}
               className={cn(
                 "w-full flex items-center gap-5 px-6 py-5 rounded-[24px] text-sm transition-all duration-500 relative group overflow-hidden border",
-                activeTab === tab.id 
-                  ? "bg-primary/10 border-primary/30 text-white shadow-xl shadow-primary/5" 
+                activeTab === tab.id
+                  ? "bg-primary/10 border-primary/30 text-white shadow-xl shadow-primary/5"
                   : "bg-white/[0.02] border-white/5 text-white/30 hover:bg-white/[0.05] hover:border-white/10 hover:text-white/60"
               )}
             >
@@ -153,16 +222,23 @@ export default function Settings() {
 
             <AnimatePresence mode="wait">
               {activeTab === 'profile' && (
-                <motion.div 
+                <motion.div
                   key="profile"
-                  initial={{ opacity: 0, x: 20 }} 
-                  animate={{ opacity: 1, x: 0 }} 
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   className="space-y-16 relative z-10"
                 >
                   <div className="flex flex-col md:flex-row items-center gap-12 pb-12 border-b border-white/5">
                     <div className="relative group profile-avatar">
                       <div className="absolute inset-0 bg-primary/20 rounded-full blur-[20px] scale-0 group-hover:scale-100 transition-transform duration-700" />
+                      <input
+                        ref={avatarInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleAvatarSelect}
+                      />
                       <div className="w-32 h-32 rounded-full bg-[#09090B] border-2 border-white/5 p-1 relative overflow-hidden group">
                         {user?.avatar ? (
                           <img src={user.avatar} alt={user.name} className="w-full h-full rounded-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" />
@@ -171,16 +247,25 @@ export default function Settings() {
                             <User className="w-12 h-12 text-white/10" />
                           </div>
                         )}
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col items-center justify-center cursor-pointer">
-                          <Camera className="w-6 h-6 text-white mb-2" />
-                          <span className="text-[8px] font-black uppercase tracking-widest text-white">Change Photo</span>
+                        <div
+                          onClick={() => avatarInputRef.current?.click()}
+                          className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col items-center justify-center cursor-pointer"
+                        >
+                          {updateAvatarMutation.isPending ? (
+                            <span className="text-[8px] font-black uppercase tracking-widest text-white">Uploading...</span>
+                          ) : (
+                            <>
+                              <Camera className="w-6 h-6 text-white mb-2" />
+                              <span className="text-[8px] font-black uppercase tracking-widest text-white">Change Photo</span>
+                            </>
+                          )}
                         </div>
                       </div>
                       <div className="absolute -bottom-2 -right-2 w-10 h-10 rounded-2xl bg-[#09090B] border border-white/10 flex items-center justify-center shadow-2xl">
                         <Upload className="w-4 h-4 text-primary" />
                       </div>
                     </div>
-                    
+
                     <div className="space-y-4 text-center md:text-left">
                       <div className="space-y-1">
                         <h3 className="text-3xl font-black text-white uppercase tracking-tight">{profile.name || 'User Profile'}</h3>
@@ -192,35 +277,35 @@ export default function Settings() {
 
                   <FormSection title="Profile Details" icon={<User className="w-4 h-4" />}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                      <RefinedField 
-                        label="Full Name" 
+                      <RefinedField
+                        label="Full Name"
                         name="name"
                         value={profile.name}
                         onChange={(e) => setProfile({ ...profile, name: e.target.value })}
                         icon={<User className="w-4 h-4" />}
                         placeholder="Full Name"
                       />
-                      <RefinedField 
-                        label="Email Address" 
+                      <RefinedField
+                        label="Email Address"
                         name="email"
-                        type="email" 
+                        type="email"
                         value={profile.email}
                         onChange={(e) => setProfile({ ...profile, email: e.target.value })}
                         icon={<Mail className="w-4 h-4" />}
                         placeholder="email@example.com"
                       />
-                      <RefinedField 
-                        label="Role" 
+                      <RefinedField
+                        label="Role"
                         name="role"
                         value={profile.role}
                         readOnly
                         icon={<ShieldCheck className="w-4 h-4" />}
                         placeholder="Admin"
                       />
-                      <RefinedField 
-                        label="Phone Number" 
+                      <RefinedField
+                        label="Phone Number"
                         name="phone"
-                        type="tel" 
+                        type="tel"
                         value={profile.phone}
                         onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
                         icon={<Phone className="w-4 h-4" />}
@@ -232,10 +317,10 @@ export default function Settings() {
               )}
 
               {activeTab === 'security' && (
-                <motion.div 
+                <motion.div
                   key="security"
-                  initial={{ opacity: 0, x: 20 }} 
-                  animate={{ opacity: 1, x: 0 }} 
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   className="space-y-16 relative z-10"
                 >
@@ -250,26 +335,26 @@ export default function Settings() {
                   <div className="p-10 rounded-[40px] bg-red-500/5 border border-red-500/10 space-y-12">
                     <FormSection title="Update Password" icon={<Lock className="w-4 h-4" />}>
                       <div className="grid grid-cols-1 gap-10 max-w-xl">
-                        <RefinedField 
-                          label="Current Password" 
+                        <RefinedField
+                          label="Current Password"
                           name="currentPassword"
-                          type="password" 
+                          type="password"
                           value={security.currentPassword}
                           onChange={(e) => setSecurity({ ...security, currentPassword: e.target.value })}
                           placeholder="••••••••"
                         />
-                        <RefinedField 
-                          label="New Password" 
+                        <RefinedField
+                          label="New Password"
                           name="newPassword"
-                          type="password" 
+                          type="password"
                           value={security.newPassword}
                           onChange={(e) => setSecurity({ ...security, newPassword: e.target.value })}
                           placeholder="••••••••"
                         />
-                        <RefinedField 
-                          label="Confirm New Password" 
+                        <RefinedField
+                          label="Confirm New Password"
                           name="confirmPassword"
-                          type="password" 
+                          type="password"
                           value={security.confirmPassword}
                           onChange={(e) => setSecurity({ ...security, confirmPassword: e.target.value })}
                           placeholder="••••••••"
@@ -294,10 +379,10 @@ export default function Settings() {
               )}
 
               {activeTab === 'notifications' && (
-                <motion.div 
+                <motion.div
                   key="notifications"
-                  initial={{ opacity: 0, x: 20 }} 
-                  animate={{ opacity: 1, x: 0 }} 
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   className="space-y-16 relative z-10"
                 >
@@ -325,7 +410,12 @@ export default function Settings() {
                           <p className="text-xs text-white/30 font-medium leading-relaxed">{item.desc}</p>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" defaultChecked={item.defaultChecked} />
+                          <input
+                            type="checkbox"
+                            className="sr-only peer"
+                            checked={notificationPrefs[item.title] ?? item.defaultChecked}
+                            onChange={() => toggleNotificationPref(item.title)}
+                          />
                           <div className="w-14 h-7 bg-white/5 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white/20 after:rounded-full after:h-[20px] after:w-[20px] after:transition-all peer-checked:bg-primary peer-checked:after:bg-white peer-checked:shadow-[0_0_20px_rgba(255,45,154,0.3)]"></div>
                         </label>
                       </div>
@@ -335,10 +425,10 @@ export default function Settings() {
               )}
 
               {activeTab === 'preferences' && (
-                <motion.div 
+                <motion.div
                   key="preferences"
-                  initial={{ opacity: 0, x: 20 }} 
-                  animate={{ opacity: 1, x: 0 }} 
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   className="space-y-16 relative z-10"
                 >
@@ -354,7 +444,7 @@ export default function Settings() {
                     <div className="space-y-4 group/field">
                       <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Language</label>
                       <div className="relative">
-                        <select 
+                        <select
                           value={preferences.language}
                           onChange={(e) => setPreferences({ ...preferences, language: e.target.value })}
                           className="w-full bg-[#09090B] border border-white/10 rounded-[28px] px-8 py-5 text-sm text-white focus:outline-none focus:border-purple-400 appearance-none font-medium"
@@ -368,7 +458,7 @@ export default function Settings() {
                     <div className="space-y-4 group/field">
                       <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Timezone</label>
                       <div className="relative">
-                        <select 
+                        <select
                           value={preferences.timezone}
                           onChange={(e) => setPreferences({ ...preferences, timezone: e.target.value })}
                           className="w-full bg-[#09090B] border border-white/10 rounded-[28px] px-8 py-5 text-sm text-white focus:outline-none focus:border-purple-400 appearance-none font-medium"
@@ -382,7 +472,7 @@ export default function Settings() {
                     <div className="space-y-4 group/field col-span-full">
                       <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Theme</label>
                       <div className="relative">
-                        <select 
+                        <select
                           value={preferences.theme}
                           onChange={(e) => setPreferences({ ...preferences, theme: e.target.value })}
                           className="w-full bg-[#09090B] border border-white/10 rounded-[28px] px-8 py-5 text-sm text-white focus:outline-none focus:border-purple-400 appearance-none font-medium"
@@ -399,10 +489,10 @@ export default function Settings() {
               )}
 
               {activeTab === 'cities' && (
-                <motion.div 
+                <motion.div
                   key="cities"
-                  initial={{ opacity: 0, x: 20 }} 
-                  animate={{ opacity: 1, x: 0 }} 
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   className="space-y-16 relative z-10"
                 >
@@ -418,11 +508,11 @@ export default function Settings() {
                     <div className="flex items-center gap-4">
                       <div className="flex-1 relative group">
                         <MapPin className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 group-focus-within:text-orange-400 transition-colors" />
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           value={newCity}
                           onChange={(e) => setNewCity(e.target.value)}
-                          placeholder="Enter city name..." 
+                          placeholder="Enter city name..."
                           className="w-full bg-[#09090B] border border-white/5 rounded-[28px] pl-14 pr-8 py-5 text-sm text-white focus:outline-none focus:border-orange-400 transition-all placeholder:text-white/10 font-medium"
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && newCity.trim()) {
@@ -432,7 +522,7 @@ export default function Settings() {
                           }}
                         />
                       </div>
-                      <button 
+                      <button
                         onClick={() => {
                           if (newCity.trim()) {
                             setCities([...cities, newCity.trim()]);
@@ -447,11 +537,11 @@ export default function Settings() {
 
                     <div className="grid grid-cols-1 gap-4">
                       {cities.map((city, index) => (
-                        <motion.div 
+                        <motion.div
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: index * 0.05 }}
-                          key={index} 
+                          key={index}
                           className="group flex items-center justify-between p-6 rounded-[32px] bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-white/10 transition-all shadow-md group"
                         >
                           <div className="flex items-center gap-5">
@@ -463,7 +553,7 @@ export default function Settings() {
                               <p className="text-[8px] text-white/20 font-black uppercase tracking-widest block">Active City</p>
                             </div>
                           </div>
-                          <button 
+                          <button
                             onClick={() => setCities(cities.filter((_, i) => i !== index))}
                             className="w-10 h-10 rounded-xl hover:bg-red-500/10 text-white/10 hover:text-red-400 transition-all flex items-center justify-center"
                           >

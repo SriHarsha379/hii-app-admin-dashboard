@@ -935,7 +935,7 @@ export default function Events() {
                       </span>
                       {selectedEvent.city && (
                         <span className="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/20 backdrop-blur-md bg-black/30 text-white/70 flex items-center gap-1.5">
-                          <MapPin className="w-3 h-3" />{selectedEvent.city}
+                          <MapPin className="w-3 h-3" />{typeof selectedEvent.city === 'object' ? selectedEvent.city?.city_name : selectedEvent.city}
                         </span>
                       )}
                     </div>

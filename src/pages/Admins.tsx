@@ -6,7 +6,8 @@ import {
   Search, 
   Filter, 
   MoreHorizontal, 
-  TrendingUp, 
+  Trash2,
+  TrendingUp,
   TrendingDown,
   Mail,
   Bell,
@@ -97,7 +98,12 @@ export default function Admins() {
       const res = await fetch(`${API_BASE}/admins`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return res.json();
+      const json = await res.json();
+      // FIXED: was returning the raw {success, message, data} wrapper
+      // instead of unwrapping it — every count/filter/list on this page
+      // was silently operating on the wrong shape, showing "No admins
+      // found" and zero counts even when creation was genuinely working.
+      return Array.isArray(json.data) ? json.data : [];
     }
   });
 
@@ -119,6 +125,46 @@ export default function Admins() {
       setIsAddModalOpen(false);
       setNewAdmin({ name: '', email: '', role: 'NORMAL_ADMIN', password: '' });
     }
+  });
+
+  // FIXED: the kebab (⋯) menu on each admin row had no dropdown, no
+  // actions, nothing — clicking it did nothing at all. Backend previously
+  // had zero support for deactivating or removing an admin account
+  // through the dashboard; added real endpoints for both.
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`${API_BASE}/admins/${id}/status`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.message || 'Failed to update admin status');
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admins'] });
+      setOpenMenuId(null);
+    },
+    onError: (err: any) => alert(err.message || 'Failed to update admin status'),
+  });
+
+  const deleteAdminMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`${API_BASE}/admins/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.message || 'Failed to remove admin');
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admins'] });
+      setOpenMenuId(null);
+    },
+    onError: (err: any) => alert(err.message || 'Failed to remove admin'),
   });
 
   const filteredAdmins = (Array.isArray(admins) ? admins : [])?.filter((a: any) => {
@@ -282,10 +328,36 @@ export default function Admins() {
                   <td className="px-6 py-4">
                     <p className="text-xs text-white font-medium">{new Date(admin.created_at).toLocaleDateString()}</p>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition-all">
+                  <td className="px-6 py-4 text-right relative">
+                    <button
+                      onClick={() => setOpenMenuId(openMenuId === admin._id ? null : admin._id)}
+                      className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition-all"
+                    >
                       <MoreHorizontal className="w-4 h-4" />
                     </button>
+                    {openMenuId === admin._id && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
+                        <div className="absolute right-6 top-12 z-20 w-48 rounded-2xl bg-[#0B0B0F] border border-white/10 shadow-2xl overflow-hidden">
+                          <button
+                            onClick={() => toggleStatusMutation.mutate(admin._id)}
+                            disabled={toggleStatusMutation.isPending}
+                            className="w-full flex items-center gap-3 px-5 py-3 text-xs font-bold text-white/70 hover:bg-white/5 hover:text-white transition-all disabled:opacity-50"
+                          >
+                            {admin.status === 'ACTIVE' ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                            {admin.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+                          </button>
+                          <button
+                            onClick={() => { if (confirm(`Remove ${admin.name}? This can't be undone from here.`)) deleteAdminMutation.mutate(admin._id); }}
+                            disabled={deleteAdminMutation.isPending}
+                            className="w-full flex items-center gap-3 px-5 py-3 text-xs font-bold text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Remove
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}

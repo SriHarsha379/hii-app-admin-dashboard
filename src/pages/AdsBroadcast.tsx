@@ -311,30 +311,58 @@ export default function AdsBroadcast() {
     setIsCreatingAd(true);
   };
 
+  // FIXED: was hitting the generic /events/list endpoint and taking the
+  // first 5 results, mislabeled as "Featured Events" — not real featured
+  // events at all. Also wasn't unwrapping .data, so `events` was the
+  // whole {success, message, data} wrapper, meaning Array.isArray(events)
+  // was always false and this table showed "No featured events" no
+  // matter what. Now hits the real featured-events endpoint.
   const { data: events } = useQuery({
-    queryKey: ['events'],
+    queryKey: ['featured-events'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/events/list`, {
+      const res = await fetch(`${API_BASE}/events/featured`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return res.json();
+      const json = await res.json();
+      return json.data ?? [];
     }
   });
 
   const featureEventMutation = useMutation({
     mutationFn: async (data: { city: string; eventId: string; duration: number }) => {
-      const res = await fetch(`${API_BASE}/events/feature`, {
+      // FIXED: was POSTing to /events/feature with eventId in the body —
+      // the real route is /events/feature/:id (id in the URL path).
+      const res = await fetch(`${API_BASE}/events/feature/${data.eventId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify({ duration: data.duration, city: data.city })
       });
-      return res.json();
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.message || 'Failed to feature event');
+      return json;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['featured-events'] });
+    }
+  });
+
+  // FIXED: the "remove from featured" trash icon on this table had no
+  // onClick at all — clicking it did nothing.
+  const unfeatureEventMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`${API_BASE}/events/unfeature/${id}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.message || 'Failed to unfeature event');
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['featured-events'] });
     }
   });
 
@@ -362,7 +390,7 @@ export default function AdsBroadcast() {
     return filterAdStatus === 'ALL' || status === filterAdStatus;
   });
 
-  const featuredEventsList = Array.isArray(events) ? events.slice(0, 5) : [];
+  const featuredEventsList = Array.isArray(events) ? events : [];
   const filteredFeaturedEvents = featuredEventsList.filter((event: any) => {
     return filterCity === 'ALL' || event.city === filterCity;
   });
@@ -693,9 +721,14 @@ export default function AdsBroadcast() {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-white">{event.date}</td>
-                        <td className="px-6 py-4 text-sm text-white">{event.city}</td>
+                        <td className="px-6 py-4 text-sm text-white">{typeof event.city === 'object' ? event.city?.city_name : event.city}</td>
                         <td className="px-6 py-4 text-right">
-                          <button className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all">
+                          <button
+                            onClick={() => unfeatureEventMutation.mutate(event.id || event._id)}
+                            disabled={unfeatureEventMutation.isPending}
+                            className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all disabled:opacity-50"
+                            title="Remove from featured"
+                          >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </td>

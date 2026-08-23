@@ -6,6 +6,7 @@ interface User {
   email: string;
   role: 'SUPER_ADMIN' | 'EVENT_ADMIN' | 'CITY_ADMIN' | 'CLUB_ADMIN' | 'ADMIN' | 'NORMAL_ADMIN';
   organisation?: string;
+  avatar?: string;
 }
 
 interface AuthContextType {

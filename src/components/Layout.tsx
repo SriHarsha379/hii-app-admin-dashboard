@@ -62,12 +62,33 @@ import EventProfilePreview from './EventProfilePreview';
 import RightClubProfile from './RightClubProfile';
 
 import { API_BASE } from '../lib/apiConfig';
-function RightSidebar({ isOpen, toggle, currentPage }: { isOpen: boolean, toggle: () => void, currentPage: string }) {
+function RightSidebar({ isOpen, toggle, currentPage, notifications }: { isOpen: boolean, toggle: () => void, currentPage: string, notifications: any[] }) {
   const { token, user } = useAuth();
   const navigate = useNavigate();
 
-  const notifications: any[] = [];
-  const team: any[] = [];
+  // FIXED: was hardcoded to permanently-empty arrays — this whole panel
+  // showed "No notifications" / an empty Team Members list no matter
+  // what, even though real data existed for both. Notifications now
+  // reuse the same real data already fetched at the top of Layout
+  // (avoids double-fetching the same query). Team Members now pulls the
+  // real admin list.
+  const { data: teamAdmins } = useQuery({
+    queryKey: ['admins-sidebar'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/admins`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return Array.isArray(json.data) ? json.data : [];
+    },
+    enabled: Boolean(token) && user?.role === 'SUPER_ADMIN',
+  });
+  const team = Array.isArray(teamAdmins) ? teamAdmins.slice(0, 6) : [];
+
+  const roleColors: Record<string, string> = {
+    SUPER_ADMIN: 'bg-primary/20 text-primary',
+    NORMAL_ADMIN: 'bg-blue-500/20 text-blue-400',
+    EVENT_ADMIN: 'bg-purple-500/20 text-purple-400',
+    CLUB_ADMIN: 'bg-emerald-500/20 text-emerald-400',
+  };
 
   // FIXED: real backend path is /vendor/get_all_vendors, response is
   // wrapped as { success, message, data }, so unwrap .data.
@@ -146,14 +167,14 @@ function RightSidebar({ isOpen, toggle, currentPage }: { isOpen: boolean, toggle
               </button>
             </div>
             <div className="space-y-4">
-              {notifications.map((n) => (
-                <div key={n.id} className="flex gap-3 group cursor-pointer">
-                  <div className={cn("w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0 transition-transform group-hover:scale-110", n.color)}>
-                    <n.icon className="w-4 h-4" />
+              {notifications.slice(0, 5).map((n: any, i: number) => (
+                <div key={n._id || n.notification_id || i} className="flex gap-3 group">
+                  <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-110", n.read_status ? "bg-white/5" : "bg-primary/10")}>
+                    <Bell className={cn("w-4 h-4", n.read_status ? "text-white/40" : "text-primary")} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-white leading-snug truncate group-hover:text-primary transition-colors">{n.text}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{n.time}</p>
+                    <p className="text-xs text-white leading-snug truncate group-hover:text-primary transition-colors">{n.title || n.message}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{n.createdAt}</p>
                   </div>
                 </div>
               ))}
@@ -168,13 +189,15 @@ function RightSidebar({ isOpen, toggle, currentPage }: { isOpen: boolean, toggle
               <div>
                 <h3 className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-4">Team Members</h3>
                 <div className="space-y-4">
-                  {team.map((t) => (
-                    <div key={t.name} className="flex items-center gap-3 group cursor-pointer">
-                      <img src={t.avatar} alt={t.name} className="w-8 h-8 rounded-full object-cover border border-white/10 group-hover:border-primary transition-colors" referrerPolicy="no-referrer" />
+                  {team.map((t: any) => (
+                    <div key={t._id} className="flex items-center gap-3 group">
+                      <div className={cn("w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black border border-white/10 group-hover:border-primary transition-colors shrink-0", roleColors[t.role] || "bg-white/10 text-white/60")}>
+                        {(t.name || '?').charAt(0).toUpperCase()}
+                      </div>
                       <div className="min-w-0">
                         <p className="text-xs text-white font-medium truncate">{t.name}</p>
-                        <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-bold", t.color)}>
-                          {t.role === 'SUPER ADMIN' ? 'Main Admin' :
+                        <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-bold", roleColors[t.role] || "bg-white/10 text-white/60")}>
+                          {t.role === 'SUPER_ADMIN' ? 'Main Admin' :
                            t.role === 'EVENT_ADMIN' ? 'Event Manager' :
                            t.role === 'CITY_ADMIN' ? 'City Manager' :
                            t.role === 'CLUB_ADMIN' ? 'Club Manager' : t.role}
@@ -246,7 +269,13 @@ export default function Layout() {
 
   // FIXED: real backend path is /notification/all, response is wrapped as
   // { success, message, data }, so unwrap .data.
-  const { data: notifications } = useQuery({
+  // FIXED: real backend path is /notification/all, response is wrapped as
+  // { success, message, data: { notifications, total_records, ... } } —
+  // was only unwrapping .data, which returns that whole object, not the
+  // actual notifications array. `.map()` on it would throw immediately.
+  // Also added a safe [] default for the pre-fetch / failed-fetch state,
+  // since the JSX below calls .map()/.length with no guard.
+  const { data: notifications = [] } = useQuery({
     queryKey: ['notifications'],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/notification/all`, {
@@ -254,14 +283,19 @@ export default function Layout() {
       });
       if (!res.ok) return [];
       const json = await res.json();
-      return json.data ?? [];
+      return json.data?.notifications ?? [];
     },
     enabled: !!token,
     refetchInterval: 30_000, // poll every 30s
   });
 
   const notifList = Array.isArray(notifications) ? notifications : [];
-  const unreadCount = notifList.filter((n: any) => !n.read).length;
+  // FIXED: was checking `n.read`, which doesn't exist on the real
+  // notification shape — the backend field is `read_status` (0 = unread,
+  // 1 = read). This always evaluated to unread for every notification,
+  // so the badge permanently showed the full count regardless of actual
+  // read state.
+  const unreadCount = notifList.filter((n: any) => !n.read_status).length;
 
   const [isClubProfileOpen, setIsClubProfileOpen] = useState(false);
   const [isEventProfileOpen, setIsEventProfileOpen] = useState(false);
@@ -369,7 +403,15 @@ export default function Layout() {
       >
         <div className={cn("p-6 flex items-center shrink-0 overflow-hidden", isLeftSidebarOpen ? "gap-3" : "justify-center")}>
           <div className="w-8 h-8 rounded-lg overflow-hidden shadow-lg shadow-primary/20 shrink-0 flex items-center justify-center bg-gradient-to-br from-primary to-purple-600">
-            <img src="./hii-logo.png" alt="Hii" className="w-full h-full object-cover" />
+            {/* FIXED: was "./hii-logo.png" — a relative path, which
+                resolves against whatever the browser thinks the current
+                URL is. On a single-page app with client-side routing,
+                this can point to the wrong location depending on the
+                route or how the page was loaded (fresh load vs.
+                client-side navigation), causing the logo to intermittently
+                fail and fall back to the container's plain gradient
+                background. Absolute path always resolves correctly. */}
+            <img src="/hii-logo.png" alt="Hii" className="w-full h-full object-cover" />
           </div>
           <AnimatePresence>
             {isLeftSidebarOpen && (
@@ -752,7 +794,15 @@ export default function Layout() {
                     {/* Footer — only show when there are notifications */}
                     {notifList.length > 0 && (
                       <div className="px-5 py-3 border-t border-white/5">
-                        <button className="text-[10px] font-black text-primary uppercase tracking-widest hover:text-white transition-colors w-full text-center">
+                        {/* FIXED: was a purely decorative button — no
+                            onClick at all. Fetching the notification list
+                            already marks everything read server-side, so
+                            this just needs to trigger that fetch and
+                            refresh the badge count. */}
+                        <button
+                          onClick={() => queryClient.invalidateQueries({ queryKey: ['notifications'] })}
+                          className="text-[10px] font-black text-primary uppercase tracking-widest hover:text-white transition-colors w-full text-center"
+                        >
                           Mark all as read
                         </button>
                       </div>
@@ -820,6 +870,7 @@ export default function Layout() {
           isOpen={isRightSidebarOpen}
           toggle={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
           currentPage={currentPage}
+          notifications={notifList}
         />
       )}
 

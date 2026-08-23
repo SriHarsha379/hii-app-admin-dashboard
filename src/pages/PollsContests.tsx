@@ -97,7 +97,11 @@ export default function PollsContests() {
       const res = await fetch(`${API_BASE}/polls`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return res.json();
+      // FIXED: was returning the raw {success, message, data} wrapper —
+      // Array.isArray(polls) further down was always false, so this table
+      // was always empty regardless of what existed.
+      const json = await res.json();
+      return json.data ?? [];
     }
   });
 
@@ -107,7 +111,9 @@ export default function PollsContests() {
       const res = await fetch(`${API_BASE}/contests`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return res.json();
+      // Same unwrap fix as the polls query above.
+      const json = await res.json();
+      return json.data ?? [];
     }
   });
 
@@ -122,7 +128,8 @@ export default function PollsContests() {
       const res = await fetch(`${API_BASE}/contests/${selectedContest.id}/participants`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return res.json();
+      const json = await res.json();
+      return json.data ?? [];
     },
     enabled: !!selectedContest?.id
   });
@@ -131,9 +138,9 @@ export default function PollsContests() {
     mutationFn: async (contest: any) => {
       const res = await fetch(`${API_BASE}/contests`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify(contest)
       });
@@ -150,9 +157,9 @@ export default function PollsContests() {
     mutationFn: async ({ id, status }: { id: string, status: string }) => {
       const res = await fetch(`${API_BASE}/contests/${id}/status`, {
         method: 'PATCH',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ status })
       });
@@ -170,7 +177,7 @@ export default function PollsContests() {
   const sortedPolls = [...filteredPolls].sort((a: any, b: any) => {
     let aValue = a[sortField];
     let bValue = b[sortField];
-    
+
     if (typeof aValue === 'string') aValue = aValue.toLowerCase();
     if (typeof bValue === 'string') bValue = bValue.toLowerCase();
 
@@ -186,7 +193,7 @@ export default function PollsContests() {
   const sortedContests = [...filteredContests].sort((a: any, b: any) => {
     let aValue = a[sortField];
     let bValue = b[sortField];
-    
+
     if (typeof aValue === 'string') aValue = aValue.toLowerCase();
     if (typeof bValue === 'string') bValue = bValue.toLowerCase();
 
@@ -208,9 +215,9 @@ export default function PollsContests() {
     mutationFn: async (poll: any) => {
       const res = await fetch(`${API_BASE}/polls`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify(poll)
       });
@@ -227,9 +234,9 @@ export default function PollsContests() {
     mutationFn: async ({ id, status }: { id: string, status: string }) => {
       const res = await fetch(`${API_BASE}/polls/${id}/status`, {
         method: 'PATCH',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ status })
       });
@@ -238,6 +245,46 @@ export default function PollsContests() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['polls'] });
     }
+  });
+
+  // FIXED: kebab menus on both poll and contest rows had no dropdown, no
+  // actions at all — required building the entire backend for this page
+  // first, since none of it existed.
+  const [openPollMenuId, setOpenPollMenuId] = useState<string | null>(null);
+  const [openContestMenuId, setOpenContestMenuId] = useState<string | null>(null);
+
+  const deletePollMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`${API_BASE}/polls/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.message || 'Failed to remove poll');
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['polls'] });
+      setOpenPollMenuId(null);
+    },
+    onError: (err: any) => alert(err.message || 'Failed to remove poll'),
+  });
+
+  const deleteContestMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`${API_BASE}/contests/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.message || 'Failed to remove contest');
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contests'] });
+      setOpenContestMenuId(null);
+    },
+    onError: (err: any) => alert(err.message || 'Failed to remove contest'),
   });
 
   const exportData = () => {
@@ -383,21 +430,25 @@ export default function PollsContests() {
                               </div>
                               <div>
                                 <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{poll.title}</p>
-                                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{poll.city}</p>
+                                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{typeof poll.city === 'object' ? poll.city?.city_name : poll.city}</p>
                               </div>
                             </div>
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
                               <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                              <span className="text-xs font-bold text-white">{poll.votes || '1,240'}</span>
+                              {/* FIXED: was `poll.votes || '1,240'` — a
+                                  hardcoded fake fallback that showed
+                                  "1,240" votes on any poll with genuinely
+                                  zero votes, including every new poll. */}
+                              <span className="text-xs font-bold text-white">{poll.votes ?? 0}</span>
                             </div>
                           </td>
                           <td className="px-6 py-4">
                             <p className="text-xs text-muted-foreground">{new Date(poll.end_date).toLocaleDateString()}</p>
                           </td>
                           <td className="px-6 py-4 text-right">
-                            <div className="flex items-center justify-end gap-3">
+                            <div className="flex items-center justify-end gap-3 relative">
                               <button
                                 onClick={() => {
                                   updatePollStatusMutation.mutate({
@@ -415,9 +466,27 @@ export default function PollsContests() {
                               >
                                 {poll.status === 'ACTIVE' ? 'Active Pop-up' : 'Activate'}
                               </button>
-                              <button className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition-all">
+                              <button
+                                onClick={() => setOpenPollMenuId(openPollMenuId === poll.id ? null : poll.id)}
+                                className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition-all"
+                              >
                                 <MoreHorizontal className="w-4 h-4" />
                               </button>
+                              {openPollMenuId === poll.id && (
+                                <>
+                                  <div className="fixed inset-0 z-10" onClick={() => setOpenPollMenuId(null)} />
+                                  <div className="absolute right-0 top-12 z-20 w-40 rounded-2xl bg-[#0B0B0F] border border-white/10 shadow-2xl overflow-hidden">
+                                    <button
+                                      onClick={() => { if (confirm(`Remove "${poll.title}"?`)) deletePollMutation.mutate(poll.id); }}
+                                      disabled={deletePollMutation.isPending}
+                                      className="w-full flex items-center gap-3 px-5 py-3 text-xs font-bold text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                      Remove
+                                    </button>
+                                  </div>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -529,6 +598,16 @@ export default function PollsContests() {
                           Activate
                         </button>
                       )}
+                      {/* FIXED: contests had no remove action anywhere on
+                          the card at all. */}
+                      <button
+                        onClick={() => { if (confirm(`Remove "${contest.title}"?`)) deleteContestMutation.mutate(contest.id); }}
+                        disabled={deleteContestMutation.isPending}
+                        className="text-[10px] px-2 py-1 rounded-lg font-bold border border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/10 transition-all uppercase disabled:opacity-50 flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Remove
+                      </button>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -545,7 +624,7 @@ export default function PollsContests() {
                     </div>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <MapPin className="w-3.5 h-3.5" />
-                      {contest.city}
+                      {typeof contest.city === 'object' ? contest.city?.city_name : contest.city}
                     </div>
                   </div>
                   <button
@@ -656,7 +735,7 @@ export default function PollsContests() {
                   Cancel
                 </button>
                 <button
-                  onClick={() => addPollMutation.mutate(newPoll)}
+                  onClick={() => addPollMutation.mutate({ ...newPoll, end_date: newPoll.endDate })}
                   disabled={addPollMutation.isPending}
                   className="flex-1 py-3 rounded-xl bg-gradient-to-br from-primary to-purple-600 text-sm font-bold shadow-lg shadow-primary/20 hover:scale-105 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >

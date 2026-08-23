@@ -51,6 +51,11 @@ const ProtectedRoute = ({
   // regardless of whether the Vendor record behind it has actually been
   // approved. A brand-new, unapproved club got identical access to an
   // approved one. This checks the real backend verification status.
+  // FIXED: this whole approval gate previously only ever checked
+  // CLUB_ADMIN — EVENT_ADMIN had no equivalent check at all, meaning an
+  // Event Admin got full dashboard access the instant `organisation` was
+  // set locally, with zero backend verification. Generalized to cover
+  // both roles the same way.
   const { data: ownVendorStatus, isLoading: vendorCheckLoading } = useQuery({
     queryKey: ['own-vendor-status', user?.organisation],
     queryFn: async () => {
@@ -59,7 +64,7 @@ const ProtectedRoute = ({
       const list = Array.isArray(json.data) ? json.data : [];
       return list.find((v: any) => v.name === user?.organisation) || null;
     },
-    enabled: user?.role === 'CLUB_ADMIN' && Boolean(user?.organisation),
+    enabled: (user?.role === 'CLUB_ADMIN' || user?.role === 'EVENT_ADMIN') && Boolean(user?.organisation),
   });
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-[#0B0B0F] text-white font-bold uppercase tracking-widest text-xs">Loading...</div>;
@@ -67,20 +72,29 @@ const ProtectedRoute = ({
   if (requireSuperAdmin && user.role !== 'SUPER_ADMIN') return <Navigate to="/" replace />;
 
   // Onboarding check for CLUB_ADMIN
-  const isClaiming = window.location.pathname.startsWith('/claim-club/');
+  const isClaiming = window.location.pathname.startsWith('/claim-club/') || window.location.pathname.startsWith('/claim-organiser/');
   if (user.role === 'CLUB_ADMIN' && !user.organisation && window.location.pathname !== '/club-onboarding' && !isClaiming) {
     return <Navigate to="/club-onboarding" replace />;
   }
 
-  // Approval gate for CLUB_ADMIN — organisation is set, but the vendor
-  // behind it isn't verified yet. Don't gate the onboarding/claim pages
-  // themselves, or the pending-approval page, to avoid a redirect loop.
+  // Onboarding check for EVENT_ADMIN
+  if (user.role === 'EVENT_ADMIN' && !user.organisation && window.location.pathname !== '/event-onboarding') {
+    return <Navigate to="/event-onboarding" replace />;
+  }
+
+  // Approval gate for CLUB_ADMIN and EVENT_ADMIN — organisation is set,
+  // but the vendor behind it isn't verified yet. Don't gate the
+  // onboarding/claim pages themselves, or the pending-approval page, to
+  // avoid a redirect loop.
   const isPendingApprovalPage = window.location.pathname === '/pending-approval';
+  const isOwnOnboardingPage =
+    (user.role === 'CLUB_ADMIN' && window.location.pathname === '/club-onboarding') ||
+    (user.role === 'EVENT_ADMIN' && window.location.pathname === '/event-onboarding');
   if (
-    user.role === 'CLUB_ADMIN' &&
+    (user.role === 'CLUB_ADMIN' || user.role === 'EVENT_ADMIN') &&
     user.organisation &&
     !isClaiming &&
-    window.location.pathname !== '/club-onboarding' &&
+    !isOwnOnboardingPage &&
     !isPendingApprovalPage
   ) {
     if (vendorCheckLoading) {
@@ -91,11 +105,6 @@ const ProtectedRoute = ({
     }
   }
 
-  // Onboarding check for EVENT_ADMIN
-  if (user.role === 'EVENT_ADMIN' && !user.organisation && window.location.pathname !== '/event-onboarding') {
-    return <Navigate to="/event-onboarding" replace />;
-  }
-
   if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/" replace />;
 
   return <>{children}</>;
@@ -104,6 +113,7 @@ const ProtectedRoute = ({
 import AccountSettings from './pages/AccountSettings';
 import EventAccountSettings from './pages/EventAccountSettings';
 import ClaimClubForm from './pages/ClaimClubForm';
+import ClaimOrganiserForm from './pages/ClaimOrganiserForm';
 import EventAdminProfilePage from './pages/EventAdminProfilePage';
 import ClubProfilePage from './pages/ClubProfilePage';
 
@@ -117,6 +127,7 @@ export default function App() {
             <Route path="/club-onboarding" element={<ProtectedRoute><ClubOnboarding /></ProtectedRoute>} />
             <Route path="/event-onboarding" element={<ProtectedRoute><EventAdminOnboarding /></ProtectedRoute>} />
             <Route path="/claim-club/:clubId" element={<ProtectedRoute><ClaimClubForm /></ProtectedRoute>} />
+            <Route path="/claim-organiser/:clubId" element={<ProtectedRoute><ClaimOrganiserForm /></ProtectedRoute>} />
             <Route path="/pending-approval" element={<ProtectedRoute><PendingApproval /></ProtectedRoute>} />
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route index element={<Dashboard />} />

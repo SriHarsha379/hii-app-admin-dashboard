@@ -39,6 +39,10 @@ export default function SupportActivity() {
   const { token } = useAuth();
   const [activeTab, setActiveTab] = useState('requests');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  // FIXED: this Filter button had no onClick at all — the only way to
+  // set statusFilter was clicking a specific KPI card, which only offers
+  // 2 of the 4 real statuses. This gives direct access to all of them.
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [responseMessage, setResponseMessage] = useState('');
@@ -333,7 +337,7 @@ export default function SupportActivity() {
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">
                   {activeTab === 'requests' ? 'User Requests' : 'User Complaints'}
                 </h3>
-                <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="flex items-center gap-2 w-full sm:w-auto relative">
                   <div className="relative flex-1 sm:flex-none">
                     <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <input
@@ -344,9 +348,40 @@ export default function SupportActivity() {
                       className="w-full sm:w-64 bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary/50"
                     />
                   </div>
-                  <button className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all">
+                  <button
+                    onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
+                    className="relative p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
+                  >
                     <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+                    {statusFilter && statusFilter !== 'UNRESOLVED' && (
+                      <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-primary" />
+                    )}
                   </button>
+                  {isFilterMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setIsFilterMenuOpen(false)} />
+                      <div className="absolute right-6 top-24 z-20 w-44 rounded-2xl bg-[#0B0B0F] border border-white/10 shadow-2xl overflow-hidden">
+                        {['OPEN', 'PENDING', 'RESOLVED', 'CLOSED'].map((s) => (
+                          <button
+                            key={s}
+                            onClick={() => { setStatusFilter(s); setIsFilterMenuOpen(false); }}
+                            className={cn(
+                              "w-full flex items-center justify-between px-5 py-3 text-xs font-bold uppercase tracking-wider transition-all",
+                              statusFilter === s ? "text-primary bg-primary/5" : "text-white/60 hover:bg-white/5 hover:text-white"
+                            )}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => { setStatusFilter(null); setIsFilterMenuOpen(false); }}
+                          className="w-full px-5 py-3 text-xs font-bold uppercase tracking-wider text-white/30 hover:bg-white/5 hover:text-white/60 transition-all border-t border-white/5"
+                        >
+                          Clear Filter
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 

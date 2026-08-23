@@ -146,6 +146,7 @@ export default function ClubOnboarding() {
   // longer applies to the new address — re-require sending a fresh OTP.
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [venueCreationWarning, setVenueCreationWarning] = useState<string | null>(null);
   const [isSticky, setIsSticky] = useState(false);
 
   // Tracks which images are currently uploading so we can show per-image spinners
@@ -206,10 +207,15 @@ export default function ClubOnboarding() {
 
   // ── Registration form ──────────────────────────────────────────────────────
 
+  // FIXED: was pre-filling with the logged-in admin's own login
+  // credentials (user.email / user.name) — but this account was very
+  // likely created by Super Admin with a placeholder identity (e.g.
+  // "Normal Admin" / "normal@admin"), not the real club owner's actual
+  // name and contact email. Pre-filling with the wrong identity here is
+  // actively misleading — the club owner might not notice they need to
+  // change it before verifying their real contact email via OTP.
   const [venueFormData, setVenueFormData] = useState({
     ...initialForm,
-    email: user?.email || '',
-    contactName: user?.name || '',
   });
 
   const emailChangedSinceVerify = emailVerified && venueFormData.email !== verifiedEmail;
@@ -331,7 +337,16 @@ export default function ClubOnboarding() {
       vendorBody.append('email', venueFormData.email);
       vendorBody.append('phone_number', venueFormData.phone);
       vendorBody.append('city', venueFormData.city);
-      vendorBody.append('state', selectedCity.state_id);
+      // FIXED: `selectedCity.state_id` comes back populated as
+      // {_id, state_name} (the city list endpoint populates it), not a
+      // plain ID string — sending the whole object here got stringified
+      // to the literal text "[object Object]" by FormData, which the
+      // backend then failed to cast to a valid ObjectId at all.
+      const stateId = typeof selectedCity.state_id === 'object' ? selectedCity.state_id?._id : selectedCity.state_id;
+      if (!stateId) {
+        throw new Error('This city has no linked state on record. Please choose a different city or contact support.');
+      }
+      vendorBody.append('state', stateId);
       vendorBody.append('address', venueFormData.address || 'Not provided');
       vendorBody.append('password', venueFormData.password);
       vendorBody.append('vendor_type', 'owner');
@@ -375,10 +390,16 @@ export default function ClubOnboarding() {
           body: venueBody,
         });
         if (!venueRes.ok) {
-          // The vendor account was still created successfully even if this
-          // part fails — don't block the whole registration on it, but do
-          // surface it, since it means their venue listing is incomplete.
-          console.error('Venue creation failed after vendor was created:', await venueRes.text());
+          // FIXED: was only a console.error — completely invisible to the
+          // person registering. The vendor account still gets created
+          // (so they can still log in and complete approval), but their
+          // venue listing itself silently never existed, and they had no
+          // way to know. Now surfaced clearly on the success screen
+          // instead of swallowed.
+          const errJson = await venueRes.json().catch(() => ({}));
+          setVenueCreationWarning(
+            errJson?.message?.[0] || errJson?.message || 'Your account was created, but we couldn\'t save your venue details. Please add them from your Profile page once approved.'
+          );
         }
       }
 
@@ -447,6 +468,22 @@ export default function ClubOnboarding() {
               Your venue has been submitted for review. A Super Admin will approve your account shortly — check your email for login details and a heads-up once you're approved.
             </motion.p>
           </div>
+
+          {/* Was previously silently swallowed (only a console.error) —
+              this is genuinely important to show, since it means their
+              venue listing (category, photos, schedule) didn't actually
+              get saved even though their account was created. */}
+          {venueCreationWarning && (
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="max-w-lg mx-auto p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-left"
+            >
+              <p className="text-amber-300 text-xs font-black uppercase tracking-widest mb-2">One thing to fix</p>
+              <p className="text-amber-200/80 text-sm leading-relaxed">{venueCreationWarning}</p>
+            </motion.div>
+          )}
           <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }} className="pt-4">
             <button
               onClick={() => navigate('/')}
@@ -570,7 +607,12 @@ export default function ClubOnboarding() {
                     <h3 className="text-xl font-black text-white uppercase">{club.name}</h3>
                     <p className="text-xs text-muted-foreground flex items-center gap-1 font-bold uppercase tracking-wider">
                       <MapPin className="w-3 h-3" />
-                      {club.city} — {club.address}
+                      {/* FIXED: city comes back as a populated
+                          {_id, city_name} object for most real vendors,
+                          not a plain string — rendering it directly
+                          crashed the whole page (React error #31:
+                          "Objects are not valid as a React child"). */}
+                      {(typeof club.city === 'object' ? club.city?.city_name : club.city) || 'City not set'} — {club.address}
                     </p>
                   </div>
                 </div>

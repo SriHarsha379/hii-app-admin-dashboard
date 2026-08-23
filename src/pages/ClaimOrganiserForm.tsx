@@ -3,12 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { 
-  Building2, 
-  MapPin, 
-  Mail, 
-  Phone, 
-  User, 
+import {
+  Building2,
+  MapPin,
+  Mail,
+  Phone,
+  User,
   Users2,
   ChevronLeft,
   ChevronDown,
@@ -55,55 +55,19 @@ export default function ClaimClubForm() {
       const res = await fetch(`${API_BASE}/vendor/get_vendor_by_id/${clubId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (!res.ok) throw new Error('Club not found');
+      if (!res.ok) throw new Error('Organiser not found');
       const json = await res.json();
       return json.data ?? null;
     },
     enabled: Boolean(token && clubId)
   });
 
-  // FIXED: was only fetching the Vendor (account) record — but venue-
-  // specific fields (type/category, capacity, description, photos) live
-  // on a separate Venue listing linked via vendor_id, not on the Vendor
-  // record at all. Basic Details and Contact Info (name/city/address/
-  // email/phone) come from Vendor and populated fine, but Venue Details
-  // and Photos were always blank regardless of what the venue actually
-  // had on file — same vendor+venue merge pattern already used on the
-  // Super Admin Clubs page.
-  const { data: venues } = useQuery({
-    queryKey: ['venues-for-claim'],
-    queryFn: async () => {
-      const res = await fetch(`${API_BASE}/venue/get_all_venues`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const json = await res.json();
-      return json.data ?? [];
-    },
-    enabled: Boolean(token),
-  });
-
-  const matchedVenue = Array.isArray(venues)
-    ? venues.find((v: any) => {
-        const vid = typeof v.vendor_id === 'object' ? v.vendor_id?._id : v.vendor_id;
-        return vid === clubId;
-      })
-    : null;
-
-  // References for hidden file inputs
+  // References for hidden file inputs — kept for the profile picture field
+  // still further down; portrait/landscape venue image concepts don't
+  // apply to an event organiser account, only Basic Details/Contact
+  // Info/Business Details (registration number, tax ID, description),
+  // which are all genuine Vendor fields and read correctly on their own.
   const portraitInputRef = React.useRef<HTMLInputElement>(null);
-  const landscapeInputRef = React.useRef<HTMLInputElement>(null);
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'portrait' | 'landscape') => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (type === 'portrait') setPortraitImage(reader.result as string);
-        else setLandscapeImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   // Form State
   const [formData, setFormData] = useState({
@@ -113,29 +77,19 @@ export default function ClaimClubForm() {
     email: '',
     phone: '',
     contactPerson: '',
-    venueType: '',
-    capacity: '',
-    description: ''
+    description: '',
+    registrationNumber: '',
+    taxId: ''
   });
 
   useEffect(() => {
     if (!club) return;
     // FIXED: was reading `club.contact_info` (a JSON blob that doesn't
-    // exist on the real Vendor schema — email/phone are direct fields),
-    // `club.type`/`club.venue_type` (also don't exist — "venue type"
-    // categorization lives on the separate Venue listing, not the vendor
-    // account), and rendered `club.city` directly despite it coming back
-    // as a populated {_id, city_name} object.
-    //
-    // "Venue Type" specifically needs the matched Venue record's
-    // category_ids — that's genuinely not on Vendor at all. Everything
-    // else here (capacity/description/contact_person) IS a real Vendor
-    // field and reads correctly already; if it shows blank, that's an
-    // honest reflection of this vendor genuinely not having that filled
-    // in yet, not a bug in this form.
-    const venueTypeId = matchedVenue?.category_ids?.[0]
-      ? (typeof matchedVenue.category_ids[0] === 'object' ? matchedVenue.category_ids[0]?._id : matchedVenue.category_ids[0])
-      : '';
+    // exist on the real Vendor schema — email/phone are direct fields)
+    // and rendered `club.city` directly despite it coming back as a
+    // populated {_id, city_name} object. All the fields here are genuine
+    // Vendor fields — if any show blank, that's honestly reflecting this
+    // organiser not having filled that in yet, not a bug in this form.
     setFormData({
       name: club.name || '',
       city: (typeof club.city === 'object' ? club.city?.city_name : club.city) || '',
@@ -143,30 +97,11 @@ export default function ClaimClubForm() {
       email: club.email || '',
       phone: club.phone_number || '',
       contactPerson: club.contact_person || '',
-      venueType: venueTypeId,
-      capacity: club.capacity ? String(club.capacity) : '',
-      description: club.description || ''
+      description: club.description || '',
+      registrationNumber: club.registration_number || '',
+      taxId: club.tax_id || ''
     });
-  }, [club, matchedVenue]);
-
-  // FIXED: was hitting a nonexistent `${API_BASE}/venueTypes` placeholder —
-  // same broken pattern fixed on every other page. "Venue types" are
-  // Category documents with category_type: 2.
-  const { data: venueTypes } = useQuery({
-    queryKey: ['venueTypes'],
-    queryFn: async () => {
-      const res = await fetch(`${API_BASE}/category/get_category`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const json = await res.json();
-      const list = Array.isArray(json.data) ? json.data : [];
-      return list.filter((c: any) => c.category_type === 2);
-    },
-    enabled: Boolean(token)
-  });
-
-  const venueTypeOptions = Array.isArray(venueTypes) ? venueTypes : [];
-  const selectedVenueTypeExists = venueTypeOptions.some((type: any) => type._id === formData.venueType);
+  }, [club]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     if (!isEditing) return;
@@ -198,8 +133,9 @@ export default function ClaimClubForm() {
         body.append('email', formData.email);
         body.append('phone_number', formData.phone);
         body.append('contact_person', formData.contactPerson);
-        body.append('capacity', formData.capacity);
         body.append('description', formData.description);
+        body.append('registration_number', formData.registrationNumber);
+        body.append('tax_id', formData.taxId);
         const res = await fetch(`${API_BASE}/vendor/update_vendor/${club._id}`, {
           method: 'PUT',
           headers: { Authorization: `Bearer ${token}` },
@@ -232,8 +168,8 @@ export default function ClaimClubForm() {
     return (
       <div className="min-h-screen bg-[#0B0B0F] flex items-center justify-center p-6">
         <div className="text-center space-y-4">
-          <p className="text-white/60">Club not found.</p>
-          <button onClick={() => navigate('/club-onboarding')} className="text-primary hover:underline">Go back</button>
+          <p className="text-white/60">Organiser not found.</p>
+          <button onClick={() => navigate('/event-onboarding')} className="text-primary hover:underline">Go back</button>
         </div>
       </div>
     );
@@ -265,7 +201,7 @@ export default function ClaimClubForm() {
         </div>
 
         <button
-          onClick={() => navigate('/club-onboarding')}
+          onClick={() => navigate('/event-onboarding')}
           className="text-primary font-black uppercase tracking-widest text-xs hover:underline pt-4 relative z-10"
         >
           Go back to login screen
@@ -301,13 +237,13 @@ export default function ClaimClubForm() {
           <div className="space-y-4">
             <div className="flex items-center gap-3 text-primary animate-pulse">
               <Zap className="w-5 h-5 fill-current" />
-              <span className="text-[10px] font-black uppercase tracking-[0.4em]">Claim Your Club</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.4em]">Claim Your Organisation</span>
             </div>
             <h1 className="text-5xl md:text-6xl font-black text-white tracking-tighter leading-none uppercase">
               Claiming <span className="text-primary neon-text">{club.name}</span>
             </h1>
             <p className="text-white/40 font-medium text-lg max-w-xl">
-              Verification required. Please validate the club details before submitting the claim for approval.
+              Verification required. Please validate the company details before submitting the claim for approval.
             </p>
           </div>
 
@@ -335,7 +271,7 @@ export default function ClaimClubForm() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                 <div className="col-span-1 md:col-span-2">
                   <RefinedField
-                    label="Club Name"
+                    label="Company Name"
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
@@ -426,41 +362,25 @@ export default function ClaimClubForm() {
               </div>
             </FormSection>
 
-            <FormSection title="Venue Details" icon={<Layers className="w-4 h-4" />}>
+            <FormSection title="Business Details" icon={<FileText className="w-4 h-4" />}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                <div className="space-y-4 group/field">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Venue Type</label>
-                  <div className="relative">
-                    <select
-                      name="venueType"
-                      value={formData.venueType}
-                      onChange={handleChange}
-                      disabled={!isEditing}
-                      className={cn(
-                        "w-full bg-[#09090B] border rounded-[24px] px-8 py-5 text-sm text-white focus:outline-none transition-all appearance-none font-medium",
-                        !isEditing ? "border-white/5 text-white/20 cursor-not-allowed" : "border-white/10 hover:border-white/20 focus:border-primary/50"
-                      )}
-                    >
-                      <option value="">Select venue type...</option>
-                      {formData.venueType && !selectedVenueTypeExists && (
-                        <option value={formData.venueType}>{formData.venueType}</option>
-                      )}
-                      {venueTypeOptions.map((type: any) => (
-                        <option key={type._id} value={type._id}>{type.category_name}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 pointer-events-none" />
-                  </div>
-                </div>
                 <RefinedField
-                  label="Capacity"
-                  name="capacity"
-                  type="number"
-                  value={formData.capacity}
+                  label="Registration Number"
+                  name="registrationNumber"
+                  value={formData.registrationNumber}
                   onChange={handleChange}
                   readOnly={!isEditing}
-                  placeholder="Max guests"
-                  icon={<Users2 className="w-4 h-4" />}
+                  placeholder="Company registration number"
+                  icon={<FileText className="w-4 h-4" />}
+                />
+                <RefinedField
+                  label="Tax ID"
+                  name="taxId"
+                  value={formData.taxId}
+                  onChange={handleChange}
+                  readOnly={!isEditing}
+                  placeholder="GST / PAN / Tax ID"
+                  icon={<FileText className="w-4 h-4" />}
                 />
                 <div className="col-span-1 md:col-span-2 space-y-4 group/field">
                   <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Description</label>
@@ -474,97 +394,8 @@ export default function ClaimClubForm() {
                       "w-full bg-[#09090B] border rounded-[32px] px-8 py-6 text-white focus:outline-none transition-all text-sm resize-none font-medium placeholder:text-white/10",
                       !isEditing ? "border-white/5 text-white/20" : "border-white/10 hover:border-white/20 focus:border-primary/50"
                     )}
-                    placeholder="Describe your club..."
+                    placeholder="Describe your company..."
                   />
-                </div>
-              </div>
-            </FormSection>
-
-            <FormSection title="Photos & Media" icon={<Camera className="w-4 h-4" />}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-4">
-                <input type="file" ref={portraitInputRef} className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, 'portrait')} />
-                <input type="file" ref={landscapeInputRef} className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, 'landscape')} />
-
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between px-2">
-                    <div className="space-y-1">
-                      <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Profile Photo</h4>
-                      <p className="text-[9px] text-white/20 font-black uppercase tracking-widest">Vertical Image (3:4)</p>
-                    </div>
-                    {portraitImage && (
-                      <button onClick={() => setPortraitImage(null)} className="w-8 h-8 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 hover:bg-red-500 transition-all hover:text-white group/btn">
-                        <Trash2 className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div
-                    onClick={() => isEditing && portraitInputRef.current?.click()}
-                    className={cn(
-                      "aspect-[3/4] rounded-[48px] border-2 border-dashed transition-all duration-700 flex flex-col items-center justify-center gap-6 group relative overflow-hidden shadow-2xl",
-                      !isEditing
-                        ? "border-white/5 bg-white/[0.01] cursor-not-allowed"
-                        : "border-primary/20 bg-primary/[0.02] cursor-pointer hover:border-primary/50 hover:bg-primary/[0.05]"
-                    )}
-                  >
-                    {portraitImage ? (
-                      <img src={portraitImage} className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="Portrait" />
-                    ) : (
-                      <>
-                        <div className={cn(
-                          "w-16 h-16 rounded-[24px] flex items-center justify-center border-2 transition-all duration-500",
-                          isEditing ? "bg-primary/10 border-primary/30 group-hover:scale-110 group-hover:rotate-6" : "bg-white/5 border-white/5"
-                        )}>
-                          <Upload className={cn("w-7 h-7", isEditing ? "text-primary" : "text-white/10")} />
-                        </div>
-                        <p className={cn(
-                          "text-[10px] font-black uppercase tracking-[0.4em] transition-all",
-                          isEditing ? "text-primary/60 group-hover:text-primary" : "text-white/10"
-                        )}>Upload Photo</p>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between px-2">
-                    <div className="space-y-1">
-                      <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Cover Image</h4>
-                      <p className="text-[9px] text-white/20 font-black uppercase tracking-widest">Horizontal Image (16:9)</p>
-                    </div>
-                    {landscapeImage && (
-                      <button onClick={() => setLandscapeImage(null)} className="w-8 h-8 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 hover:bg-red-500 transition-all hover:text-white group/btn">
-                        <Trash2 className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div
-                    onClick={() => isEditing && landscapeInputRef.current?.click()}
-                    className={cn(
-                      "aspect-video rounded-[48px] border-2 border-dashed transition-all duration-700 flex flex-col items-center justify-center gap-6 group relative overflow-hidden shadow-2xl",
-                      !isEditing
-                        ? "border-white/5 bg-white/[0.01] cursor-not-allowed"
-                        : "border-blue-500/20 bg-blue-500/[0.02] cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/[0.05]"
-                    )}
-                  >
-                    {landscapeImage ? (
-                      <img src={landscapeImage} className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="Landscape" />
-                    ) : (
-                      <>
-                        <div className={cn(
-                          "w-16 h-16 rounded-[24px] flex items-center justify-center border-2 transition-all duration-500",
-                          isEditing ? "bg-blue-500/10 border-blue-500/30 group-hover:scale-110 group-hover:-rotate-6" : "bg-white/5 border-white/5"
-                        )}>
-                          <Upload className={cn("w-7 h-7", isEditing ? "text-blue-400" : "text-white/10")} />
-                        </div>
-                        <p className={cn(
-                          "text-[10px] font-black uppercase tracking-[0.4em] transition-all",
-                          isEditing ? "text-blue-400/60 group-hover:text-blue-400" : "text-white/10"
-                        )}>Upload Cover</p>
-                      </>
-                    )}
-                  </div>
                 </div>
               </div>
             </FormSection>
@@ -574,7 +405,7 @@ export default function ClaimClubForm() {
         {/* Action Controls */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6 pt-12 border-t border-white/5">
           <button
-            onClick={() => navigate('/club-onboarding')}
+            onClick={() => navigate('/event-onboarding')}
             className="w-full sm:w-auto px-12 py-5 rounded-[24px] bg-white/5 border border-white/10 text-[11px] font-black uppercase tracking-[0.2em] text-white/40 hover:text-white hover:bg-white/10 transition-all flex items-center justify-center gap-4 active:scale-95 shadow-xl"
           >
             <ChevronLeft className="w-5 h-5" />
