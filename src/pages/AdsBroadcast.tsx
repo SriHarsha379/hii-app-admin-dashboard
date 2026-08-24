@@ -366,22 +366,47 @@ export default function AdsBroadcast() {
     }
   });
 
+  const [broadcastStatus, setBroadcastStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
   const sendBroadcastMutation = useMutation({
-    mutationFn: async (broadcast: any) => {
-      const res = await fetch(`${API_BASE}/broadcasts`, {
+    mutationFn: async (broadcast: { title: string; message: string }) => {
+      // FIXED: was posting to `/broadcasts` (no matching route on the
+      // backend at all — 404) with a body shape (audience/city/subject/
+      // content) the real endpoint doesn't understand. The real route is
+      // `/broadcast/send_user_notification`, and its Joi schema only
+      // accepts { title, message, userType, select_arr } — there is no
+      // backend support for audience-segment or city filtering at all
+      // (no `city` field anywhere in broadcastValidation.js), so this
+      // always sends to every verified user (userType: 'all') rather
+      // than pretending the Audience/City pickers above do something
+      // they can't.
+      const res = await fetch(`${API_BASE}/broadcast/send_user_notification`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(broadcast)
+        body: JSON.stringify({
+          title: broadcast.title,
+          message: broadcast.message,
+          userType: 'all',
+        })
       });
-      return res.json();
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.success === false) {
+        throw new Error(apiErrorMessage(json, 'Failed to send broadcast'));
+      }
+      return json;
     },
     onSuccess: () => {
       setIsSending(false);
-      // Show success toast
-    }
+      setBroadcastStatus({ type: 'success', message: 'Broadcast sent to all verified users.' });
+      setBroadcastData({ audience: 'All Active Users (12.4k)', city: 'ALL', subject: '', content: '' });
+    },
+    onError: (err: any) => {
+      setIsSending(false);
+      setBroadcastStatus({ type: 'error', message: err.message || 'Failed to send broadcast' });
+    },
   });
 
   const filteredAds = (Array.isArray(ads) ? ads : []).filter((ad: any) => {
@@ -761,10 +786,20 @@ export default function AdsBroadcast() {
                   </div>
 
                   <div className="grid grid-cols-3 gap-6">
-                    {channels.map((channel) => (
+                    {channels.map((channel) => {
+                      // Backend only ever sends via OneSignal push
+                      // (sendNotification("broadcast", ...) in
+                      // broadcastController.js) — WhatsApp/Email have no
+                      // implementation at all, so they're shown but
+                      // disabled rather than silently doing nothing if
+                      // picked.
+                      const isSupported = channel.id === 'push';
+                      return (
                       <button
                         key={channel.id}
+                        disabled={!isSupported}
                         onClick={() => {
+                          if (!isSupported) return;
                           setSelectedChannels(prev =>
                             prev.includes(channel.id)
                               ? prev.filter(id => id !== channel.id)
@@ -773,6 +808,7 @@ export default function AdsBroadcast() {
                         }}
                         className={cn(
                           "p-6 rounded-[32px] border transition-all flex flex-col items-center gap-4 group/channel relative overflow-hidden",
+                          !isSupported && "opacity-30 cursor-not-allowed",
                           selectedChannels.includes(channel.id)
                             ? "bg-primary/10 border-primary/40 shadow-[0_10px_30px_rgba(255,45,154,0.1)]"
                             : "bg-[#09090B] border-white/5 hover:bg-white/5 hover:border-white/10"
@@ -785,7 +821,7 @@ export default function AdsBroadcast() {
                           "text-[10px] font-black uppercase tracking-[0.2em]",
                           selectedChannels.includes(channel.id) ? "text-primary" : "text-white/30"
                         )}>
-                          {channel.label}
+                          {channel.label}{!isSupported && ' (Soon)'}
                         </span>
                         {selectedChannels.includes(channel.id) && (
                           <motion.div
@@ -796,13 +832,20 @@ export default function AdsBroadcast() {
                           </motion.div>
                         )}
                       </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10 relative z-10">
                   <div className="space-y-4 group/field">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Select Audience</label>
+                    {/* NOTE: purely cosmetic for now — the real broadcast
+                        endpoint (broadcastValidation.js) only supports
+                        userType 'all' or a specific list of user IDs, with
+                        no audience-segment concept at all, so this always
+                        sends to every verified user regardless of what's
+                        picked here. */}
                     <select
                       value={broadcastData.audience}
                       onChange={(e) => setBroadcastData({ ...broadcastData, audience: e.target.value })}
@@ -813,9 +856,13 @@ export default function AdsBroadcast() {
                       <option>Premium Users (2.1k)</option>
                       <option>Inactive Users (840)</option>
                     </select>
+                    <p className="text-[9px] text-white/20 font-medium ml-1">Segmented targeting isn't available yet — every broadcast currently goes to all verified users.</p>
                   </div>
                   <div className="space-y-4 group/field">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Select City</label>
+                    {/* Same limitation as Audience above — no `city` field
+                        exists anywhere in the broadcast request/validation
+                        on the backend. */}
                     <select
                       value={broadcastData.city}
                       onChange={(e) => setBroadcastData({ ...broadcastData, city: e.target.value })}
@@ -826,6 +873,7 @@ export default function AdsBroadcast() {
                         <option key={city._id || city.id} value={city.city_name}>{city.city_name}</option>
                       ))}
                     </select>
+                    <p className="text-[9px] text-white/20 font-medium ml-1">City filtering isn't available yet either.</p>
                   </div>
                 </div>
 
@@ -851,20 +899,53 @@ export default function AdsBroadcast() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-10 border-t border-white/5 relative z-10">
+                <div className="space-y-6 relative z-10">
+                  {broadcastStatus && (
+                    <div className={cn(
+                      "flex items-start gap-4 p-6 rounded-2xl border",
+                      broadcastStatus.type === 'success'
+                        ? "bg-emerald-500/10 border-emerald-500/20"
+                        : "bg-red-500/10 border-red-500/20"
+                    )}>
+                      <div className={cn(
+                        "w-10 h-10 rounded-xl border flex items-center justify-center shrink-0",
+                        broadcastStatus.type === 'success' ? "bg-emerald-500/10 border-emerald-500/20" : "bg-red-500/10 border-red-500/20"
+                      )}>
+                        {broadcastStatus.type === 'success' ? <Check className="w-5 h-5 text-emerald-400" /> : <Send className="w-5 h-5 text-red-400" />}
+                      </div>
+                      <p className={cn("text-sm font-medium leading-relaxed", broadcastStatus.type === 'success' ? "text-emerald-200" : "text-red-200")}>
+                        {broadcastStatus.message}
+                      </p>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between pt-10 border-t border-white/5">
                   <div className="flex items-center gap-6">
-                    <button className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 text-white/20 hover:text-white hover:bg-white/10 transition-all flex items-center justify-center">
+                    {/* No attachment support anywhere in the broadcast
+                        endpoint (broadcastValidation.js has no file/
+                        attachment field at all) — disabled honestly
+                        rather than left clickable with no effect. */}
+                    <button disabled className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 text-white/10 flex items-center justify-center cursor-not-allowed">
                       <Plus className="w-5 h-5" />
                     </button>
-                    <span className="text-[10px] text-white/30 font-black uppercase tracking-[0.2em]">Add Attachment</span>
+                    <span className="text-[10px] text-white/20 font-black uppercase tracking-[0.2em]">Add Attachment (Soon)</span>
                   </div>
                   <button
-                    onClick={() => setIsSending(true)}
-                    className="px-12 py-5 rounded-[24px] bg-primary text-white text-[11px] font-black uppercase tracking-[0.2em] shadow-[0_10px_40px_rgba(255,45,154,0.3)] hover:shadow-[0_15px_50px_rgba(255,45,154,0.4)] hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-3 group"
+                    onClick={() => {
+                      if (!broadcastData.subject.trim() || !broadcastData.content.trim()) {
+                        setBroadcastStatus({ type: 'error', message: 'Subject and message content are both required.' });
+                        return;
+                      }
+                      setBroadcastStatus(null);
+                      setIsSending(true);
+                      sendBroadcastMutation.mutate({ title: broadcastData.subject, message: broadcastData.content });
+                    }}
+                    disabled={isSending}
+                    className="px-12 py-5 rounded-[24px] bg-primary text-white text-[11px] font-black uppercase tracking-[0.2em] shadow-[0_10px_40px_rgba(255,45,154,0.3)] hover:shadow-[0_15px_50px_rgba(255,45,154,0.4)] hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                   >
                     {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />}
                     {isSending ? 'Sending...' : 'Send Broadcast'}
                   </button>
+                  </div>
                 </div>
               </div>
             </div>
