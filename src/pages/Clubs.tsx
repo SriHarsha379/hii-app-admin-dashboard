@@ -69,7 +69,7 @@ import {
   ArrowDown,
   ArrowUpDown
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, apiErrorMessage } from '../lib/utils';
 import { FilterDropdown } from '../components/FilterDropdown';
 import { FilterPanel } from '../components/FilterPanel';
 import { FormSection, RefinedField } from '../components/RefinedForm';
@@ -356,7 +356,7 @@ export default function Clubs() {
 
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.success === false) {
-        throw new Error(json?.message?.[0] || json?.message || 'Failed to save event');
+        throw new Error(apiErrorMessage(json, 'Failed to save event'));
       }
 
       queryClient.invalidateQueries({ queryKey: ['events-admin'] });
@@ -415,7 +415,7 @@ export default function Clubs() {
 
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.success === false) {
-        throw new Error(json?.message?.[0] || json?.message || 'Failed to save venue');
+        throw new Error(apiErrorMessage(json, 'Failed to save venue'));
       }
 
       queryClient.invalidateQueries({ queryKey: ['clubs'] });

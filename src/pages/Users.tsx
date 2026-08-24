@@ -68,7 +68,7 @@ import {
   Download,
   ExternalLink
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, apiErrorMessage } from '../lib/utils';
 import { FilterDropdown } from '../components/FilterDropdown';
 import { FilterPanel } from '../components/FilterPanel';
 import { motion, AnimatePresence } from 'motion/react';
@@ -134,7 +134,7 @@ export default function Users() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.success === false) {
-        throw new Error(json?.message?.[0] || json?.message || 'Failed to update user status');
+        throw new Error(apiErrorMessage(json, 'Failed to update user status'));
       }
       return json;
     },

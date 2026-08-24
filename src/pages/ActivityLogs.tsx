@@ -60,7 +60,7 @@ export default function ActivityLogs() {
     const headers = ['Admin', 'Action', 'Resource', 'Date'];
     const rows = filteredData.map((item: any) => [
       `"${item.admin_name || ''}"`, `"${item.action || ''}"`, `"${item.resource || ''}"`,
-      `"${item.created_at ? new Date(item.created_at).toLocaleString() : ''}"`,
+      `"${item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}"`,
     ]);
     const csv  = [headers.join(','), ...rows.map((r: string[]) => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -155,7 +155,7 @@ export default function ActivityLogs() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Clock className="w-3.5 h-3.5" />
-                          {new Date(log.created_at).toLocaleString()}
+                          {log.createdAt ? new Date(log.createdAt).toLocaleString() : '—'}
                         </div>
                       </td>
                     </tr>

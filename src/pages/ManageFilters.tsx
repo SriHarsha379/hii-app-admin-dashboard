@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { Plus, Trash2, Loader2, MapPin, Music, Calendar, Building2, AlertTriangle, Eye, EyeOff } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, apiErrorMessage } from '../lib/utils';
 import { FilterDropdown } from '../components/FilterDropdown';
 
 import { API_BASE } from '../lib/apiConfig';
@@ -158,7 +158,7 @@ export default function ManageFilters() {
 
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.success === false) {
-        throw new Error(json?.message?.[0] || json?.message || 'Failed to add item');
+        throw new Error(apiErrorMessage(json, 'Failed to add item'));
       }
       return json;
     },

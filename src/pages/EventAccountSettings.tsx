@@ -28,7 +28,7 @@ import {
   FileText
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { cn } from '../lib/utils';
+import { cn, apiErrorMessage } from '../lib/utils';
 import { API_BASE } from '../lib/apiConfig';
 
 const INITIAL_DATA = {
@@ -108,7 +108,7 @@ export default function EventAccountSettings() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.success === false) {
-        throw new Error(json?.message?.[0] || json?.message || 'Failed to save changes');
+        throw new Error(apiErrorMessage(json, 'Failed to save changes'));
       }
       return json;
     },

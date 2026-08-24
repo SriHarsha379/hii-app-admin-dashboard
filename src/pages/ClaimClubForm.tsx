@@ -23,7 +23,7 @@ import {
   Camera,
   Layers
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, apiErrorMessage } from '../lib/utils';
 import { FormSection, RefinedField } from '../components/RefinedForm';
 
 import { API_BASE } from '../lib/apiConfig';
@@ -207,7 +207,7 @@ export default function ClaimClubForm() {
         });
         if (!res.ok) {
           const json = await res.json().catch(() => ({}));
-          throw new Error(json?.message?.[0] || json?.message || 'Failed to save your changes');
+          throw new Error(apiErrorMessage(json, 'Failed to save your changes'));
         }
       }
 

@@ -51,7 +51,7 @@ import {
   Bar,
   Cell,
 } from 'recharts';
-import { cn } from '../lib/utils';
+import { cn, apiErrorMessage } from '../lib/utils';
 import { FilterDropdown } from '../components/FilterDropdown';
 import { MultiSelectDropdown } from '../components/MultiSelectDropdown';
 import { FilterPanel } from '../components/FilterPanel';
@@ -391,7 +391,7 @@ export default function Events() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.success === false) {
-        throw new Error(json?.message?.[0] || json?.message || 'Failed to create event');
+        throw new Error(apiErrorMessage(json, 'Failed to create event'));
       }
       return json;
     },
@@ -414,7 +414,7 @@ export default function Events() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.success === false) {
-        throw new Error(json?.message?.[0] || json?.message || 'Failed to update event');
+        throw new Error(apiErrorMessage(json, 'Failed to update event'));
       }
       return json;
     },
@@ -454,7 +454,7 @@ export default function Events() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.success === false) {
-        throw new Error(json?.message?.[0] || json?.message || 'Failed to feature event');
+        throw new Error(apiErrorMessage(json, 'Failed to feature event'));
       }
       return json;
     },

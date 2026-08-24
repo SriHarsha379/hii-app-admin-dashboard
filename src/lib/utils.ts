@@ -5,6 +5,21 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// Backend error responses come in two shapes depending on where they
+// originate: a plain string (thrown directly by a controller, e.g.
+// "An account with this email already exists") or an array of strings
+// (Joi validation errors, one per invalid field — see validate.js on
+// the backend). Indexing a string with [0] "succeeds" too — it just
+// returns the string's first character — so code that did
+// `json?.message?.[0] || json?.message || fallback` silently truncated
+// every plain-string message down to one letter instead of ever
+// reaching the fallback. This checks the actual shape instead.
+export function apiErrorMessage(response: any, fallback: string): string {
+  const msg = response?.message;
+  if (Array.isArray(msg)) return msg[0] || fallback;
+  return msg || fallback;
+}
+
 export interface DateBucket {
   label: string;
   count: number;

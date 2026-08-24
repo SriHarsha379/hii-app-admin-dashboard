@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { API_BASE } from './lib/apiConfig';
@@ -46,6 +46,22 @@ const ProtectedRoute = ({
   allowedRoles?: string[]
 }) => {
   const { user, token, isLoading } = useAuth();
+  // BUG FIX: every check below used to compare window.location.pathname
+  // directly against bare route strings like '/club-onboarding'. That's
+  // the *browser's* pathname, which includes the router's basename
+  // ("/app/admin") — so window.location.pathname is always something
+  // like "/app/admin/club-onboarding", never the bare "/club-onboarding"
+  // these checks expected. Every one of them was permanently false (or
+  // permanently true, for the "!==" ones), which meant a fresh
+  // CLUB_ADMIN/EVENT_ADMIN account (no organisation yet) landing on its
+  // own onboarding page immediately got redirected... back to the exact
+  // same onboarding page, forever — an infinite loop that silently
+  // never renders anything (no error, since Navigate doesn't throw) and
+  // leaves a permanently blank screen. useLocation() returns the path
+  // *relative to the basename*, which is what actually matches the
+  // route definitions below.
+  const location = useLocation();
+  const pathname = location.pathname;
 
   // Was previously missing entirely — the only gate was `!user.organisation`,
   // which becomes true the instant the registration form is submitted,
@@ -73,13 +89,13 @@ const ProtectedRoute = ({
   if (requireSuperAdmin && user.role !== 'SUPER_ADMIN') return <Navigate to="/" replace />;
 
   // Onboarding check for CLUB_ADMIN
-  const isClaiming = window.location.pathname.startsWith('/claim-club/') || window.location.pathname.startsWith('/claim-organiser/');
-  if (user.role === 'CLUB_ADMIN' && !user.organisation && window.location.pathname !== '/club-onboarding' && !isClaiming) {
+  const isClaiming = pathname.startsWith('/claim-club/') || pathname.startsWith('/claim-organiser/');
+  if (user.role === 'CLUB_ADMIN' && !user.organisation && pathname !== '/club-onboarding' && !isClaiming) {
     return <Navigate to="/club-onboarding" replace />;
   }
 
   // Onboarding check for EVENT_ADMIN
-  if (user.role === 'EVENT_ADMIN' && !user.organisation && window.location.pathname !== '/event-onboarding') {
+  if (user.role === 'EVENT_ADMIN' && !user.organisation && pathname !== '/event-onboarding') {
     return <Navigate to="/event-onboarding" replace />;
   }
 
@@ -89,13 +105,13 @@ const ProtectedRoute = ({
   // admin's own profile page (they land there straight after onboarding
   // now, with a "pending verification" badge/banner instead of a
   // separate blank holding page), to avoid a redirect loop / dead end.
-  const isPendingApprovalPage = window.location.pathname === '/pending-approval';
+  const isPendingApprovalPage = pathname === '/pending-approval';
   const isOwnOnboardingPage =
-    (user.role === 'CLUB_ADMIN' && window.location.pathname === '/club-onboarding') ||
-    (user.role === 'EVENT_ADMIN' && window.location.pathname === '/event-onboarding');
+    (user.role === 'CLUB_ADMIN' && pathname === '/club-onboarding') ||
+    (user.role === 'EVENT_ADMIN' && pathname === '/event-onboarding');
   const isOwnProfilePage =
-    (user.role === 'CLUB_ADMIN' && window.location.pathname === '/club-profile') ||
-    (user.role === 'EVENT_ADMIN' && window.location.pathname === '/event-profile');
+    (user.role === 'CLUB_ADMIN' && pathname === '/club-profile') ||
+    (user.role === 'EVENT_ADMIN' && pathname === '/event-profile');
   if (
     (user.role === 'CLUB_ADMIN' || user.role === 'EVENT_ADMIN') &&
     user.organisation &&

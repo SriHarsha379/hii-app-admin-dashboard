@@ -70,7 +70,7 @@ import {
   Link as LinkIcon,
   AlertTriangle
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, apiErrorMessage } from '../lib/utils';
 import { FilterDropdown } from '../components/FilterDropdown';
 import { FilterPanel } from '../components/FilterPanel';
 import { motion, AnimatePresence } from 'motion/react';
@@ -213,7 +213,7 @@ export default function AdsBroadcast() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.success === false) {
-        throw new Error(json?.message?.[0] || json?.message || 'Failed to create ad');
+        throw new Error(apiErrorMessage(json, 'Failed to create ad'));
       }
       return json;
     },
@@ -264,7 +264,7 @@ export default function AdsBroadcast() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.success === false) {
-        throw new Error(json?.message?.[0] || json?.message || 'Failed to update ad');
+        throw new Error(apiErrorMessage(json, 'Failed to update ad'));
       }
       return json;
     },

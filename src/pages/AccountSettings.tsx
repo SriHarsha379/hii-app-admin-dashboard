@@ -28,7 +28,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { cn } from '../lib/utils';
+import { cn, apiErrorMessage } from '../lib/utils';
 import { FormSection, RefinedField } from '../components/RefinedForm';
 
 import { API_BASE } from '../lib/apiConfig';
@@ -124,7 +124,7 @@ export default function AccountSettings() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.success === false) {
-        throw new Error(json?.message?.[0] || json?.message || 'Failed to save changes');
+        throw new Error(apiErrorMessage(json, 'Failed to save changes'));
       }
       return json;
     },

@@ -178,7 +178,7 @@ export default function Admins() {
     const headers = ['Name', 'Email', 'Role', 'Status', 'Created'];
     const rows = filteredAdmins.map((a: any) => [
       `"${a.name || ''}"`, `"${a.email || ''}"`, `"${a.role || 'ADMIN'}"`,
-      `"${a.status || 'ACTIVE'}"`, `"${a.created_at ? new Date(a.created_at).toLocaleDateString() : ''}"`,
+      `"${a.status || 'ACTIVE'}"`, `"${a.createdAt ? new Date(a.createdAt).toLocaleDateString() : ''}"`,
     ]);
     const csv  = [headers.join(','), ...rows.map((r: string[]) => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -326,7 +326,7 @@ export default function Admins() {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <p className="text-xs text-white font-medium">{new Date(admin.created_at).toLocaleDateString()}</p>
+                    <p className="text-xs text-white font-medium">{admin.createdAt ? new Date(admin.createdAt).toLocaleDateString() : '—'}</p>
                   </td>
                   <td className="px-6 py-4 text-right relative">
                     <button

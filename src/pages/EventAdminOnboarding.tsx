@@ -24,7 +24,7 @@ import {
   Layers,
   Plus
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, apiErrorMessage } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { FormSection, RefinedField } from '../components/RefinedForm';
 import { useQuery } from '@tanstack/react-query';
@@ -140,7 +140,7 @@ export default function EventAdminOnboarding() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.success === false) {
-        throw new Error(json?.message?.[0] || json?.message || 'Failed to send OTP');
+        throw new Error(apiErrorMessage(json, 'Failed to send OTP'));
       }
       setOtpSent(true);
       setEmailVerified(false);
@@ -167,7 +167,7 @@ export default function EventAdminOnboarding() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.success === false) {
-        throw new Error(json?.message?.[0] || json?.message || 'Incorrect OTP');
+        throw new Error(apiErrorMessage(json, 'Incorrect OTP'));
       }
       setEmailVerified(true);
       setVerifiedEmail(formData.email);
@@ -287,7 +287,7 @@ export default function EventAdminOnboarding() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(json?.message?.[0] || json?.message || `Registration failed with status ${res.status}`);
+        throw new Error(apiErrorMessage(json, `Registration failed with status ${res.status}`));
       }
 
       // New signups require Super Admin approval before they get full

@@ -18,7 +18,7 @@ import {
   ArrowDown,
   ArrowUpDown
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, apiErrorMessage } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 import { API_BASE } from '../lib/apiConfig';
@@ -96,7 +96,7 @@ export default function SupportActivity() {
 
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.success === false) {
-        throw new Error(json?.message?.[0] || json?.message || 'Failed to update status');
+        throw new Error(apiErrorMessage(json, 'Failed to update status'));
       }
       return json;
     },

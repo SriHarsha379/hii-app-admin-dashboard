@@ -44,7 +44,16 @@ export default function Signup() {
       });
       const result = await res.json();
       if (!res.ok || !result.success) {
-        throw new Error(result.message?.[0] || result.message || 'Sign up failed');
+        // Backend error messages come in two shapes: a plain string
+        // (e.g. "An account with this email already exists", thrown
+        // directly by a controller) or an array of strings (Joi
+        // validation errors, one per invalid field). Indexing a string
+        // with [0] "succeeds" too (just returns its first character),
+        // so a naive `.message?.[0] || .message` silently truncates
+        // any string message down to one letter instead of falling
+        // back to the full text — check the actual shape instead.
+        const msg = Array.isArray(result.message) ? result.message[0] : result.message;
+        throw new Error(msg || 'Sign up failed');
       }
 
       const { token, ...user } = result.data;

@@ -31,7 +31,7 @@ import {
   Trash2,
   ArrowRight
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, apiErrorMessage } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { FilterDropdown } from '../components/FilterDropdown';
 import { useQuery } from '@tanstack/react-query';
@@ -112,7 +112,7 @@ export default function ClubOnboarding() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.success === false) {
-        throw new Error(json?.message?.[0] || json?.message || 'Failed to send OTP');
+        throw new Error(apiErrorMessage(json, 'Failed to send OTP'));
       }
       setOtpSent(true);
       setEmailVerified(false);
@@ -139,7 +139,7 @@ export default function ClubOnboarding() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.success === false) {
-        throw new Error(json?.message?.[0] || json?.message || 'Incorrect OTP');
+        throw new Error(apiErrorMessage(json, 'Incorrect OTP'));
       }
       setEmailVerified(true);
       setVerifiedEmail(venueFormData.email);
@@ -431,7 +431,7 @@ export default function ClubOnboarding() {
 
       const vendorJson = await vendorRes.json().catch(() => null);
       if (!vendorRes.ok) {
-        throw new Error(vendorJson?.message?.[0] || vendorJson?.message || `Registration failed with status ${vendorRes.status}`);
+        throw new Error(apiErrorMessage(vendorJson, `Registration failed with status ${vendorRes.status}`));
       }
       const newVendorId = vendorJson?.data?._id;
 
@@ -467,7 +467,7 @@ export default function ClubOnboarding() {
           // instead of swallowed.
           const errJson = await venueRes.json().catch(() => ({}));
           setVenueCreationWarning(
-            errJson?.message?.[0] || errJson?.message || 'Your account was created, but we couldn\'t save your venue details. Please add them from your Profile page once approved.'
+            apiErrorMessage(errJson, 'Your account was created, but we couldn\'t save your venue details. Please add them from your Profile page once approved.')
           );
         }
       }
