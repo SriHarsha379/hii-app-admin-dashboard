@@ -42,16 +42,27 @@ export default function Analytics() {
   const { data: events } = useQuery({
     queryKey: ['events'],
     queryFn: async () => {
+      // FIXED: was returning the raw { success, message, data } envelope
+      // instead of unwrapping .data. eventList below does
+      // `Array.isArray(events) ? events : []`, which was always false for
+      // an object — so Events by Status, Clubs/Events on the growth chart,
+      // and Total Events all silently showed empty/zero regardless of how
+      // much real data existed.
       const res = await fetch(`${API_BASE}/events/list`, { headers: { Authorization: `Bearer ${token}` } });
-      return res.json();
+      const json = await res.json();
+      return Array.isArray(json.data) ? json.data : [];
     },
   });
 
   const { data: clubs } = useQuery({
     queryKey: ['clubs'],
     queryFn: async () => {
+      // FIXED: same bug as the events query above — was returning the raw
+      // envelope instead of the array, so Top Cities by Clubs and Total
+      // Clubs always showed empty/zero.
       const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, { headers: { Authorization: `Bearer ${token}` } });
-      return res.json();
+      const json = await res.json();
+      return Array.isArray(json.data) ? json.data : [];
     },
   });
 
