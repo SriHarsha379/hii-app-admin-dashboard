@@ -482,7 +482,11 @@ export default function Layout() {
             )}
             {user?.role === 'CLUB_ADMIN' && <NavLink to="/bookings" icon={Ticket}>Bookings</NavLink>}
             {(user?.role === 'SUPER_ADMIN' || user?.role === 'NORMAL_ADMIN') && <NavLink to="/polls-contests" icon={Vote}>Polls & Contests</NavLink>}
-            {(user?.role === 'SUPER_ADMIN' || user?.role === 'NORMAL_ADMIN') && <NavLink to="/recommendations" icon={Sparkles}>Recommendations</NavLink>}
+            {/* Hidden for now — /recommendations has no matching backend
+                route at all (no model, no route file), so the page can't
+                list, create, update, delete, or preview anything. Re-enable
+                once that endpoint exists. */}
+            {false && (user?.role === 'SUPER_ADMIN' || user?.role === 'NORMAL_ADMIN') && <NavLink to="/recommendations" icon={Sparkles}>Recommendations</NavLink>}
           </nav>
 
           <AnimatePresence initial={false}>
