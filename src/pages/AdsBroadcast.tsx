@@ -169,6 +169,20 @@ export default function AdsBroadcast() {
     }
   });
 
+  // Ad analytics — was completely missing (no tracking, no admin view).
+  // Backend now returns per-ad impressions_count/clicks_count on `ads`
+  // itself, plus this dedicated endpoint for pre-computed totals + CTR.
+  const { data: adStats } = useQuery({
+    queryKey: ['ad-stats'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/ads/stats`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json();
+      return json.data ?? null;
+    }
+  });
+
   const resetAdForm = () => {
     setIsCreatingAd(false);
     setEditingAdId(null);
@@ -528,12 +542,14 @@ export default function AdsBroadcast() {
             className="space-y-6"
           >
             {/* Ads Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
               {[
                 { label: 'Total Ads', value: filteredAds.length, icon: Megaphone, color: 'text-blue-400', bg: 'bg-blue-400/10' },
                 { label: 'Active Ads', value: filteredAds.filter((a: any) => !a.expiry_date || new Date(a.expiry_date).getTime() >= Date.now()).length, icon: Zap, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
                 { label: 'With Video', value: filteredAds.filter((a: any) => a.ad_video).length, icon: Video, color: 'text-purple-400', bg: 'bg-purple-400/10' },
                 { label: 'With Link', value: filteredAds.filter((a: any) => a.link_url).length, icon: LinkIcon, color: 'text-amber-400', bg: 'bg-amber-400/10' },
+                { label: 'Impressions', value: (adStats?.totals?.total_impressions ?? 0).toLocaleString(), icon: Eye, color: 'text-sky-400', bg: 'bg-sky-400/10' },
+                { label: 'Clicks · CTR', value: `${(adStats?.totals?.total_clicks ?? 0).toLocaleString()} · ${adStats?.totals?.ctr ?? 0}%`, icon: MousePointer2, color: 'text-pink-400', bg: 'bg-pink-400/10' },
               ].map((stat) => (
                 <div key={stat.label} className="glass-card p-6 rounded-2xl border border-white/10 flex items-center gap-4">
                   <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", stat.bg)}>
@@ -587,17 +603,18 @@ export default function AdsBroadcast() {
                       <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Creative</th>
                       <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Destination Link</th>
                       <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Expires</th>
+                      <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Performance</th>
                       <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {adsLoading ? (
                       <tr>
-                        <td colSpan={4} className="px-6 py-12 text-center text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] leading-none">Loading campaigns...</td>
+                        <td colSpan={5} className="px-6 py-12 text-center text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] leading-none">Loading campaigns...</td>
                       </tr>
                     ) : filteredAds.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="px-6 py-12 text-center text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] leading-none">No ads yet. Create one to get started.</td>
+                        <td colSpan={5} className="px-6 py-12 text-center text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] leading-none">No ads yet. Create one to get started.</td>
                       </tr>
                     ) : filteredAds.map((ad: any) => {
                       const adId = ad._id || ad.id;
@@ -637,6 +654,24 @@ export default function AdsBroadcast() {
                         </td>
                         <td className="px-6 py-4">
                           <span className="text-[11px] text-white font-medium">{ad.expiry_date ? new Date(ad.expiry_date).toLocaleDateString() : '—'}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {(() => {
+                            const impressions = ad.impressions_count || 0;
+                            const clicks = ad.clicks_count || 0;
+                            const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(1) : '0.0';
+                            return (
+                              <div className="flex items-center gap-3 text-[11px] text-white/70 font-medium">
+                                <span className="flex items-center gap-1" title="Impressions">
+                                  <Eye className="w-3.5 h-3.5 text-sky-400" /> {impressions.toLocaleString()}
+                                </span>
+                                <span className="flex items-center gap-1" title="Clicks">
+                                  <MousePointer2 className="w-3.5 h-3.5 text-pink-400" /> {clicks.toLocaleString()}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{ctr}% CTR</span>
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-6 py-4 text-right relative">
                           <button

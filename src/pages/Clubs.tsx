@@ -77,6 +77,7 @@ import { MultiSelectDropdown } from '../components/MultiSelectDropdown';
 import { motion, AnimatePresence } from 'motion/react';
 import ClubProfilePreview from '../components/ClubProfilePreview';
 import EventProfilePreview from '../components/EventProfilePreview';
+import { FeatureClubModal } from '../components/FeatureClubModal';
 
 import { API_BASE } from '../lib/apiConfig';
 
@@ -132,6 +133,11 @@ export default function Clubs() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedClub, setSelectedClub] = useState<any>(null);
   const [isCreatingClub, setIsCreatingClub] = useState(false);
+  // Feature Clubs — mirrors the Featured Events pattern (was missing
+  // entirely: the app already shows a "Featured" section on Venues, but
+  // admin had no way to mark a club as featured).
+  const [isFeaturingClub, setIsFeaturingClub] = useState(false);
+  const [isViewingFeaturedClubs, setIsViewingFeaturedClubs] = useState(false);
   const [isEditingVenue, setIsEditingVenue] = useState(false);
   const [isViewingVenue, setIsViewingVenue] = useState(false);
 
@@ -458,6 +464,54 @@ export default function Clubs() {
     },
   });
 
+  // Feature Clubs — was entirely unbuilt server-side until now. Mirrors
+  // the Featured Events mutations/query exactly.
+  const featureVenueMutation = useMutation({
+    mutationFn: async (data: { city: string; clubId: string; duration: number }) => {
+      const res = await fetch(`${API_BASE}/venue/feature/${data.clubId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ duration: data.duration, city: data.city }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.success === false) {
+        throw new Error(apiErrorMessage(json, 'Failed to feature club'));
+      }
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clubs'] });
+      queryClient.invalidateQueries({ queryKey: ['venues-for-clubs'] });
+      queryClient.invalidateQueries({ queryKey: ['featured-venues'] });
+    },
+  });
+
+  const unfeatureVenueMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`${API_BASE}/venue/unfeature/${id}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to unfeature club');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clubs'] });
+      queryClient.invalidateQueries({ queryKey: ['venues-for-clubs'] });
+      queryClient.invalidateQueries({ queryKey: ['featured-venues'] });
+    },
+  });
+
+  const { data: featuredVenues, isLoading: featuredVenuesLoading } = useQuery({
+    queryKey: ['featured-venues'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/venue/featured`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return Array.isArray(json.data) ? json.data : [];
+    },
+    enabled: isViewingFeaturedClubs,
+  });
+
   const getVenueForVendor = (vendorId: string) => {
     if (!Array.isArray(venues)) return null;
     return venues.find((v: any) => {
@@ -628,6 +682,26 @@ export default function Clubs() {
   };
 
   const exportData = () => console.log('Exporting data...', filteredClubs);
+
+  // The Feature/Unfeature endpoints operate on Venue documents, whose _id
+  // is NOT the same as the vendor (club account) _id used elsewhere on
+  // this page — withVenueData() above deliberately keeps _id as the
+  // vendor id for the rest of the page's logic, so a separate list is
+  // built here with the real venue _id for the feature flow specifically.
+  // Clubs with no linked venue yet (getVenueForVendor returns null) are
+  // excluded since there's nothing to feature.
+  const featurableClubs = filteredClubs
+    .map((c: any) => {
+      const venue = getVenueForVendor(c._id || c.id);
+      if (!venue) return null;
+      return {
+        _id: venue._id,
+        venue_name: venue.venue_name || c.name,
+        city: c.city,
+        venue_image: venue.venue_image,
+      };
+    })
+    .filter(Boolean);
 
   if (user?.role === 'CLUB_ADMIN') {
     return (
@@ -1186,6 +1260,11 @@ export default function Clubs() {
         <div className="flex items-center gap-3">
           <button onClick={exportData} className="px-5 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2">
             <Download className="w-3.5 h-3.5" /> Export Data
+          </button>
+          {/* Featured Clubs — was entirely missing; the app already shows a
+              "Featured" section on Venues but admin had no control for it. */}
+          <button onClick={() => setIsViewingFeaturedClubs(true)} className="px-5 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2">
+            <Star className="w-3.5 h-3.5" /> Featured
           </button>
           <button
             onClick={() => { setSelectedClub(null); resetVenueForm(); setVenueFormData((prev: any) => ({ ...prev, vendor_id: ownVendorForVenue?._id || '' })); setIsCreatingClub(true); }}
@@ -1794,6 +1873,88 @@ export default function Clubs() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Featured Clubs list — mirrors the Featured Events panel. Shows
+          what's currently featured (with remaining days + city scope, or
+          "All Cities" if unscoped), with Unfeature per row and a "+ Feature
+          Club" button that opens the select-club/city/duration modal. */}
+      <AnimatePresence>
+        {isViewingFeaturedClubs && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-card w-full max-w-2xl max-h-[80vh] rounded-3xl border border-white/10 overflow-hidden shadow-2xl flex flex-col"
+            >
+              <div className="p-8 border-b border-white/5 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+                    <Star className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-white uppercase tracking-tight">Featured Clubs</h3>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">{Array.isArray(featuredVenues) ? featuredVenues.length : 0} currently featured</p>
+                  </div>
+                </div>
+                <button onClick={() => setIsViewingFeaturedClubs(false)} className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all text-muted-foreground hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-3">
+                {featuredVenuesLoading ? (
+                  <div className="py-12 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+                ) : !featuredVenues || featuredVenues.length === 0 ? (
+                  <div className="py-12 text-center space-y-2">
+                    <Star className="w-8 h-8 text-white/10 mx-auto" />
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">No clubs currently featured</p>
+                  </div>
+                ) : (
+                  featuredVenues.map((v: any) => {
+                    const daysLeft = v.featured_until ? Math.max(0, Math.ceil((new Date(v.featured_until).getTime() - Date.now()) / (24 * 60 * 60 * 1000))) : null;
+                    return (
+                      <div key={v._id} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-white truncate">{v.venue_name}</p>
+                          <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
+                            <span>{v.featured_city || 'All Cities'}</span>
+                            <span>·</span>
+                            <span>{daysLeft != null ? `${daysLeft} day${daysLeft === 1 ? '' : 's'} left` : 'No expiry'}</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => unfeatureVenueMutation.mutate(v._id)}
+                          disabled={unfeatureVenueMutation.isPending}
+                          className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-[10px] font-black uppercase tracking-widest text-red-400 hover:bg-red-500/20 transition-all shrink-0 disabled:opacity-50"
+                        >
+                          Unfeature
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="p-6 border-t border-white/5 shrink-0">
+                <button
+                  onClick={() => { setIsViewingFeaturedClubs(false); setIsFeaturingClub(true); }}
+                  className="w-full py-3.5 rounded-2xl bg-primary text-white text-[11px] font-black uppercase tracking-widest hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
+                >
+                  <Star className="w-4 h-4" /> Feature a Club
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Feature Modal */}
+      <FeatureClubModal
+        isOpen={isFeaturingClub}
+        onClose={() => setIsFeaturingClub(false)}
+        cities={cities || []}
+        clubs={featurableClubs || []}
+        onConfirm={async (data) => { await featureVenueMutation.mutateAsync(data); setIsFeaturingClub(false); }}
+      />
     </div>
   );
 }
