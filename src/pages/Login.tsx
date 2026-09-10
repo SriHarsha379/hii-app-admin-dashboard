@@ -186,7 +186,12 @@ navigate('/');
             </div>
 
             <div className="space-y-3">
-              <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Password</label>
+              <div className="flex items-center justify-between ml-1 mr-1">
+                <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Password</label>
+                <Link to="/forgot-password" className="text-[10px] font-black text-primary hover:underline uppercase tracking-wider">
+                  Forgot password?
+                </Link>
+              </div>
               <div className="relative group/field">
                 <Lock className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20 group-focus-within/field:text-primary transition-all" />
                 <input

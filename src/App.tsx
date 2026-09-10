@@ -5,6 +5,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { API_BASE } from './lib/apiConfig';
 import Layout from './components/Layout';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import Events from './pages/Events';
@@ -148,6 +150,10 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            {/* Matches the link emailed by POST /auth/forget_password:
+                https://hii.life/app/admin/reset-password/:token */}
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
             <Route path="/club-onboarding" element={<ProtectedRoute><ClubOnboarding /></ProtectedRoute>} />
             <Route path="/event-onboarding" element={<ProtectedRoute><EventAdminOnboarding /></ProtectedRoute>} />
             <Route path="/claim-club/:clubId" element={<ProtectedRoute><ClaimClubForm /></ProtectedRoute>} />
