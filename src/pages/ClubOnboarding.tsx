@@ -37,22 +37,6 @@ import { FilterDropdown } from '../components/FilterDropdown';
 import { useQuery } from '@tanstack/react-query';
 
 import { API_BASE } from '../lib/apiConfig';
-// ── Image upload helper ───────────────────────────────────────────────────────
-// Sends a file to /api/upload (multer endpoint) and returns the server-side URL.
-// Using base64 strings directly would make the payload enormous and break image
-// rendering everywhere downstream.
-async function uploadImage(file: File, token: string): Promise<string> {
-  const body = new FormData();
-  body.append('file', file);
-  const res = await fetch(`${API_BASE}/upload`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body,
-  });
-  if (!res.ok) throw new Error(`Upload failed with status ${res.status}`);
-  const data = await res.json();
-  return data.url as string; // e.g. "/uploads/1234567890-portrait.jpg"
-}
 
 const initialForm = {
   name: '',

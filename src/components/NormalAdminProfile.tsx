@@ -52,27 +52,22 @@ export default function NormalAdminProfile() {
     },
   });
 
-  // TODO: no pollRoute.js exists on the backend yet - disabled until a real
-  // endpoint is added. "Polls & Contests" section will show its empty state
-  // until then.
   const { data: polls } = useQuery({
     queryKey: ['polls'],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/polls`, { headers: { Authorization: `Bearer ${token}` } });
-      return res.json();
+      const json = await res.json();
+      return json.data ?? [];
     },
-    enabled: false,
   });
 
-  // TODO: no contestRoute.js exists on the backend yet - disabled until a
-  // real endpoint is added.
   const { data: contests } = useQuery({
     queryKey: ['contests'],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/contests`, { headers: { Authorization: `Bearer ${token}` } });
-      return res.json();
+      const json = await res.json();
+      return json.data ?? [];
     },
-    enabled: false,
   });
 
   // ── Derived values (all from real data, no hardcoding) ─────────────────────

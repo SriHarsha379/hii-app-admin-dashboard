@@ -1,6 +1,8 @@
 node_modules/
 .next/
 dist/
+build/
+*.zip
 .env
 .env.local
 coverage/

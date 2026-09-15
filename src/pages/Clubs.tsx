@@ -97,28 +97,6 @@ const statusColors: any = {
   'SUSPENDED': 'bg-purple-500/10 text-purple-400 border-purple-500/20',
 };
 
-// ─── Upload helper ────────────────────────────────────────────────────────────
-// TODO: BROKEN - there is no `/upload` route on the real backend (that endpoint
-// only existed in an old, unused Mongoose codebase). The real backend's
-// vendorRoute.js / eventRoute.js expect multipart form-data directly on the
-// create/update calls (e.g. `upload.single("business_image")`,
-// `upload.fields([{ name: "venue_image" }, ...])`), not a separate upload step
-// that returns a URL. This function will always fail until the submit handlers
-// below are rewritten to build FormData with the exact field names the backend
-// controllers expect (see vendorController.js / eventController.js).
-async function uploadFile(file: File, token: string): Promise<string> {
-  const form = new FormData();
-  form.append('file', file);
-  const res = await fetch(`${API_BASE}/upload`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: form,
-  });
-  if (!res.ok) throw new Error('Upload failed');
-  const data = await res.json();
-  return data.url as string;
-}
-
 export default function Clubs() {
   const { token, user } = useAuth();
   const navigate = useNavigate();
