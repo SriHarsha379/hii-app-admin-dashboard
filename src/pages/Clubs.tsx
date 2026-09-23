@@ -124,6 +124,13 @@ export default function Clubs() {
     name: '', type: '', email: '', capacity: '', contactName: '',
     phone: '', description: '', city: '', address: '', vendor_id: '',
     landscape_urls: [''], portrait_url: '',
+    // Per-club reservation options (issue: "every club will have
+    // different options for members") — table_reservation_fee is the
+    // flat ₹ charged when a member picks the discounted-bill option,
+    // bill_discount_percentage is what they get off in return. A club
+    // that leaves the discount at 0 simply won't show that option to
+    // members at all — see book_venue_table.dart on the app side.
+    table_reservation_fee: '', bill_discount_percentage: '', tax_percentage: '',
   });
   const [workingHours, setWorkingHours] = useState<any[]>([
     { day: 'Monday',    time: '10:00 PM - 04:00 AM', active: false },
@@ -228,6 +235,7 @@ export default function Clubs() {
       name: '', type: '', email: '', capacity: '', contactName: '',
       phone: '', description: '', city: '', address: '', vendor_id: '',
       landscape_urls: [''], portrait_url: '',
+      table_reservation_fee: '', bill_discount_percentage: '', tax_percentage: '',
     });
     setVenueLandscapeFiles([null]); setVenueLandscapePreviews(['']);
     setVenuePortraitFile(null); setVenuePortraitPreview('');
@@ -254,6 +262,9 @@ export default function Clubs() {
       vendor_id: typeof club.vendor_id === 'object' ? club.vendor_id?._id || '' : club.vendor_id || '',
       landscape_urls: Array.isArray(club.gallery_images) ? club.gallery_images : [''],
       portrait_url: club.venue_image ? adAssetUrlForClub(club.venue_image) : (club.portrait_url || ''),
+      table_reservation_fee: club.table_reservation_fee != null ? String(club.table_reservation_fee) : '',
+      bill_discount_percentage: club.bill_discount_percentage != null ? String(club.bill_discount_percentage) : '',
+      tax_percentage: club.tax_percentage != null ? String(club.tax_percentage) : '',
     });
     setVenueLandscapeFiles((Array.isArray(club.gallery_images) ? club.gallery_images : ['']).map(() => null));
     setVenueLandscapePreviews(Array.isArray(club.gallery_images) && club.gallery_images.length ? club.gallery_images.map((g: string) => adAssetUrlForClub(g)) : ['']);
@@ -384,6 +395,9 @@ export default function Clubs() {
       body.append('end_time', end_time || '');
       body.append('address', venueFormData.address || '');
       body.append('about', venueFormData.description || '');
+      body.append('table_reservation_fee', venueFormData.table_reservation_fee || '0');
+      body.append('bill_discount_percentage', venueFormData.bill_discount_percentage || '0');
+      body.append('tax_percentage', venueFormData.tax_percentage || '0');
       if (!isEditingVenue) body.append('vendor_id', vendorId);
       if (venuePortraitFile) body.append('venue_image', venuePortraitFile);
       venueLandscapeFiles.forEach((f) => { if (f) body.append('gallery_images', f); });
@@ -1695,6 +1709,16 @@ export default function Clubs() {
                             <RefinedField label="Contact Email" name="email" type="email" value={venueFormData.email} onChange={(e: any) => setVenueFormData({ ...venueFormData, email: e.target.value })} placeholder="ops@venue.com" icon={<Mail className="w-4 h-4" />} />
                             <RefinedField label="Capacity" name="capacity" type="number" value={venueFormData.capacity} onChange={(e: any) => setVenueFormData({ ...venueFormData, capacity: e.target.value })} placeholder="3500" icon={<Users className="w-4 h-4" />} />
                             <RefinedField label="Contact Number" name="phone" value={venueFormData.phone} onChange={(e: any) => setVenueFormData({ ...venueFormData, phone: e.target.value })} placeholder="+91 00000 00000" icon={<Phone className="w-4 h-4" />} />
+                          </div>
+                        </FormSection>
+                        <FormSection title="Reservation Options" icon={<Ticket className="w-4 h-4" />}>
+                          <p className="text-[10px] text-white/30 -mt-2 mb-2">
+                            Each club sets its own reservation options — leave the discount at 0 to only offer a regular, no-cover-charge reservation to members.
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                            <RefinedField label="Cover Charge (₹)" name="table_reservation_fee" type="number" value={venueFormData.table_reservation_fee} onChange={(e: any) => setVenueFormData({ ...venueFormData, table_reservation_fee: e.target.value })} placeholder="0" icon={<Wallet className="w-4 h-4" />} />
+                            <RefinedField label="Bill Discount (%)" name="bill_discount_percentage" type="number" value={venueFormData.bill_discount_percentage} onChange={(e: any) => setVenueFormData({ ...venueFormData, bill_discount_percentage: e.target.value })} placeholder="0" icon={<TrendingDown className="w-4 h-4" />} />
+                            <RefinedField label="Tax (%)" name="tax_percentage" type="number" value={venueFormData.tax_percentage} onChange={(e: any) => setVenueFormData({ ...venueFormData, tax_percentage: e.target.value })} placeholder="0" icon={<BarChart3 className="w-4 h-4" />} />
                           </div>
                         </FormSection>
                         <FormSection title="Club Description" icon={<FileText className="w-4 h-4" />}>
