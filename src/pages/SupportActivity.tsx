@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -37,7 +38,13 @@ const statusColors: any = {
 
 export default function SupportActivity() {
   const { token } = useAuth();
-  const [activeTab, setActiveTab] = useState('requests');
+  // ?tab=complaints (from a notification) opens that tab directly.
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') === 'complaints' ? 'complaints' : 'requests');
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'complaints' || tab === 'requests') setActiveTab(tab);
+  }, [searchParams]);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   // FIXED: this Filter button had no onClick at all — the only way to
   // set statusFilter was clicking a specific KPI card, which only offers

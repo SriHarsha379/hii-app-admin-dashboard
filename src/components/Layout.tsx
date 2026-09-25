@@ -62,6 +62,22 @@ import EventProfilePreview from './EventProfilePreview';
 import RightClubProfile from './RightClubProfile';
 
 import { API_BASE } from '../lib/apiConfig';
+
+// Where a dashboard notification leads when clicked (actions are set by the
+// backend - see utility/adminNotify.js). null = just a message, no page.
+function notificationLink(n: any): string | null {
+  switch (String(n?.action || '').toLowerCase()) {
+    case 'organiser_request': return '/organiser-requests';
+    case 'support_request': return '/support-activity?tab=requests';
+    case 'member_report': return '/support-activity?tab=complaints';
+    case 'reply': return '/support-activity';
+    case 'new_booking':
+      // Clubs have a Bookings page; event organisers see sales under Events.
+      return n?.action_json?.booking_type === 'event' ? '/events' : '/bookings';
+    default: return null;
+  }
+}
+
 function RightSidebar({ isOpen, toggle, currentPage, notifications }: { isOpen: boolean, toggle: () => void, currentPage: string, notifications: any[] }) {
   const { token, user } = useAuth();
   const navigate = useNavigate();
@@ -168,7 +184,12 @@ function RightSidebar({ isOpen, toggle, currentPage, notifications }: { isOpen: 
             </div>
             <div className="space-y-4">
               {notifications.slice(0, 5).map((n: any, i: number) => (
-                <div key={n._id || n.notification_id || i} className="flex gap-3 group">
+                <div
+                  key={n._id || n.notification_id || i}
+                  onClick={() => { const to = notificationLink(n); if (to) navigate(to); }}
+                  title={notificationLink(n) ? 'Open' : undefined}
+                  className={cn("flex gap-3 group rounded-lg", notificationLink(n) && "cursor-pointer")}
+                >
                   <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-110", n.read_status ? "bg-white/5" : "bg-primary/10")}>
                     <Bell className={cn("w-4 h-4", n.read_status ? "text-white/40" : "text-primary")} />
                   </div>
@@ -754,33 +775,50 @@ export default function Layout() {
                         <div className="p-2">
                           {notifList.map((n: any) => (
                             <div
-                              key={n._id || n.id}
+                              key={n._id || n.notification_id || n.id}
+                              onClick={() => {
+                                const to = notificationLink(n);
+                                if (!to) return;
+                                setIsNotifOpen(false);
+                                navigate(to);
+                              }}
                               className={cn(
-                                "flex items-start gap-3 px-3 py-3 rounded-xl transition-all cursor-pointer group",
-                                !n.read ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-white/5"
+                                "flex items-start gap-3 px-3 py-3 rounded-xl transition-all group",
+                                notificationLink(n) && "cursor-pointer",
+                                !n.read_status ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-white/5"
                               )}
                             >
                               {/* Icon or avatar */}
                               <div className={cn(
                                 "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5",
-                                !n.read ? "bg-primary/20 text-primary" : "bg-white/5 text-muted-foreground"
+                                !n.read_status ? "bg-primary/20 text-primary" : "bg-white/5 text-muted-foreground"
                               )}>
                                 <Bell className="w-4 h-4" />
                               </div>
                               <div className="min-w-0 flex-1">
+                                {n.title && (
+                                  <p className={cn(
+                                    "text-xs leading-snug",
+                                    !n.read_status ? "text-white font-bold" : "text-white/70 font-semibold"
+                                  )}>
+                                    {n.title}
+                                  </p>
+                                )}
                                 <p className={cn(
                                   "text-xs leading-snug",
-                                  !n.read ? "text-white font-bold" : "text-white/60 font-medium"
+                                  n.title ? "text-white/60 font-medium mt-0.5" : (!n.read_status ? "text-white font-bold" : "text-white/60 font-medium")
                                 )}>
                                   {n.message || n.text || 'New notification'}
                                 </p>
-                                <p className="text-[10px] text-muted-foreground mt-1">
-                                  {n.time || n.createdAt
-                                    ? new Date(n.time || n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                    : ''}
+                                <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-2">
+                                  {/* backend already sends a friendly "2 hours ago" */}
+                                  <span>{n.createdAt || n.time || ''}</span>
+                                  {notificationLink(n) && (
+                                    <span className="text-primary font-bold group-hover:underline">Open ›</span>
+                                  )}
                                 </p>
                               </div>
-                              {!n.read && (
+                              {!n.read_status && (
                                 <div className="w-1.5 h-1.5 rounded-full bg-primary shrink-0 mt-2" />
                               )}
                             </div>
