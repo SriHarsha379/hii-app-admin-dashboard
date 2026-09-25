@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { Plus, Trash2, Loader2, MapPin, Music, Calendar, Building2, AlertTriangle, Eye, EyeOff } from 'lucide-react';
+import { Plus, Trash2, Loader2, MapPin, Music, Calendar, Building2, AlertTriangle, Eye, EyeOff, Star } from 'lucide-react';
 import { cn, apiErrorMessage } from '../lib/utils';
 import { FilterDropdown } from '../components/FilterDropdown';
 
@@ -30,6 +30,7 @@ const TAB_CONFIG: Record<TabId, {
   createUrl: string;
   deleteUrl: (id: string) => string;
   toggleUrl?: (id: string) => string;
+  preferredUrl?: (id: string) => string;
   nameField: string;
   categoryType?: number;
 }> = {
@@ -38,10 +39,14 @@ const TAB_CONFIG: Record<TabId, {
     // to let the admin control which cities are active for the rest of the
     // app's filters, so it needs to include inactive ones too or there'd be
     // no way to see/reactivate a deactivated city.
-    listUrl: `${API_BASE}/city/get_all_cities?include_inactive=true`,
+    // Client rule: the app shows every city (unless hidden here), while all
+    // admin dropdowns show only the starred (preferred) cities. scope=all
+    // lists every city so they can be starred / hidden here.
+    listUrl: `${API_BASE}/city/get_all_cities?scope=all`,
     createUrl: `${API_BASE}/city/create_city`,
     deleteUrl: (id) => `${API_BASE}/city/delete_city/${id}`,
     toggleUrl: (id) => `${API_BASE}/city/toggle_status/${id}`,
+    preferredUrl: (id) => `${API_BASE}/city/toggle_preferred/${id}`,
     nameField: 'city_name',
   },
   genres: {
@@ -72,7 +77,7 @@ export default function ManageFilters() {
   const [activeTab, setActiveTab] = useState<TabId>('cities');
   const [newItemName, setNewItemName] = useState('');
   const [itemSearch, setItemSearch] = useState('');
-  const [statusView, setStatusView] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  const [statusView, setStatusView] = useState<'PREFERRED' | 'ALL' | 'INACTIVE'>('PREFERRED');
   const [newItemState, setNewItemState] = useState('');
   const [newItemLat, setNewItemLat] = useState('');
   const [newItemLng, setNewItemLng] = useState('');
@@ -206,6 +211,24 @@ export default function ManageFilters() {
     },
   });
 
+  // Cities-only: star / un-star a preferred city. Preferred cities are the
+  // only ones offered in admin dropdowns (clubs, events, ads, users...), so
+  // every cached city list across the dashboard is refreshed afterwards.
+  const preferredMutation = useMutation({
+    mutationFn: async (id: string) => {
+      if (!config.preferredUrl) throw new Error('Not supported for this tab');
+      const res = await fetch(config.preferredUrl(id), {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to update preferred city');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+    },
+  });
+
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
@@ -314,6 +337,17 @@ export default function ManageFilters() {
               cities?" without scrolling through the whole list. Now you can
               filter to "Active" alone to see exactly what's live at a glance,
               and the count up top confirms it without any scrolling. */}
+          {activeTab === 'cities' && (
+            <div className="flex items-start gap-2 -mt-2 p-3 rounded-xl bg-primary/5 border border-primary/20 text-xs text-muted-foreground leading-relaxed">
+              <Star className="w-4 h-4 text-primary fill-primary shrink-0 mt-0.5" />
+              <span>
+                <b className="text-white">Preferred cities</b> (starred) are the only cities shown in admin dropdowns
+                (clubs, events, ads, users, club &amp; organiser signup). Members in the app can choose{' '}
+                <b className="text-white">any city</b> that isn't hidden. Tap the star to add or remove a preferred city.
+              </span>
+            </div>
+          )}
+
           {activeTab === 'cities' && Array.isArray(items) && items.length > 0 && (
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 -mt-2">
               <div className="flex-1 relative">
@@ -326,8 +360,8 @@ export default function ManageFilters() {
                 />
               </div>
               <div className="flex items-center gap-1 p-1 rounded-xl bg-white/5 border border-white/10 shrink-0">
-                {(['ALL', 'ACTIVE', 'INACTIVE'] as const).map((v) => {
-                  const count = v === 'ALL' ? items.length : items.filter((i: any) => (v === 'ACTIVE' ? i.is_active : !i.is_active)).length;
+                {(['PREFERRED', 'ALL', 'INACTIVE'] as const).map((v) => {
+                  const count = v === 'ALL' ? items.length : items.filter((i: any) => (v === 'PREFERRED' ? i.is_preferred : !i.is_active)).length;
                   return (
                     <button
                       key={v}
@@ -337,7 +371,7 @@ export default function ManageFilters() {
                         statusView === v ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-muted-foreground hover:text-white'
                       )}
                     >
-                      {v === 'ALL' ? 'All' : v === 'ACTIVE' ? 'Active' : 'Inactive'} ({count})
+                      {v === 'ALL' ? 'All' : v === 'PREFERRED' ? 'Preferred' : 'Hidden in app'} ({count})
                     </button>
                   );
                 })}
@@ -349,7 +383,7 @@ export default function ManageFilters() {
             {(() => {
               const visibleItems = activeTab === 'cities'
                 ? (Array.isArray(items) ? items : [])
-                    .filter((item: any) => statusView === 'ALL' || (statusView === 'ACTIVE' ? item.is_active : !item.is_active))
+                    .filter((item: any) => statusView === 'ALL' || (statusView === 'PREFERRED' ? item.is_preferred : !item.is_active))
                     .filter((item: any) => item[config.nameField]?.toLowerCase().includes(itemSearch.toLowerCase()))
                 : items;
 
@@ -371,21 +405,39 @@ export default function ManageFilters() {
                 <div key={item._id || item.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 group hover:bg-white/10 transition-colors gap-2">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <span className="text-sm font-bold text-white truncate min-w-0 flex-1">{item[config.nameField]}</span>
+                    {activeTab === 'cities' && item.is_preferred && (
+                      <span className="shrink-0 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-widest border bg-primary/10 text-primary border-primary/30">
+                        Preferred
+                      </span>
+                    )}
                     {activeTab === 'cities' && (
                       <span className={cn(
                         'shrink-0 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-widest border',
                         item.is_active ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
                       )}>
-                        {item.is_active ? 'Active' : 'Inactive'}
+                        {item.is_active ? 'In app' : 'Hidden'}
                       </span>
                     )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {activeTab === 'cities' && (
                       <button
+                        onClick={() => preferredMutation.mutate(item._id || item.id)}
+                        disabled={preferredMutation.isPending}
+                        title={item.is_preferred ? 'Remove from preferred cities (hide from admin dropdowns)' : 'Make preferred (show in admin dropdowns)'}
+                        className={cn(
+                          'p-2 rounded-lg transition-colors disabled:opacity-50 hover:bg-primary/15',
+                          item.is_preferred ? 'text-primary' : 'text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100'
+                        )}
+                      >
+                        <Star className={cn('w-4 h-4', item.is_preferred && 'fill-primary')} />
+                      </button>
+                    )}
+                    {activeTab === 'cities' && (
+                      <button
                         onClick={() => toggleItemMutation.mutate(item._id || item.id)}
                         disabled={toggleItemMutation.isPending}
-                        title={item.is_active ? 'Deactivate (hide from Events/Venues/Ads filters)' : 'Activate (show in Events/Venues/Ads filters)'}
+                        title={item.is_active ? 'Hide this city from members in the app' : 'Show this city to members in the app'}
                         className={cn(
                           'p-2 rounded-lg transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50',
                           item.is_active ? 'hover:bg-zinc-500/20 text-muted-foreground hover:text-zinc-300' : 'hover:bg-emerald-500/20 text-muted-foreground hover:text-emerald-400'
