@@ -40,6 +40,15 @@ export default function SupportActivity() {
   const { token } = useAuth();
   // ?tab=complaints (from a notification) opens that tab directly.
   const [searchParams] = useSearchParams();
+  // Requests are shown in separate sections by sender (client request):
+  // app members, clubs and event organisers - each with its own categories.
+  const [reqSource, setReqSource] = useState<'member' | 'club' | 'organiser'>(
+    (['member', 'club', 'organiser'].includes(searchParams.get('source') || '') ? searchParams.get('source') : 'member') as any);
+  const [reqCategory, setReqCategory] = useState('');
+  useEffect(() => {
+    const src = searchParams.get('source');
+    if (src === 'member' || src === 'club' || src === 'organiser') { setReqSource(src); setReqCategory(''); }
+  }, [searchParams]);
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') === 'complaints' ? 'complaints' : 'requests');
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -116,7 +125,7 @@ export default function SupportActivity() {
   });
 
   const { data: requests, isLoading: requestsLoading } = useQuery({
-    queryKey: ['requests'],
+    queryKey: ['requests', reqSource, reqCategory],
     queryFn: async () => {
       // NOTE: was hitting the bare `${API_BASE}/requests` — no matching
       // backend route existed, so this tab always showed nothing even
@@ -124,14 +133,16 @@ export default function SupportActivity() {
       // database. Real endpoint is `/support-requests/get_all`, and the raw
       // ReportProblem documents are normalized here into the shape this
       // page's UI expects (it has no native "subject"/"priority" fields).
-      const res = await fetch(`${API_BASE}/support-requests/get_all`, {
+      const qs = new URLSearchParams({ source: reqSource, ...(reqCategory ? { category: reqCategory } : {}) });
+      const res = await fetch(`${API_BASE}/support-requests/get_all?${qs}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const json = await res.json();
       const list = json.data?.requests ?? [];
       return list.map((r: any) => ({
         id: r._id,
-        username: r.user_id?.name || r.user_id?.email || 'Unknown user',
+        username: r.sender_name || r.user_id?.name || r.user_id?.email || 'Unknown user',
+        category: r.category || 'Other',
         subject: r.description ? (r.description.length > 60 ? `${r.description.slice(0, 60)}…` : r.description) : 'Reported problem',
         message: r.description || '',
         priority: 'MEDIUM',
@@ -141,6 +152,15 @@ export default function SupportActivity() {
         admin_reply: r.admin_reply || '',
       }));
     }
+  });
+
+  const { data: supportCategories } = useQuery({
+    queryKey: ['support-categories-all'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/support-requests/categories`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return (json.data || {}) as Record<string, string[]>;
+    },
   });
 
   const { data: complaints, isLoading: complaintsLoading } = useQuery({
@@ -265,6 +285,26 @@ export default function SupportActivity() {
             exit={{ opacity: 0, y: -20 }}
             className="space-y-6"
           >
+            {activeTab === 'requests' && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  {([['member', 'Members'], ['club', 'Clubs'], ['organiser', 'Event organisers']] as const).map(([key, label]) => (
+                    <button key={key} type="button" onClick={() => { setReqSource(key); setReqCategory(''); }}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${reqSource === key ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-card border border-border/40 text-muted-foreground hover:text-white'}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {['', ...((supportCategories && supportCategories[reqSource]) || [])].map((c) => (
+                    <button key={c || 'all'} type="button" onClick={() => setReqCategory(c)}
+                      className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-colors ${reqCategory === c ? 'border-primary text-primary' : 'border-border/40 text-muted-foreground hover:text-white'}`}>
+                      {c || 'All categories'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {/* Stats — was showing item.length for "Open"/"Pending" (i.e. ALL
                 requests/complaints regardless of status, not just open/pending
                 ones), and Avg. Response Time / Resolution Rate were hardcoded
@@ -433,6 +473,7 @@ export default function SupportActivity() {
                         </td>
                         <td className="px-6 py-4">
                           <p className="text-xs text-white font-medium truncate max-w-[200px]">{item.subject}</p>
+                          {item.category && <span className="inline-block mt-1 text-[9px] font-bold uppercase tracking-widest text-primary">{item.category}</span>}
                         </td>
                         <td className="px-6 py-4">
                           <span className={cn("text-[10px] px-2 py-1 rounded-lg font-bold border", priorityColors[item.priority] || priorityColors.MEDIUM)}>

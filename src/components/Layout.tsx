@@ -68,7 +68,9 @@ import { API_BASE } from '../lib/apiConfig';
 function notificationLink(n: any): string | null {
   switch (String(n?.action || '').toLowerCase()) {
     case 'organiser_request': return '/organiser-requests';
-    case 'support_request': return '/support-activity?tab=requests';
+    case 'support_request':
+      return `/support-activity?tab=requests&source=${n?.action_json?.source || 'member'}`;
+    case 'support_reply': return '/contact-support';
     case 'member_report': return '/support-activity?tab=complaints';
     case 'reply': return '/support-activity';
     case 'new_booking':
@@ -523,9 +525,14 @@ export default function Layout() {
             )}
           </AnimatePresence>
           <nav className="px-3 space-y-1 mb-8">
-            {(user?.role === 'SUPER_ADMIN' || user?.role === 'NORMAL_ADMIN' || user?.role === 'CLUB_ADMIN' || user?.role === 'EVENT_ADMIN') && (
-              <NavLink to="/support-activity" icon={MessageSquare} badge="7">
+            {(user?.role === 'SUPER_ADMIN' || user?.role === 'NORMAL_ADMIN') && (
+              <NavLink to="/support-activity" icon={MessageSquare}>
                 Support & Requests
+              </NavLink>
+            )}
+            {(user?.role === 'CLUB_ADMIN' || user?.role === 'EVENT_ADMIN') && (
+              <NavLink to="/contact-support" icon={MessageSquare}>
+                Contact Support
               </NavLink>
             )}
           </nav>

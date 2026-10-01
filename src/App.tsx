@@ -17,6 +17,7 @@ import Analytics from './pages/Analytics';
 import AdsBroadcast from './pages/AdsBroadcast';
 import PollsContests from './pages/PollsContests';
 import SupportActivity from './pages/SupportActivity';
+import ContactSupport from './pages/ContactSupport';
 import ActivityLogs from './pages/ActivityLogs';
 import Settings from './pages/Settings';
 import ManageFilters from './pages/ManageFilters';
@@ -168,7 +169,8 @@ export default function App() {
               <Route path="ticketing" element={<Ticketing />} />
               <Route path="ads-broadcast" element={<ProtectedRoute requireSuperAdmin><AdsBroadcast /></ProtectedRoute>} />
               <Route path="polls-contests" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'NORMAL_ADMIN']}><PollsContests /></ProtectedRoute>} />
-              <Route path="support-activity" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'NORMAL_ADMIN', 'CLUB_ADMIN', 'EVENT_ADMIN']}><SupportActivity /></ProtectedRoute>} />
+              <Route path="support-activity" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'NORMAL_ADMIN']}><SupportActivity /></ProtectedRoute>} />
+              <Route path="contact-support" element={<ProtectedRoute allowedRoles={['CLUB_ADMIN', 'EVENT_ADMIN']}><ContactSupport /></ProtectedRoute>} />
               <Route path="activity-logs" element={<ProtectedRoute requireSuperAdmin><ActivityLogs /></ProtectedRoute>} />
               <Route path="analytics" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'EVENT_ADMIN']}><Analytics /></ProtectedRoute>} />
               <Route path="settings" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><Settings /></ProtectedRoute>} />
