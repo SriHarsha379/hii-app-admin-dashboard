@@ -211,7 +211,17 @@ export default function ClaimClubForm() {
         }
       }
 
-      updateUser({ organisation: club.name });
+      // Save the claim on the server (it used to be saved only in this browser,
+      // so logging in again sent the club admin back to onboarding).
+      const claimRes = await fetch(`${API_BASE}/vendor/claim/${club._id}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const claimJson = await claimRes.json().catch(() => ({}));
+      if (!claimRes.ok || claimJson.success === false) {
+        throw new Error(apiErrorMessage(claimJson, 'Could not claim this listing'));
+      }
+      updateUser({ organisation: claimJson?.data?.organisation || club.name });
       setIsSuccess(true);
     } catch (err: any) {
       setClaimError(err.message || 'Something went wrong. Please try again.');
