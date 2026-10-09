@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -69,6 +70,8 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { cn, apiErrorMessage } from '../lib/utils';
+import { useUserRoles } from '../hooks/useUserRoles';
+import RoleBadges from '../components/RoleBadges';
 import { FilterDropdown } from '../components/FilterDropdown';
 import { FilterPanel } from '../components/FilterPanel';
 import { motion, AnimatePresence } from 'motion/react';
@@ -102,6 +105,13 @@ export default function Users() {
       const res = await fetch(`${API_BASE}/users/get_all_user`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const focusId = searchParams.get('focus');
+    if (!focusId || !Array.isArray(users)) return;
+    const match = (users as any[]).find((x: any) => String(x._id || x.id) === focusId);
+    if (match) setSelectedUser(match);
+  }, [searchParams, users]);
       const json = await res.json();
       // Backend returns { success, message, data: { users, total, page, limit } }
       return json.data?.users ?? [];
@@ -162,6 +172,8 @@ export default function Users() {
     if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
     return 0;
   });
+
+  const { data: rolesByUser = {} } = useUserRoles(filteredUsers.map((u: any) => String(u._id || u.id)));
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -319,6 +331,7 @@ export default function Users() {
                       <div>
                         <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{user.name}</p>
                         <p className="text-[10px] text-muted-foreground">{user.email}</p>
+                        <div className="mt-1.5"><RoleBadges roles={rolesByUser[String(user._id || user.id)]} /></div>
                       </div>
                     </div>
                   </td>

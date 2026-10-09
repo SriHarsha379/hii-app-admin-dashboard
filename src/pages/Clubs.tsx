@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import {useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   Plus,
@@ -74,6 +74,7 @@ import { FilterDropdown } from '../components/FilterDropdown';
 import { FilterPanel } from '../components/FilterPanel';
 import { FormSection, RefinedField } from '../components/RefinedForm';
 import { MultiSelectDropdown } from '../components/MultiSelectDropdown';
+import { LocationPicker } from '../components/LocationPicker';
 import { motion, AnimatePresence } from 'motion/react';
 import ClubProfilePreview from '../components/ClubProfilePreview';
 import EventProfilePreview from '../components/EventProfilePreview';
@@ -394,6 +395,8 @@ export default function Clubs() {
       body.append('start_time', start_time || '');
       body.append('end_time', end_time || '');
       body.append('address', venueFormData.address || '');
+      body.append('latitude', venueFormData.latitude || '');
+      body.append('longitude', venueFormData.longitude || '');
       body.append('about', venueFormData.description || '');
       body.append('table_reservation_fee', venueFormData.table_reservation_fee || '0');
       body.append('bill_discount_percentage', venueFormData.bill_discount_percentage || '0');
@@ -434,6 +437,13 @@ export default function Clubs() {
       const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const focusId = searchParams.get('focus');
+    if (!focusId || !Array.isArray(clubs)) return;
+    const match = (clubs as any[]).find((x: any) => String(x._id || x.id) === focusId);
+    if (match) { setSelectedClub(withVenueData(match)); setIsViewingVenue(true); }
+  }, [searchParams, clubs]);
       const json = await res.json();
       return json.data ?? [];
     },
@@ -971,28 +981,11 @@ export default function Clubs() {
                             </div>
                           </FormSection>
                           <FormSection title="Location" icon={<MapPin className="w-4 h-4" />}>
-                            <div className="space-y-8">
-                              <RefinedField
-                                label="Address" name="address" value={eventFormData.address}
-                                onChange={(e: any) => setEventFormData({ ...eventFormData, address: e.target.value })}
-                                placeholder="Street address / venue location"
-                                icon={<MapPin className="w-4 h-4" />}
-                              />
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                                <RefinedField
-                                  label="Latitude" name="latitude" type="number" value={eventFormData.latitude}
-                                  onChange={(e: any) => setEventFormData({ ...eventFormData, latitude: e.target.value })}
-                                  placeholder="e.g. 19.0760"
-                                  icon={<MapPin className="w-4 h-4" />}
-                                />
-                                <RefinedField
-                                  label="Longitude" name="longitude" type="number" value={eventFormData.longitude}
-                                  onChange={(e: any) => setEventFormData({ ...eventFormData, longitude: e.target.value })}
-                                  placeholder="e.g. 72.8777"
-                                  icon={<MapPin className="w-4 h-4" />}
-                                />
-                              </div>
-                            </div>
+                            <LocationPicker
+                              value={{ address: eventFormData.address, latitude: eventFormData.latitude, longitude: eventFormData.longitude }}
+                              onChange={(loc) => setEventFormData({ ...eventFormData, address: loc.address, latitude: loc.latitude, longitude: loc.longitude })}
+                              placeholder="Search address or place..."
+                            />
                           </FormSection>
                           <FormSection title="Description" icon={<FileText className="w-4 h-4" />}>
                             <div className="space-y-4 group/field">
@@ -1742,7 +1735,7 @@ export default function Clubs() {
                               </select>
                             </div>
                             <div className="col-span-1 md:col-span-2">
-                              <RefinedField label="Full Address" name="address" value={venueFormData.address} onChange={(e: any) => setVenueFormData({ ...venueFormData, address: e.target.value })} placeholder="The Underground, District 7..." icon={<MapPin className="w-4 h-4" />} />
+                              <LocationPicker value={{ address: venueFormData.address, latitude: venueFormData.latitude, longitude: venueFormData.longitude }} onChange={(loc) => setVenueFormData({ ...venueFormData, address: loc.address, latitude: loc.latitude, longitude: loc.longitude })} placeholder="Search address or place..." />
                             </div>
                           </div>
                         </FormSection>

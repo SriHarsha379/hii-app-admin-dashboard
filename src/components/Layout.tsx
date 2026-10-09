@@ -383,6 +383,13 @@ export default function Layout() {
     setTimeout(() => setIsRefreshing(false), 600);
   };
 
+  const TYPE_META: Record<string, { label: string; route: string }> = {
+    club:  { label: 'Clubs',  route: '/clubs'  },
+    event: { label: 'Events', route: '/events' },
+    user:  { label: 'Users',  route: '/users'  },
+  };
+  const TYPE_ORDER = ['club', 'event', 'user'];
+
   const currentPage = location.pathname.split('/')[1] || 'overview';
 
   const NavLink = ({ to, icon: Icon, children, badge }: any) => {
@@ -671,7 +678,7 @@ export default function Layout() {
                   setIsSearchOpen(true);
                 }}
                 onFocus={() => setIsSearchOpen(true)}
-                className="bg-white/5 border border-white/10 rounded-xl pl-9 pr-10 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary/50 w-full transition-all hover:bg-white/10"
+                className="bg-white/10 border border-white/15 rounded-xl pl-9 pr-10 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary/50 w-full transition-all hover:bg-white/15"
               />
               <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 text-[10px] text-muted-foreground border border-white/10 rounded px-1.5 bg-white/5 font-mono">
                 <Command className="w-2.5 h-2.5" /> K
@@ -683,38 +690,49 @@ export default function Layout() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="absolute top-full mt-2 w-full left-0 bg-card border border-border rounded-xl shadow-2xl overflow-hidden z-50 glass"
+                    className="absolute top-full mt-2 w-full left-0 bg-[#09090B] border border-white/10 rounded-2xl shadow-[0_40px_80px_rgba(0,0,0,0.85)] ring-1 ring-white/5 overflow-hidden z-50"
                   >
                     {isSearching ? (
                       <div className="p-4 text-center text-sm text-muted-foreground">Searching...</div>
                     ) : searchResults && searchResults.length > 0 ? (
-                      <div className="max-h-[400px] overflow-y-auto scrollbar-hide">
-                        <div className="p-2">
-                          {searchResults.map((result: any) => (
-                            <button
-                              key={`${result.type}-${result.id}`}
-                              onClick={() => {
-                                navigate(result.link);
-                                setIsSearchOpen(false);
-                                setSearchQuery('');
-                              }}
-                              className="w-full text-left px-3 py-2 hover:bg-white/5 rounded-lg flex items-center justify-between group transition-colors"
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-[10px] font-bold text-primary border border-primary/20">
-                                  {result.type.charAt(0)}
+                          <div className="max-h-[400px] overflow-y-auto scrollbar-hide p-2">
+                            {TYPE_ORDER
+                              .map((t) => ({ t, items: searchResults.filter((r: any) => r.type === t) }))
+                              .filter((g) => g.items.length > 0)
+                              .map(({ t, items }) => (
+                                <div key={t} className="mb-1">
+                                  <div className="px-3 pt-2 pb-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                    {TYPE_META[t]?.label ?? t}
+                                  </div>
+                                  {items.map((result: any) => (
+                                    <button
+                                      key={`${result.type}-${result.id}`}
+                                      onClick={() => {
+                                        const base = TYPE_META[result.type]?.route ?? result.link;
+                                        navigate(`${base}?focus=${result.id}`);
+                                        setIsSearchOpen(false);
+                                        setSearchQuery('');
+                                      }}
+                                      className="w-full text-left px-3 py-2 hover:bg-white/10 rounded-lg flex items-center justify-between group transition-colors"
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-[10px] font-bold text-primary border border-primary/20 uppercase">
+                                          {String(result.title || '?').charAt(0)}
+                                        </div>
+                                        <div>
+                                          <div className="text-sm font-medium text-white group-hover:text-primary transition-colors">{result.title}</div>
+                                          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                                            {result.role || TYPE_META[result.type]?.label?.replace(/s$/, '') || result.type}
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <ChevronRight className="w-3 h-3 text-muted-foreground group-hover:text-primary transition-transform group-hover:translate-x-1" />
+                                    </button>
+                                  ))}
                                 </div>
-                                <div>
-                                  <div className="text-sm font-medium text-white group-hover:text-primary transition-colors">{result.title}</div>
-                                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{result.type}</div>
-                                </div>
-                              </div>
-                              <ChevronRight className="w-3 h-3 text-muted-foreground group-hover:text-primary transition-transform group-hover:translate-x-1" />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : searchQuery ? (
+                              ))}
+                          </div>
+                        ) : searchQuery ? (
                       <div className="p-4 text-center text-sm text-muted-foreground">No results found for "{searchQuery}"</div>
                     ) : null}
                   </motion.div>

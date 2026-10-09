@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import EventProfilePreview from './EventProfilePreview';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '../context/AuthContext';
+import { API_BASE } from '../lib/apiConfig';
 import { 
   Heart, 
   MapPin, 
@@ -53,6 +56,29 @@ export default function ClubProfilePreview({ club, onClose, onEdit, hideCloseBut
       pastEvents: Array.isArray(base.pastEvents) ? base.pastEvents : (Array.isArray(base.lineup) ? base.lineup : [])
     };
   }, [club]);
+
+  const { token } = useAuth();
+  const vendorId = (club && typeof club.vendor_id === 'object' && club.vendor_id)
+    ? (club.vendor_id._id || club.vendor_id.id)
+    : (club && (club.vendor_id || club._id || club.id)) || '';
+  const UPLOADS_BASE = API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads');
+  const eventImg = (f: any) => !f ? '' : (/^https?:\/\//i.test(f) ? f : (UPLOADS_BASE + '/' + f));
+  const { data: upcomingEvents = [] } = useQuery({
+    queryKey: ['club-upcoming-events', vendorId],
+    enabled: Boolean(token && vendorId),
+    queryFn: async () => {
+      const res = await fetch(API_BASE + '/events/list', { headers: { Authorization: 'Bearer ' + token } });
+      if (!res.ok) return [];
+      const json = await res.json();
+      const list = Array.isArray(json.data) ? json.data : [];
+      const vid = (e: any) => (e && typeof e.vendor_id === 'object' && e.vendor_id) ? (e.vendor_id._id || e.vendor_id.id) : (e && e.vendor_id);
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      return list
+        .filter((e: any) => !e.is_deleted && String(vid(e)) === String(vendorId))
+        .filter((e: any) => { const d = new Date(e.end_date || e.start_date); return !isNaN(d.getTime()) && d >= today; })
+        .sort((a: any, b: any) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
+    },
+  });
 
   return (
     <div className="flex flex-col h-full bg-black text-white relative select-none font-sans overflow-hidden">

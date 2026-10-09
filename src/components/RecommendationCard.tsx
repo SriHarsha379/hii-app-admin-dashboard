@@ -12,6 +12,7 @@ import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
 
 interface RecommendationCardProps {
+  key?: React.Key;
   rec: any;
   isSuperAdmin: boolean;
   onToggleActive: (id: string, active: boolean) => void;

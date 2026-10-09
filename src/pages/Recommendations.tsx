@@ -73,7 +73,7 @@ const toLocalInput = (iso: string | null | undefined) => {
 
 // ─── Phone Preview Card ───────────────────────────────────────────────────────
 
-function PhonePreviewCard({ rec }: { rec: any }) {
+function PhonePreviewCard({ rec }: { rec: any; key?: React.Key }) {
   const resource = rec.resource_id || {};
   const name = rec.type === 'event' ? resource.title : resource.name;
   const city = resource.city || '';
@@ -535,7 +535,7 @@ export default function Recommendations() {
             {/* Filter bar */}
             <div className="flex items-center gap-3 flex-wrap">
               <FilterDropdown
-                label="Type"
+                
                 value={filterType}
                 options={[
                   { label: 'All Types', value: '' },
@@ -779,7 +779,7 @@ export default function Recommendations() {
                         Target City
                       </label>
                       <FilterDropdown
-                        label="Any City"
+                        
                         value={form.target_city}
                         options={[
                           { label: 'Any City', value: '' },
@@ -793,7 +793,7 @@ export default function Recommendations() {
                         Target Gender
                       </label>
                       <FilterDropdown
-                        label="Any Gender"
+                        
                         value={form.target_gender}
                         options={[
                           { label: 'Any Gender', value: '' },
@@ -807,7 +807,7 @@ export default function Recommendations() {
                         Crowd Type
                       </label>
                       <FilterDropdown
-                        label="Any Crowd"
+                        
                         value={form.target_crowd_type}
                         options={[
                           { label: 'Any Crowd', value: '' },

@@ -85,7 +85,7 @@ const filteredEvents = useMemo(() => {
 
 const selectedEvent = useMemo(() => {
   if (!Array.isArray(events)) return undefined;
-  return events.find(e => (e._id || e.id) === selectedEventId);
+  return events.find((e: any) => (e._id || e.id) === selectedEventId);
 }, [events, selectedEventId]);
 
   const handleConfirm = async () => {

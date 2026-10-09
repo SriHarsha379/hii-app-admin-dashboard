@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -54,6 +55,8 @@ import {
 import { cn, apiErrorMessage } from '../lib/utils';
 import { FilterDropdown } from '../components/FilterDropdown';
 import { MultiSelectDropdown } from '../components/MultiSelectDropdown';
+import { SingleSelectDropdown } from '../components/SingleSelectDropdown';
+import { LocationPicker } from '../components/LocationPicker';
 import { FilterPanel } from '../components/FilterPanel';
 import { motion, AnimatePresence } from 'motion/react';
 import { FormSection, RefinedField } from '../components/RefinedForm';
@@ -299,9 +302,26 @@ export default function Events() {
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/events/list`, { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json();
-      return json.data ?? [];
+      const raw = Array.isArray(json.data) ? json.data : [];
+      // Normalize backend field names to what this page renders (name is
+      // stored as venue_name; city is a populated { city_name } object).
+      return raw.map((e: any) => ({
+        ...e,
+        title: e.title || e.venue_name || e.event_name || '',
+        city: (typeof e.city_id === 'object' && e.city_id) ? (e.city_id.city_name || '')
+              : (e.city || (typeof e.city === 'string' ? e.city : '')),
+        date: e.date || e.start_date || '',
+      }));
     },
   });
+
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const focusId = searchParams.get('focus');
+    if (!focusId || !Array.isArray(events)) return;
+    const match = (events as any[]).find((x: any) => String(x._id || x.id) === focusId);
+    if (match) setSelectedEvent(match);
+  }, [searchParams, events]);
 
   const { data: cities } = useQuery({
     queryKey: ['cities'],
@@ -493,7 +513,8 @@ export default function Events() {
   const eventList        = Array.isArray(events) ? events : [];
 
   const filteredEvents = eventList.filter((e: any) => {
-    const matchesSearch  = e.title?.toLowerCase().includes(searchTerm.toLowerCase()) || e.city?.toLowerCase().includes(searchTerm.toLowerCase());
+    const _name = (e.venue_name || e.title || e.event_name || '').toLowerCase();
+    const matchesSearch  = _name.includes(searchTerm.toLowerCase()) || (e.city || '').toLowerCase().includes(searchTerm.toLowerCase());
     let   matchesStatus  = true;
     if      (filterStatus === 'ACTIVE')    matchesStatus = e.status === 'LIVE' || e.status === 'UPCOMING';
     else if (filterStatus === 'PAST')      matchesStatus = e.status === 'COMPLETED';
@@ -568,8 +589,7 @@ export default function Events() {
       if (!eventFormData.end_time)    missing.push('End Time');
       if (!eventFormData.city)        missing.push('City');
       if (!eventFormData.address)     missing.push('Address');
-      if (!eventFormData.latitude)    missing.push('Latitude');
-      if (!eventFormData.longitude)   missing.push('Longitude');
+      if (!eventFormData.latitude || !eventFormData.longitude) missing.push('Location (pick a point on the map)');
       if (!isEditingEvent && !posterFile) missing.push('Main Poster image');
       if (missing.length) { setSubmitError(`Please fill in: ${missing.join(', ')}`); return; }
 
@@ -1333,7 +1353,7 @@ export default function Events() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                         <div className="space-y-3">
                           <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">City</label>
-                          <FilterDropdown value={eventFormData.city} onChange={(val) => setEventFormData({ ...eventFormData, city: val })} options={cities?.slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((c: any) => ({ label: c.city_name, value: c._id })) || []} placeholder="Select city" buttonClassName="py-4 px-8 rounded-2xl text-sm bg-[#09090B] border-white/5 hover:border-white/10 text-white/60" />
+                          <SingleSelectDropdown value={eventFormData.city} onChange={(val) => setEventFormData({ ...eventFormData, city: val })} options={cities?.slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((c: any) => ({ label: c.city_name, value: c._id })) || []} placeholder="Select city" />
                         </div>
                         <div className="space-y-3">
                           <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Venue</label>
@@ -1345,8 +1365,8 @@ export default function Events() {
                             </div>
                           ) : (
                             <div className="relative">
-                              <Building2 className="absolute left-6 top-1/2 -translate-y-1/2 text-white/20 w-4 h-4 z-10" />
-                              <FilterDropdown value={eventFormData.vendor_id || eventFormData.venue_id} onChange={(vendorId) => setEventFormData({ ...eventFormData, vendor_id: vendorId, venue_id: vendorId })} options={vendorList.map((v: any) => ({ label: v.name, value: v._id || v.id }))} placeholder="Select venue" buttonClassName="py-4 pl-14 pr-8 rounded-2xl text-sm bg-[#09090B] border-white/5 hover:border-white/10 text-white/60" />
+                              
+                              <SingleSelectDropdown value={eventFormData.vendor_id || eventFormData.venue_id} onChange={(vendorId) => setEventFormData({ ...eventFormData, vendor_id: vendorId, venue_id: vendorId })} options={vendorList.map((v: any) => ({ label: v.name, value: v._id || v.id }))} placeholder="Select venue" />
                             </div>
                           )}
                         </div>
@@ -1368,13 +1388,11 @@ export default function Events() {
                       </div>
                     </FormSection>
                     <FormSection title="Location" icon={<MapPin className="w-4 h-4" />}>
-                      <div className="space-y-8">
-                        <RefinedField label="Address" name="address" value={eventFormData.address} onChange={(e: any) => setEventFormData({ ...eventFormData, address: e.target.value })} placeholder="Street address / venue location" icon={<MapPin className="w-4 h-4" />} />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                          <RefinedField label="Latitude" name="latitude" type="number" value={eventFormData.latitude} onChange={(e: any) => setEventFormData({ ...eventFormData, latitude: e.target.value })} placeholder="e.g. 19.0760" icon={<MapPin className="w-4 h-4" />} />
-                          <RefinedField label="Longitude" name="longitude" type="number" value={eventFormData.longitude} onChange={(e: any) => setEventFormData({ ...eventFormData, longitude: e.target.value })} placeholder="e.g. 72.8777" icon={<MapPin className="w-4 h-4" />} />
-                        </div>
-                      </div>
+                      <LocationPicker
+                        value={{ address: eventFormData.address, latitude: eventFormData.latitude, longitude: eventFormData.longitude }}
+                        onChange={(loc) => setEventFormData({ ...eventFormData, address: loc.address, latitude: loc.latitude, longitude: loc.longitude })}
+                        placeholder="Search address or place..."
+                      />
                     </FormSection>
                   </motion.div>
                 )}
