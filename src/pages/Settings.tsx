@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { digitsMax, isPhone10 } from '../lib/inputRules';
 import { useAuth } from '../context/AuthContext';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   User,
@@ -72,7 +73,40 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState('profile');
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [cities, setCities] = useState(['Mumbai', 'Delhi', 'Bangalore', 'Goa']);
+  const queryClient = useQueryClient();
+  const { data: cities = [] } = useQuery({
+    queryKey: ['admin-cities'],
+    enabled: !!token,
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/city/get_all_cities?scope=all`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return Array.isArray(json.data) ? json.data : [];
+    },
+  });
+  const createCityMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const body = new FormData();
+      body.append('city_name', name);
+      const res = await fetch(`${API_BASE}/city/create_city`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` }, body,
+      });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j?.errors || j?.message || 'Failed to add city'); }
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-cities'] }),
+    onError: (e: any) => alert(e.message || 'Failed to add city'),
+  });
+  const deleteCityMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`${API_BASE}/city/delete_city/${id}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j?.errors || j?.message || 'Failed to delete city'); }
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-cities'] }),
+    onError: (e: any) => alert(e.message || 'Failed to delete city'),
+  });
 
   // FIXED: these toggles used `defaultChecked` (uncontrolled) with no
   // onChange at all — they'd visually flip on click but nothing was ever
@@ -384,7 +418,7 @@ export default function Settings() {
                         name="phone"
                         type="tel"
                         value={profile.phone}
-                        onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                        onChange={(e) => setProfile({ ...profile, phone: digitsMax(e.target.value) })}
                         icon={<Phone className="w-4 h-4" />}
                         placeholder="+91..."
                       />
@@ -673,31 +707,22 @@ export default function Settings() {
                           type="text"
                           value={newCity}
                           onChange={(e) => setNewCity(e.target.value)}
-                          placeholder="Enter city name..."
+                          placeholder="Search cities..." disabled
                           className="w-full bg-[#09090B] border border-white/5 rounded-[28px] pl-14 pr-8 py-5 text-sm text-white focus:outline-none focus:border-orange-400 transition-all placeholder:text-white/10 font-medium"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && newCity.trim()) {
-                              setCities([...cities, newCity.trim()]);
-                              setNewCity('');
-                            }
-                          }}
+
                         />
                       </div>
                       <button
-                        onClick={() => {
-                          if (newCity.trim()) {
-                            setCities([...cities, newCity.trim()]);
-                            setNewCity('');
-                          }
-                        }}
-                        className="w-16 h-16 rounded-[28px] bg-orange-400/10 text-orange-400 border border-orange-400/20 hover:bg-orange-400 transition-all hover:text-white flex items-center justify-center shadow-xl active:scale-95"
+                        disabled
+                        title="Adding new cities needs state & map coordinates — manage existing cities here for now."
+                        className="w-16 h-16 rounded-[28px] bg-white/5 text-white/20 border border-white/10 flex items-center justify-center shadow-xl cursor-not-allowed"
                       >
                         <Plus className="w-7 h-7" />
                       </button>
                     </div>
 
                     <div className="grid grid-cols-1 gap-4">
-                      {cities.map((city, index) => (
+                      {cities.map((city: any, index: number) => (
                         <motion.div
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -710,12 +735,12 @@ export default function Settings() {
                               <MapPin className="w-5 h-5" />
                             </div>
                             <div>
-                              <span className="text-[14px] font-black text-white uppercase tracking-widest">{city}</span>
+                              <span className="text-[14px] font-black text-white uppercase tracking-widest">{city.city_name}</span>
                               <p className="text-[8px] text-white/20 font-black uppercase tracking-widest block">Active City</p>
                             </div>
                           </div>
                           <button
-                            onClick={() => setCities(cities.filter((_, i) => i !== index))}
+                            onClick={() => { if (confirm('Delete this city?')) deleteCityMutation.mutate(city._id); }}
                             className="w-10 h-10 rounded-xl hover:bg-red-500/10 text-white/10 hover:text-red-400 transition-all flex items-center justify-center"
                           >
                             <Trash2 className="w-4 h-4" />

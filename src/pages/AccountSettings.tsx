@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { digitsMax, isPhone10 } from '../lib/inputRules';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -149,7 +150,8 @@ export default function AccountSettings() {
     formData.description !== initialFormData.description;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const value = e.target.name === 'phone' ? digitsMax(e.target.value) : e.target.value;
+    setFormData(prev => ({ ...prev, [e.target.name]: value }));
     if (isSaved) setIsSaved(false);
   };
 
@@ -195,6 +197,7 @@ export default function AccountSettings() {
   // anything at all — it just logged the admin out, silently discarding
   // whatever they'd typed. Now genuinely saves the changed fields.
   const handleConfirmSubmitForReview = async () => {
+    if (formData.phone && !isPhone10(formData.phone)) { alert('Enter a valid 10-digit phone number'); return; }
     try {
       await updateVendorMutation.mutateAsync({
         name: formData.venueName,

@@ -1319,7 +1319,7 @@ export default function Events() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8" id="modal-scroll-body">
+            <div className="flex-1 overflow-y-auto p-8 scrollbar-hide" id="modal-scroll-body">
               {/* Stepper */}
               <div className="flex items-center justify-between relative px-20">
                 <div className="absolute left-20 right-20 top-6 h-1 bg-white/5 z-0 rounded-full" />

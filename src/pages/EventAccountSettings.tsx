@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { digitsMax, isPhone10 } from '../lib/inputRules';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
@@ -172,7 +173,8 @@ export default function EventAccountSettings() {
         [parent]: { ...prev[parent as keyof typeof prev] as object, [child]: value }
       }));
     } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
+      const v = (name === 'phone' || name === 'businessPhone') ? digitsMax(value) : value;
+      setFormData(prev => ({ ...prev, [name]: v }));
     }
     if (isSaved) setIsSaved(false);
   };
@@ -228,6 +230,7 @@ export default function EventAccountSettings() {
   // promising that. Implementing the full "requires re-approval" workflow
   // is a separate, larger decision — not scope-creeping into it here.
   const handleConfirmSubmitForReview = async () => {
+    if (formData.businessPhone && !isPhone10(formData.businessPhone)) { alert('Enter a valid 10-digit phone number'); return; }
     try {
       // FIXED: hasBox1Changes tracked edits to companyType, businessEmail,
       // businessPhone, and website — but this payload only ever sent

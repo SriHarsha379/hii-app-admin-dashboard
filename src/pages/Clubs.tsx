@@ -122,7 +122,7 @@ export default function Clubs() {
 
   const [venueStep, setVenueStep] = useState(1);
   const [venueFormData, setVenueFormData] = useState<any>({
-    name: '', type: '', email: '', capacity: '', contactName: '',
+    name: '', type: [], email: '', capacity: '', contactName: '',
     phone: '', description: '', city: '', address: '', vendor_id: '',
     landscape_urls: [''], portrait_url: '',
     // Per-club reservation options (issue: "every club will have
@@ -233,7 +233,7 @@ export default function Clubs() {
 
   const resetVenueForm = () => {
     setVenueFormData({
-      name: '', type: '', email: '', capacity: '', contactName: '',
+      name: '', type: [], email: '', capacity: '', contactName: '',
       phone: '', description: '', city: '', address: '', vendor_id: '',
       landscape_urls: [''], portrait_url: '',
       table_reservation_fee: '', bill_discount_percentage: '', tax_percentage: '',
@@ -252,7 +252,7 @@ export default function Clubs() {
   const openEditVenue = (club: any) => {
     setVenueFormData({
       name: club.name || '',
-      type: Array.isArray(club.category_ids) ? (club.category_ids[0]?._id || club.category_ids[0] || '') : '',
+      type: Array.isArray(club.category_ids) ? club.category_ids.map((c: any) => c?._id || c) : [],
       email: club.email || '',
       capacity: club.capacity || '',
       contactName: club.contactName || '',
@@ -384,13 +384,14 @@ export default function Clubs() {
       const vendorId = selectedClub ? (selectedClub.vendor_id || selectedClub._id) : venueFormData.vendor_id;
       if (!vendorId) throw new Error('Select a vendor/organiser for this venue');
       if (!venueFormData.city) throw new Error('Select a city');
-      if (!venueFormData.type) throw new Error('Select a category');
+      if (venueFormData.phone && !/^\d{10}$/.test(venueFormData.phone)) throw new Error('Enter a valid 10-digit phone number');
+      if (!venueFormData.type || venueFormData.type.length === 0) throw new Error('Select a category');
       if (!venuePortraitFile && !venueFormData.portrait_url) throw new Error('Upload a venue image');
 
       const body = new FormData();
       body.append('venue_name', venueFormData.name);
       body.append('city_id', venueFormData.city);
-      body.append('category_ids', JSON.stringify([venueFormData.type]));
+      body.append('category_ids', JSON.stringify(Array.isArray(venueFormData.type) ? venueFormData.type : [venueFormData.type]));
       body.append('open_days', JSON.stringify(activeDays.map((h) => h.day)));
       body.append('start_time', start_time || '');
       body.append('end_time', end_time || '');
@@ -1694,14 +1695,16 @@ export default function Clubs() {
                             </div>
                             <div className="space-y-4 group/field">
                               <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Category</label>
-                              <select value={venueFormData.type} onChange={(e) => setVenueFormData({ ...venueFormData, type: e.target.value })} className="w-full bg-[#09090B] border border-white/5 rounded-[24px] px-8 py-5 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 appearance-none font-medium">
-                                <option value="">Select Category...</option>
-                                {venueTypes?.slice().sort((a: any, b: any) => (a.category_name || '').localeCompare(b.category_name || '')).map((type: any) => <option key={type._id} value={type._id}>{type.category_name}</option>)}
-                              </select>
+                              <MultiSelectDropdown
+                                options={venueTypes?.slice().sort((a: any, b: any) => (a.category_name || '').localeCompare(b.category_name || '')).map((t: any) => ({ label: t.category_name, value: t._id })) || []}
+                                value={Array.isArray(venueFormData.type) ? venueFormData.type : (venueFormData.type ? [venueFormData.type] : [])}
+                                onChange={(v: any) => setVenueFormData({ ...venueFormData, type: v })}
+                                placeholder="Select categories"
+                              />
                             </div>
                             <RefinedField label="Contact Email" name="email" type="email" value={venueFormData.email} onChange={(e: any) => setVenueFormData({ ...venueFormData, email: e.target.value })} placeholder="ops@venue.com" icon={<Mail className="w-4 h-4" />} />
                             <RefinedField label="Capacity" name="capacity" type="number" value={venueFormData.capacity} onChange={(e: any) => setVenueFormData({ ...venueFormData, capacity: e.target.value })} placeholder="3500" icon={<Users className="w-4 h-4" />} />
-                            <RefinedField label="Contact Number" name="phone" value={venueFormData.phone} onChange={(e: any) => setVenueFormData({ ...venueFormData, phone: e.target.value })} placeholder="+91 00000 00000" icon={<Phone className="w-4 h-4" />} />
+                            <RefinedField label="Contact Number" name="phone" value={venueFormData.phone} onChange={(e: any) => setVenueFormData({ ...venueFormData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} placeholder="10-digit mobile number" icon={<Phone className="w-4 h-4" />} />
                           </div>
                         </FormSection>
                         <FormSection title="Reservation Options" icon={<Ticket className="w-4 h-4" />}>
@@ -1850,7 +1853,15 @@ export default function Clubs() {
                     Cancel
                   </button>
                   {venueStep < 3 ? (
-                    <button onClick={() => setVenueStep((v) => v + 1)} className="px-14 py-5 rounded-[24px] bg-white text-black text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-4 group">
+                    <button onClick={() => {
+                      if (venueStep === 1) {
+                        if (!venueFormData.name) { alert('Enter a club name'); return; }
+                        if (!selectedClub && !venueFormData.vendor_id) { alert('Select an organiser / vendor'); return; }
+                        if (!venueFormData.city) { alert('Select a city'); return; }
+                        if (!venueFormData.type || venueFormData.type.length === 0) { alert('Select a category'); return; }
+                      }
+                      setVenueStep((v) => v + 1);
+                    }} className="px-14 py-5 rounded-[24px] bg-white text-black text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-4 group">
                       Next Step <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                     </button>
                   ) : (

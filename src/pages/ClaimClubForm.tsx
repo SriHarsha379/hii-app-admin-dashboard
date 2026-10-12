@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { digitsMax, isPhone10 } from '../lib/inputRules';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { useQuery } from '@tanstack/react-query';
@@ -170,7 +171,8 @@ export default function ClaimClubForm() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     if (!isEditing) return;
-    setFormData((prev: any) => ({ ...prev, [e.target.name]: e.target.value }));
+    const value = e.target.name === 'phone' ? digitsMax(e.target.value) : e.target.value;
+    setFormData((prev: any) => ({ ...prev, [e.target.name]: value }));
   };
 
   // FIXED: was completely fake — called setIsSuccess(true) with zero
@@ -187,6 +189,10 @@ export default function ClaimClubForm() {
   // land on Pending Approval or their real dashboard, based on this
   // vendor's actual verification status.
   const handleClaim = async () => {
+    if (isEditing && formData.phone && !isPhone10(formData.phone)) {
+      setClaimError('Enter a valid 10-digit phone number');
+      return;
+    }
     setClaimError(null);
     setIsClaiming(true);
     try {

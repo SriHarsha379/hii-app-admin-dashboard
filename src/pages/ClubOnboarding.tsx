@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { digitsMax, isPhone10 } from '../lib/inputRules';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { FormSection, RefinedField } from '../components/RefinedForm';
@@ -306,6 +307,7 @@ export default function ClubOnboarding() {
       if (!selectedCity) errors.city = 'Select a city.';
       if (!venueFormData.email) errors.email = 'Email is required.';
       if (!venueFormData.phone) errors.phone = 'Phone number is required.';
+      else if (!isPhone10(venueFormData.phone)) errors.phone = 'Enter a valid 10-digit phone number.';
       if (!venueFormData.password || venueFormData.password.length < 6) errors.password = 'At least 6 characters required.';
       if (venueFormData.password !== venueFormData.confirmPassword) errors.confirmPassword = 'Passwords do not match.';
       if (!emailVerified || emailChangedSinceVerify) errors.email = errors.email || 'Please verify your email before continuing.';
@@ -351,6 +353,8 @@ export default function ClubOnboarding() {
       }
       if (!venueFormData.phone) {
         errors.phone = 'Phone number is required.';
+      } else if (!isPhone10(venueFormData.phone)) {
+        errors.phone = 'Enter a valid 10-digit phone number.';
       }
       if (!venueFormData.password || venueFormData.password.length < 6) {
         errors.password = 'At least 6 characters required.';
@@ -892,7 +896,7 @@ export default function ClubOnboarding() {
                           </>
                         )}
                       </div>
-                      <RefinedField label="Phone Number" name="phone" value={venueFormData.phone} onChange={(e: any) => { setVenueFormData({ ...venueFormData, phone: e.target.value }); setFieldErrors((prev) => ({ ...prev, phone: '' })); }} placeholder="+91 00000 00000" icon={<Phone className="w-4 h-4" />} error={fieldErrors.phone} />
+                      <RefinedField label="Phone Number" name="phone" value={venueFormData.phone} onChange={(e: any) => { setVenueFormData({ ...venueFormData, phone: digitsMax(e.target.value) }); setFieldErrors((prev) => ({ ...prev, phone: '' })); }} placeholder="10-digit mobile number" icon={<Phone className="w-4 h-4" />} error={fieldErrors.phone} />
                       <RefinedField label="Contact Person" name="contactName" value={venueFormData.contactName} onChange={(e: any) => setVenueFormData({ ...venueFormData, contactName: e.target.value })} placeholder="Full Name" icon={<User className="w-4 h-4" />} />
                       <RefinedField label="Choose a Password" name="password" type="password" value={venueFormData.password} onChange={(e: any) => { setVenueFormData({ ...venueFormData, password: e.target.value }); setFieldErrors((prev) => ({ ...prev, password: '' })); }} placeholder="At least 6 characters" icon={<Lock className="w-4 h-4" />} error={fieldErrors.password} />
                       <RefinedField label="Confirm Password" name="confirmPassword" type="password" value={venueFormData.confirmPassword} onChange={(e: any) => { setVenueFormData({ ...venueFormData, confirmPassword: e.target.value }); setFieldErrors((prev) => ({ ...prev, confirmPassword: '' })); }} placeholder="Re-enter password" icon={<Lock className="w-4 h-4" />} error={fieldErrors.confirmPassword} />

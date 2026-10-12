@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { digitsMax, isPhone10 } from '../lib/inputRules';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -208,7 +209,8 @@ export default function EventAdminOnboarding() {
         [parent]: { ...prev[parent as keyof typeof prev] as object, [child]: value }
       }));
     } else {
-      setFormData(prev => ({ ...prev, [name as keyof typeof prev]: value }));
+      const v = name === 'phone' ? digitsMax(value) : value;
+      setFormData(prev => ({ ...prev, [name as keyof typeof prev]: v }));
     }
   };
 
@@ -232,6 +234,10 @@ export default function EventAdminOnboarding() {
     setSubmitError(null);
     if (!formData.companyName || !formData.email || !formData.phone) {
       setSubmitError('Company name, email, and phone number are required.');
+      return;
+    }
+    if (!isPhone10(formData.phone)) {
+      setSubmitError('Enter a valid 10-digit phone number.');
       return;
     }
     if (!emailVerified || emailChangedSinceVerify) {
