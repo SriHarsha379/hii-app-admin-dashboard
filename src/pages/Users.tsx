@@ -105,6 +105,12 @@ export default function Users() {
       const res = await fetch(`${API_BASE}/users/get_all_user`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      const json = await res.json();
+      // Backend returns { success, message, data: { users, total, page, limit } }
+      return json.data?.users ?? [];
+    }
+  });
+
   const [searchParams] = useSearchParams();
   useEffect(() => {
     const focusId = searchParams.get('focus');
@@ -112,11 +118,6 @@ export default function Users() {
     const match = (users as any[]).find((x: any) => String(x._id || x.id) === focusId);
     if (match) setSelectedUser(match);
   }, [searchParams, users]);
-      const json = await res.json();
-      // Backend returns { success, message, data: { users, total, page, limit } }
-      return json.data?.users ?? [];
-    }
-  });
 
   const { data: cities } = useQuery({
     queryKey: ['cities-all'],

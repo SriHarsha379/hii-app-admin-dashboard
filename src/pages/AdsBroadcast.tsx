@@ -218,6 +218,7 @@ export default function AdsBroadcast() {
         body.append('video_height', adFormData.videoHeight);
       }
       if (adFormData.name) body.append('ad_name', adFormData.name);
+      if (adFormData.startDate) body.append('start_date', adFormData.startDate);
       body.append('expiry_date', expiryDate);
       if (adFormData.linkUrl) body.append('link_url', adFormData.linkUrl);
 
@@ -271,6 +272,7 @@ export default function AdsBroadcast() {
       }
       if (expiryDate) body.append('expiry_date', expiryDate);
       body.append('ad_name', adFormData.name || '');
+      body.append('start_date', adFormData.startDate || '');
       body.append('link_url', adFormData.linkUrl || '');
 
       const res = await fetch(`${API_BASE}/ads/update/${editingAdId}`, {
@@ -310,7 +312,7 @@ export default function AdsBroadcast() {
     setEditingAdId(ad._id || ad.id);
     setAdFormData({
       name: ad.ad_name || '', city: 'all', audience: 'all',
-      startDate: '',
+      startDate: ad.start_date ? new Date(ad.start_date).toISOString().slice(0, 10) : '',
       endDate: ad.expiry_date ? new Date(ad.expiry_date).toISOString().slice(0, 10) : '',
       untilPaused: false,
       imageUrl: adAssetUrl(ad.ad_image),

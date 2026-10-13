@@ -74,6 +74,7 @@ import { FilterDropdown } from '../components/FilterDropdown';
 import { FilterPanel } from '../components/FilterPanel';
 import { FormSection, RefinedField } from '../components/RefinedForm';
 import { MultiSelectDropdown } from '../components/MultiSelectDropdown';
+import { SingleSelectDropdown } from '../components/SingleSelectDropdown';
 import { LocationPicker } from '../components/LocationPicker';
 import { motion, AnimatePresence } from 'motion/react';
 import ClubProfilePreview from '../components/ClubProfilePreview';
@@ -384,6 +385,7 @@ export default function Clubs() {
       const vendorId = selectedClub ? (selectedClub.vendor_id || selectedClub._id) : venueFormData.vendor_id;
       if (!vendorId) throw new Error('Select a vendor/organiser for this venue');
       if (!venueFormData.city) throw new Error('Select a city');
+      if (!venueFormData.address) throw new Error('Pick a location on the map (address is required)');
       if (venueFormData.phone && !/^\d{10}$/.test(venueFormData.phone)) throw new Error('Enter a valid 10-digit phone number');
       if (!venueFormData.type || venueFormData.type.length === 0) throw new Error('Select a category');
       if (!venuePortraitFile && !venueFormData.portrait_url) throw new Error('Upload a venue image');
@@ -391,7 +393,9 @@ export default function Clubs() {
       const body = new FormData();
       body.append('venue_name', venueFormData.name);
       body.append('city_id', venueFormData.city);
-      body.append('category_ids', JSON.stringify(Array.isArray(venueFormData.type) ? venueFormData.type : [venueFormData.type]));
+      (Array.isArray(venueFormData.type) ? venueFormData.type : [venueFormData.type])
+        .filter(Boolean)
+        .forEach((id: string) => body.append('category_ids', id));
       body.append('open_days', JSON.stringify(activeDays.map((h) => h.day)));
       body.append('start_time', start_time || '');
       body.append('end_time', end_time || '');
@@ -400,7 +404,7 @@ export default function Clubs() {
       body.append('longitude', venueFormData.longitude || '');
       body.append('about', venueFormData.description || '');
       body.append('table_reservation_fee', venueFormData.table_reservation_fee || '0');
-      body.append('bill_discount_percentage', venueFormData.bill_discount_percentage || '0');
+      body.append('bill_discount_percentage', String(Math.max(0, Math.min(100, Number(venueFormData.bill_discount_percentage) || 0))));
       body.append('tax_percentage', venueFormData.tax_percentage || '0');
       if (!isEditingVenue) body.append('vendor_id', vendorId);
       if (venuePortraitFile) body.append('venue_image', venuePortraitFile);
@@ -438,6 +442,11 @@ export default function Clubs() {
       const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      const json = await res.json();
+      return json.data ?? [];
+    },
+  });
+
   const [searchParams] = useSearchParams();
   useEffect(() => {
     const focusId = searchParams.get('focus');
@@ -445,10 +454,6 @@ export default function Clubs() {
     const match = (clubs as any[]).find((x: any) => String(x._id || x.id) === focusId);
     if (match) { setSelectedClub(withVenueData(match)); setIsViewingVenue(true); }
   }, [searchParams, clubs]);
-      const json = await res.json();
-      return json.data ?? [];
-    },
-  });
 
   // The `clubs` list above is Vendor (organiser account) data only — name,
   // email, city, verification status. It has none of the actual venue
@@ -1686,10 +1691,12 @@ export default function Clubs() {
                                   <span className="ml-auto text-[9px] font-black uppercase tracking-widest text-white/20 shrink-0">Locked to your account</span>
                                 </div>
                               ) : (
-                                <select value={venueFormData.vendor_id} onChange={(e) => setVenueFormData({ ...venueFormData, vendor_id: e.target.value })} className="w-full bg-[#09090B] border border-white/5 rounded-[24px] px-8 py-5 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 appearance-none font-medium">
-                                  <option value="">Select vendor...</option>
-                                  {vendorListForVenue.map((v: any) => <option key={v._id || v.id} value={v._id || v.id}>{v.name}</option>)}
-                                </select>
+                                <SingleSelectDropdown
+                                  options={(vendorListForVenue || []).map((v: any) => ({ label: v.name, value: v._id || v.id }))}
+                                  value={venueFormData.vendor_id}
+                                  onChange={(val: string) => setVenueFormData({ ...venueFormData, vendor_id: val })}
+                                  placeholder="Select vendor..."
+                                />
                               )}
                               <p className="text-[9px] text-white/20 ml-1">Note: each vendor can only have one venue on the backend.</p>
                             </div>
@@ -1713,7 +1720,7 @@ export default function Clubs() {
                           </p>
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                             <RefinedField label="Cover Charge (₹)" name="table_reservation_fee" type="number" value={venueFormData.table_reservation_fee} onChange={(e: any) => setVenueFormData({ ...venueFormData, table_reservation_fee: e.target.value })} placeholder="0" icon={<Wallet className="w-4 h-4" />} />
-                            <RefinedField label="Bill Discount (%)" name="bill_discount_percentage" type="number" value={venueFormData.bill_discount_percentage} onChange={(e: any) => setVenueFormData({ ...venueFormData, bill_discount_percentage: e.target.value })} placeholder="0" icon={<TrendingDown className="w-4 h-4" />} />
+                            <RefinedField label="Bill Discount (%)" name="bill_discount_percentage" type="number" value={venueFormData.bill_discount_percentage} onChange={(e: any) => { const v = e.target.value === '' ? '' : String(Math.max(0, Math.min(100, Number(e.target.value)))); setVenueFormData({ ...venueFormData, bill_discount_percentage: v }); }} placeholder="0" icon={<TrendingDown className="w-4 h-4" />} />
                             <RefinedField label="Tax (%)" name="tax_percentage" type="number" value={venueFormData.tax_percentage} onChange={(e: any) => setVenueFormData({ ...venueFormData, tax_percentage: e.target.value })} placeholder="0" icon={<BarChart3 className="w-4 h-4" />} />
                           </div>
                         </FormSection>
@@ -1732,10 +1739,12 @@ export default function Clubs() {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                             <div className="space-y-4 group/field">
                               <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">City</label>
-                              <select value={venueFormData.city} onChange={(e) => setVenueFormData({ ...venueFormData, city: e.target.value })} className="w-full bg-[#09090B] border border-white/5 rounded-[24px] px-8 py-5 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 appearance-none font-medium">
-                                <option value="">Select City...</option>
-                                {(Array.isArray(cities) ? cities : []).slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((city: any) => <option key={city._id} value={city._id}>{city.city_name}</option>)}
-                              </select>
+                              <SingleSelectDropdown
+                                options={(Array.isArray(cities) ? cities : []).slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((city: any) => ({ label: city.city_name, value: city._id }))}
+                                value={venueFormData.city}
+                                onChange={(val: string) => setVenueFormData({ ...venueFormData, city: val })}
+                                placeholder="Select City..."
+                              />
                             </div>
                             <div className="col-span-1 md:col-span-2">
                               <LocationPicker value={{ address: venueFormData.address, latitude: venueFormData.latitude, longitude: venueFormData.longitude }} onChange={(loc) => setVenueFormData({ ...venueFormData, address: loc.address, latitude: loc.latitude, longitude: loc.longitude })} placeholder="Search address or place..." />
@@ -1857,9 +1866,9 @@ export default function Clubs() {
                       if (venueStep === 1) {
                         if (!venueFormData.name) { alert('Enter a club name'); return; }
                         if (!selectedClub && !venueFormData.vendor_id) { alert('Select an organiser / vendor'); return; }
-                        if (!venueFormData.city) { alert('Select a city'); return; }
                         if (!venueFormData.type || venueFormData.type.length === 0) { alert('Select a category'); return; }
                       }
+                      if (venueStep === 2 && !venueFormData.city) { alert('Select a city'); return; }
                       setVenueStep((v) => v + 1);
                     }} className="px-14 py-5 rounded-[24px] bg-white text-black text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-4 group">
                       Next Step <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />

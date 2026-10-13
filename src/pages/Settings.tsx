@@ -707,15 +707,14 @@ export default function Settings() {
                           type="text"
                           value={newCity}
                           onChange={(e) => setNewCity(e.target.value)}
-                          placeholder="Search cities..." disabled
+                          placeholder="Search or add a city..."
                           className="w-full bg-[#09090B] border border-white/5 rounded-[28px] pl-14 pr-8 py-5 text-sm text-white focus:outline-none focus:border-orange-400 transition-all placeholder:text-white/10 font-medium"
 
                         />
                       </div>
                       <button
-                        disabled
-                        title="Adding new cities needs state & map coordinates — manage existing cities here for now."
-                        className="w-16 h-16 rounded-[28px] bg-white/5 text-white/20 border border-white/10 flex items-center justify-center shadow-xl cursor-not-allowed"
+                        onClick={() => { if (newCity.trim()) { createCityMutation.mutate(newCity.trim()); setNewCity(''); } }}
+                        className="w-16 h-16 rounded-[28px] bg-orange-400/10 text-orange-400 border border-orange-400/20 hover:bg-orange-400 transition-all hover:text-white flex items-center justify-center shadow-xl active:scale-95"
                       >
                         <Plus className="w-7 h-7" />
                       </button>
