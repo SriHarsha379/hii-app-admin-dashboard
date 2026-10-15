@@ -911,7 +911,7 @@ export default function Clubs() {
                   </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-10 lg:p-12 scrollbar-hide">
+                <div className="flex-1 overflow-y-auto p-10 lg:p-12 custom-scrollbar">
                   <div className="flex items-center justify-between mb-16 relative px-4">
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-white/5 rounded-full z-0" />
                     <div
@@ -1658,7 +1658,7 @@ export default function Clubs() {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-10 lg:p-12 scrollbar-hide">
+              <div className="flex-1 overflow-y-auto p-10 lg:p-12 custom-scrollbar">
                 <div className="flex items-center justify-between mb-16 relative px-4">
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-white/5 rounded-full z-0" />
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary rounded-full z-0 transition-all duration-700 shadow-[0_0_15px_rgba(255,45,154,0.5)]" style={{ width: `${((venueStep - 1) / 2) * 100}%` }} />

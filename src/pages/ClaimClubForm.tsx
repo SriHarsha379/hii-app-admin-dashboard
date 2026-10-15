@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { cn, apiErrorMessage } from '../lib/utils';
 import { FormSection, RefinedField } from '../components/RefinedForm';
+import { MultiSelectDropdown } from '../components/MultiSelectDropdown';
 
 import { API_BASE } from '../lib/apiConfig';
 export default function ClaimClubForm() {
@@ -114,7 +115,7 @@ export default function ClaimClubForm() {
     email: '',
     phone: '',
     contactPerson: '',
-    venueType: '',
+    categoryIds: [] as string[],
     capacity: '',
     description: ''
   });
@@ -134,9 +135,9 @@ export default function ClaimClubForm() {
     // field and reads correctly already; if it shows blank, that's an
     // honest reflection of this vendor genuinely not having that filled
     // in yet, not a bug in this form.
-    const venueTypeId = matchedVenue?.category_ids?.[0]
-      ? (typeof matchedVenue.category_ids[0] === 'object' ? matchedVenue.category_ids[0]?._id : matchedVenue.category_ids[0])
-      : '';
+    const categoryIds = Array.isArray(matchedVenue?.category_ids)
+      ? matchedVenue.category_ids.map((c: any) => (typeof c === 'object' ? c?._id : c)).filter(Boolean)
+      : [];
     setFormData({
       name: club.name || '',
       city: (typeof club.city === 'object' ? club.city?.city_name : club.city) || '',
@@ -144,7 +145,7 @@ export default function ClaimClubForm() {
       email: club.email || '',
       phone: club.phone_number || '',
       contactPerson: club.contact_person || '',
-      venueType: venueTypeId,
+      categoryIds,
       capacity: club.capacity ? String(club.capacity) : '',
       description: club.description || ''
     });
@@ -167,7 +168,6 @@ export default function ClaimClubForm() {
   });
 
   const venueTypeOptions = Array.isArray(venueTypes) ? venueTypes : [];
-  const selectedVenueTypeExists = venueTypeOptions.some((type: any) => type._id === formData.venueType);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     if (!isEditing) return;
@@ -226,6 +226,19 @@ export default function ClaimClubForm() {
       const claimJson = await claimRes.json().catch(() => ({}));
       if (!claimRes.ok || claimJson.success === false) {
         throw new Error(apiErrorMessage(claimJson, 'Could not claim this listing'));
+      }
+      // Categories live on the Venue, not the Vendor. Save them after the
+      // claim so ownership is linked; never block the claim if this fails.
+      if (isEditing && matchedVenue?._id) {
+        try {
+          const vbody = new FormData();
+          formData.categoryIds.forEach((id: string) => vbody.append('category_ids', id));
+          await fetch(`${API_BASE}/venue/update_venue/${matchedVenue._id}`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${token}` },
+            body: vbody,
+          });
+        } catch { /* non-blocking */ }
       }
       updateUser({ organisation: claimJson?.data?.organisation || club.name });
       setIsSuccess(true);
@@ -446,27 +459,25 @@ export default function ClaimClubForm() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                 <div className="space-y-4 group/field">
                   <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Venue Type</label>
-                  <div className="relative">
-                    <select
-                      name="venueType"
-                      value={formData.venueType}
-                      onChange={handleChange}
-                      disabled={!isEditing}
-                      className={cn(
-                        "w-full bg-[#09090B] border rounded-[24px] px-8 py-5 text-sm text-white focus:outline-none transition-all appearance-none font-medium",
-                        !isEditing ? "border-white/5 text-white/20 cursor-not-allowed" : "border-white/10 hover:border-white/20 focus:border-primary/50"
-                      )}
-                    >
-                      <option value="">Select venue type...</option>
-                      {formData.venueType && !selectedVenueTypeExists && (
-                        <option value={formData.venueType}>{formData.venueType}</option>
-                      )}
-                      {venueTypeOptions.map((type: any) => (
-                        <option key={type._id} value={type._id}>{type.category_name}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 pointer-events-none" />
-                  </div>
+                  {isEditing ? (
+                    <MultiSelectDropdown
+                      options={venueTypeOptions.map((type: any) => ({ label: type.category_name, value: type._id }))}
+                      value={formData.categoryIds}
+                      onChange={(v) => setFormData((prev: any) => ({ ...prev, categoryIds: v }))}
+                      placeholder="Select venue types"
+                    />
+                  ) : (
+                    <div className="flex flex-wrap gap-2 min-h-[46px] items-center bg-[#09090B] border border-white/5 rounded-[24px] px-6 py-4">
+                      {formData.categoryIds.length ? formData.categoryIds.map((id: string) => {
+                        const opt = venueTypeOptions.find((t: any) => t._id === id);
+                        return (
+                          <span key={id} className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30">
+                            {opt?.category_name || id}
+                          </span>
+                        );
+                      }) : <span className="text-white/20 text-sm">No venue type set</span>}
+                    </div>
+                  )}
                 </div>
                 <RefinedField
                   label="Capacity"

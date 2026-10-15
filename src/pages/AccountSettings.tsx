@@ -31,6 +31,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { cn, apiErrorMessage } from '../lib/utils';
 import { FormSection, RefinedField } from '../components/RefinedForm';
+import ClubVenueMedia from '../components/ClubVenueMedia';
 
 import { API_BASE } from '../lib/apiConfig';
 const EMPTY_FORM_DATA = {
@@ -513,6 +514,8 @@ export default function AccountSettings() {
           </div>
         </div>
       </div>
+      <ClubVenueMedia />
+
 
       {/* Dialogs - Modular UI */}
       <AnimatePresence>

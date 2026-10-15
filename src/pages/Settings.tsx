@@ -249,7 +249,6 @@ export default function Settings() {
     { id: 'security', label: 'Security', icon: Lock, desc: 'Password & 2FA' },
     { id: 'notifications', label: 'Notifications', icon: Bell, desc: 'Email & Mobile' },
     { id: 'preferences', label: 'App Settings', icon: Globe, desc: 'Theme & Language' },
-    { id: 'cities', label: 'Cities', icon: MapPin, desc: 'Manage Locations' },
   ];
 
   return (
