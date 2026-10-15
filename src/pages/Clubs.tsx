@@ -734,7 +734,7 @@ export default function Clubs() {
             <button
               onClick={() => {
                 resetEventForm();
-                setEventFormData((d: any) => ({ ...d, venue_id: clubData?.id || clubData?._id || '', city: clubData?.city || '' }));
+                setEventFormData((d: any) => ({ ...d, venue_id: clubData?.id || clubData?._id || '', city: (typeof clubData?.city === 'object' ? clubData?.city?._id : clubData?.city) || '' }));
                 setIsCreatingEvent(true);
               }}
               className="px-6 py-3 rounded-2xl bg-gradient-to-br from-primary to-purple-600 text-xs font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all flex items-center gap-2"
@@ -869,7 +869,7 @@ export default function Clubs() {
                   <button
                     onClick={() => {
                       resetEventForm();
-                      setEventFormData((d: any) => ({ ...d, venue_id: clubData?.id || clubData?._id || '', city: clubData?.city || '' }));
+                      setEventFormData((d: any) => ({ ...d, venue_id: clubData?.id || clubData?._id || '', city: (typeof clubData?.city === 'object' ? clubData?.city?._id : clubData?.city) || '' }));
                       setIsCreatingEvent(true);
                     }}
                     className="text-primary font-black text-xs hover:underline uppercase tracking-widest leading-none"

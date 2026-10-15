@@ -353,22 +353,13 @@ export default function AccountSettings() {
 
                   <div className="space-y-6">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1 text-center block">Exact Location</label>
-                    <div className="aspect-video bg-[#09090B] border border-white/5 rounded-[40px] relative overflow-hidden flex items-center justify-center group cursor-pointer shadow-inner">
-                      <img
-                        src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=2000"
-                        className="absolute inset-0 w-full h-full object-cover opacity-10 grayscale group-hover:opacity-20 transition-all duration-1000 group-hover:scale-110"
-                        alt="Map"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                      <div className="relative flex flex-col items-center gap-6 text-center px-10">
-                        <div className="w-16 h-16 rounded-[24px] bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:animate-pulse">
-                          <MapPin className="w-8 h-8" />
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-[11px] font-black text-white uppercase tracking-[0.3em]">Exact Location</p>
-                          <p className="text-[9px] text-primary/40 font-black tracking-widest uppercase">Set Map Location</p>
-                        </div>
+                    <div className="aspect-video bg-[#09090B] border border-white/5 rounded-[40px] flex flex-col items-center justify-center gap-4 text-center px-10">
+                      <div className="w-16 h-16 rounded-[24px] bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+                        <MapPin className="w-8 h-8" />
                       </div>
+                      <p className="text-[10px] text-white/40 font-medium leading-relaxed">
+                        Set your exact map location in the <span className="text-primary font-black uppercase tracking-widest">Venue Media &amp; Location</span> section below.
+                      </p>
                     </div>
                   </div>
                 </div>

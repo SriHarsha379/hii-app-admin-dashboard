@@ -29,6 +29,9 @@ import ClubProfilePreview from './ClubProfilePreview';
 import EventProfilePreview from './EventProfilePreview';
 
 import { API_BASE } from '../lib/apiConfig';
+
+const UPLOADS_BASE = API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads');
+const assetUrl = (f?: string | null) => !f ? '' : (/^https?:\/\//i.test(f) ? f : `${UPLOADS_BASE}/${f}`);
 export default function ClubAdminProfile() {
   const navigate = useNavigate();
   const { user, token } = useAuth();
@@ -41,11 +44,27 @@ export default function ClubAdminProfile() {
       const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return res.json();
+      const json = await res.json();
+      return json.data ?? [];
     }
   });
 
   const clubData = (Array.isArray(clubs) ? clubs : []).find(c => c.name === user?.organisation) || (Array.isArray(clubs) ? clubs[0] : null);
+
+  const { data: venues } = useQuery({
+    queryKey: ['venues-club-admin'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/venue/get_all_venues`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json();
+      return json.data ?? [];
+    }
+  });
+  const venueForClub = (Array.isArray(venues) ? venues : []).find((v: any) => {
+    const vid = typeof v.vendor_id === 'object' ? v.vendor_id?._id : v.vendor_id;
+    return vid === (clubData?._id || clubData?.id);
+  }) || null;
 
   const { data: events } = useQuery({
     queryKey: ['events-club-admin'],
@@ -53,7 +72,8 @@ export default function ClubAdminProfile() {
       const res = await fetch(`${API_BASE}/events/list`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return res.json();
+      const json = await res.json();
+      return json.data ?? [];
     }
   });
 
@@ -110,7 +130,7 @@ export default function ClubAdminProfile() {
           <div className="relative shrink-0">
             <div className="w-48 h-64 rounded-[40px] overflow-hidden border-2 border-primary/20 group-hover:border-primary transition-all duration-700 shadow-2xl bg-black/40">
               <img
-                src={clubData?.portrait_url || clubData?.logo || `https://api.dicebear.com/7.x/identicon/svg?seed=${clubData?.name || 'Club'}`}
+                src={venueForClub?.venue_image ? assetUrl(venueForClub.venue_image) : (clubData?.portrait_url || clubData?.logo || `https://api.dicebear.com/7.x/identicon/svg?seed=${clubData?.name || 'Club'}`)}
                 alt={clubData?.name}
                 className="w-full h-full object-cover"
               />
@@ -239,7 +259,7 @@ export default function ClubAdminProfile() {
               </button>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              {(clubData?.landscape_urls || clubData?.gallery || []).slice(0, 4).map((url: string, index: number) => (
+              {(venueForClub?.gallery_images || clubData?.landscape_urls || clubData?.gallery || []).slice(0, 4).map((url: string, index: number) => (
                 <motion.div
                   key={index}
                   whileHover={{ scale: 1.05 }}
@@ -248,7 +268,7 @@ export default function ClubAdminProfile() {
                     index === 0 ? "col-span-2 aspect-video" : "aspect-square"
                   )}
                 >
-                  <img src={url} className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110" alt="" />
+                  <img src={assetUrl(url)} className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110" alt="" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <Plus className="w-6 h-6 text-white" />
                   </div>
