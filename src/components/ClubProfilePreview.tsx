@@ -30,6 +30,8 @@ export default function ClubProfilePreview({ club, onClose, onEdit, hideCloseBut
 
   const data = React.useMemo(() => {
     const base = club || {};
+    const UPLOADS = API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads');
+    const toUrl = (f: any) => !f ? '' : (/^https?:\/\//i.test(f) ? f : UPLOADS + '/' + f);
     // `city` (and `state`) come back from the vendor list API as populated
     // objects — { _id, city_name } — not plain strings. Rendering that
     // object directly as a React child throws "Objects are not valid as a
@@ -43,16 +45,20 @@ export default function ClubProfilePreview({ club, onClose, onEdit, hideCloseBut
 
     return {
       name: base.name || 'Unnamed club',
-      portrait_url: base.portrait_url || base.poster_url || base.business_image || '',
+      portrait_url: toUrl(base.venue_image || base.portrait_url || base.poster_url || base.business_image || ''),
       tags: Array.isArray(base.tags) ? base.tags : [],
-      date: base.date || 'Schedule not set',
-      time: base.time || 'Hours not set',
+      date: Array.isArray(base.open_days) && base.open_days.length
+        ? base.open_days.join(', ')
+        : (base.date || 'Schedule not set'),
+      time: (base.start_time && base.end_time)
+        ? `${base.start_time} – ${base.end_time}`
+        : (base.start_time || base.time || 'Hours not set'),
       location: cityName || base.location || 'Location not set',
       venue: base.venue || base.name || 'Venue not set',
       followers: String(base.likes || 0),
-      capacity: base.capacity || 'Not set',
+      capacity: (base.capacity != null && base.capacity > 0) ? base.capacity : 'Not set',
       about: base.about || base.description || 'No description available.',
-      gallery: Array.isArray(base.gallery) ? base.gallery : (Array.isArray(base.landscape_urls) ? base.landscape_urls.filter(Boolean) : []),
+      gallery: (Array.isArray(base.gallery) ? base.gallery : (Array.isArray(base.gallery_images) ? base.gallery_images : (Array.isArray(base.landscape_urls) ? base.landscape_urls : []))).filter(Boolean).map(toUrl),
       pastEvents: Array.isArray(base.pastEvents) ? base.pastEvents : (Array.isArray(base.lineup) ? base.lineup : [])
     };
   }, [club]);
@@ -227,14 +233,17 @@ export default function ClubProfilePreview({ club, onClose, onEdit, hideCloseBut
           {/* Past Events Section */}
           <div className="space-y-5 pb-12">
             <div className="flex items-center justify-between">
-              <h3 className="text-[10px] font-black text-[#FF2D9A] uppercase tracking-[0.3em]">Past Events</h3>
+              <h3 className="text-[10px] font-black text-[#FF2D9A] uppercase tracking-[0.3em]">Upcoming Events</h3>
               <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/5">
                 <CalendarDays className="w-3 h-3 text-white/40" />
                 <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">History</span>
               </div>
             </div>
             <div className="grid grid-cols-1 gap-3">
-              {data.pastEvents.map((event: any, i: number) => (
+              {upcomingEvents.length === 0 && (
+                <p className="text-xs text-white/20 font-medium">No upcoming events scheduled.</p>
+              )}
+              {upcomingEvents.map((event: any, i: number) => (
                 <div
                   key={i}
                   onClick={() => setSelectedEvent(event)}
@@ -242,15 +251,15 @@ export default function ClubProfilePreview({ club, onClose, onEdit, hideCloseBut
                 >
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 rounded-2xl overflow-hidden border border-white/10 bg-black/40">
-                      {event.image ? (
-                        <img src={event.image} alt={event.name} className="w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
+                      {event.poster_url ? (
+                        <img src={eventImg(event.poster_url)} alt={event.title} className="w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
                       ) : (
                         <CalendarDays className="w-5 h-5 text-white/20 m-auto mt-4" />
                       )}
                     </div>
                     <div>
-                      <p className="text-[11px] font-black text-white uppercase tracking-tight">{event.name}</p>
-                      <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest mt-1">{event.role}</p>
+                      <p className="text-[11px] font-black text-white uppercase tracking-tight">{event.title || event.venue_name}</p>
+                      <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest mt-1">{event.start_date || event.date || ''}</p>
                     </div>
                   </div>
                   <ChevronRightIcon className="w-4 h-4 text-white/10 group-hover:text-primary transition-colors mr-2" />

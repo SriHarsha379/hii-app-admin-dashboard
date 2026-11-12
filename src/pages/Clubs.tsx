@@ -431,7 +431,7 @@ export default function Clubs() {
         vendorBody.append('password',       Math.random().toString(36).slice(-10) + 'Hii1!');
         vendorBody.append('vendor_type',    'owner');
         vendorBody.append('contact_person', venueFormData.contactName || '');
-        vendorBody.append('capacity',       venueFormData.capacity    || '');
+        if (venueFormData.capacity) vendorBody.append('capacity', venueFormData.capacity);
         vendorBody.append('description',    venueFormData.description || '');
 
         const vendorRes = await fetch(`${API_BASE}/vendor/add_vendor`, {
@@ -1440,8 +1440,8 @@ export default function Clubs() {
                 onClick={() => { setSelectedClub(withVenueData(club)); setIsViewingVenue(true); }}
               >
                 <div className="aspect-video relative overflow-hidden">
-                  {club.landscape_urls?.[0] ? (
-                    <img src={club.landscape_urls[0]} alt={club.name} className="w-full h-full object-cover" />
+                  {(() => { const _v = getVenueForVendor(club._id || club.id); const _img = _v?.venue_image || club.portrait_url; return _img; })() ? (
+                    <img src={adAssetUrlForClub((() => { const _v = getVenueForVendor(club._id || club.id); return _v?.venue_image || club.portrait_url; })())} alt={club.name} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full bg-white/5 flex items-center justify-center">
                       <Building2 className="w-12 h-12 text-white/15" />
@@ -1936,7 +1936,7 @@ export default function Clubs() {
                     <button onClick={() => {
                       if (venueStep === 1) {
                         if (!venueFormData.name) { alert('Enter a club name'); return; }
-                        if (!selectedClub && !venueFormData.vendor_id) { alert('Select an organiser / vendor'); return; }
+                        // Vendor is now auto-created in handleSubmitVenue if none selected — no need to block here
                         if (!venueFormData.type || venueFormData.type.length === 0) { alert('Select a category'); return; }
                       }
                       if (venueStep === 2 && !venueFormData.city) { alert('Select a city'); return; }

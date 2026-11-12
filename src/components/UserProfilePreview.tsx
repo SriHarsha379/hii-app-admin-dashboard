@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '../lib/utils';
+import { API_BASE } from '../lib/apiConfig';
 import { 
   X, 
   Heart, 
@@ -20,20 +21,30 @@ interface UserProfilePreviewProps {
 export default function UserProfilePreview({ user, onClose }: UserProfilePreviewProps) {
   const data = React.useMemo(() => {
     const base = user || {};
+    const UPLOADS_BASE = API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads');
+  const toUrl = (f: any) => !f ? '' : (/^https?:\/\//i.test(f) ? f : UPLOADS_BASE + '/' + f);
     return {
-      name: base.name || 'Unnamed user',
+      // first_name + last_name are the real fields; name is a fallback
+      name: base.name || [base.first_name, base.last_name].filter(Boolean).join(' ') || 'Unnamed user',
       role: base.role || 'User',
-      avatar: base.avatar || base.image || '',
+      // profile_image is the real field; avatar/image don't exist on User model
+      avatar: toUrl(base.profile_image || base.avatar || base.image || ''),
       tags: Array.isArray(base.tags) ? base.tags : [],
-      joinedDate: base.joined_date || 'Join date unavailable',
-      location: base.city || base.location || 'Location unavailable',
+      // createdAt is the real join date; joined_date doesn't exist
+      joinedDate: base.createdAt ? new Date(base.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Join date unavailable',
+      // city_id is a populated object; city alone doesn't exist
+      location: (typeof base.city_id === 'object' ? base.city_id?.city_name : base.city_id) || base.city || 'Location unavailable',
       stats: {
+        // none of these fields exist on User model — show real signup_step as proxy
         eventsAttended: base.events_count || 0,
         followers: base.followers || 0,
         engagement: base.engagement || '—'
       },
       about: base.bio || 'No bio available.',
-      gallery: Array.isArray(base.gallery) ? base.gallery : [],
+      // user_gallery is the real field — array of { url, type, thumbnail_url }
+      gallery: Array.isArray(base.user_gallery)
+        ? base.user_gallery.filter((g: any) => g.type === 'image' && g.is_visible !== false).map((g: any) => toUrl(g.url))
+        : [],
       recentActivity: Array.isArray(base.recentActivity) ? base.recentActivity : []
     };
   }, [user]);

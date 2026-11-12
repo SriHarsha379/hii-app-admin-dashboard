@@ -49,8 +49,8 @@ export default function Settings() {
     mutationFn: async (file: File) => {
       const body = new FormData();
       body.append('profile_image', file);
-      const res = await fetch(`${API_BASE}/admins/me/avatar`, {
-        method: 'PATCH',
+      const res = await fetch(`${API_BASE}/auth/update`, {
+        method: 'PUT',
         headers: { Authorization: `Bearer ${token}` },
         body,
       });
@@ -83,10 +83,23 @@ export default function Settings() {
       return Array.isArray(json.data) ? json.data : [];
     },
   });
+  const { data: states = [] } = useQuery({
+    queryKey: ['admin-states'],
+    enabled: !!token,
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/state/get_all_states`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return Array.isArray(json.data) ? json.data : [];
+    },
+  });
+  const [newCityState, setNewCityState] = React.useState('');
+
   const createCityMutation = useMutation({
     mutationFn: async (name: string) => {
+      if (!newCityState) throw new Error('Select a state first');
       const body = new FormData();
       body.append('city_name', name);
+      body.append('state_id', newCityState);
       const res = await fetch(`${API_BASE}/city/create_city`, {
         method: 'POST', headers: { Authorization: `Bearer ${token}` }, body,
       });
@@ -235,13 +248,49 @@ export default function Settings() {
     theme: 'dark'
   });
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      if (activeTab === 'profile') {
+        const body = new FormData();
+        if (profile.name)  body.append('name', profile.name);
+        if (profile.email) body.append('email', profile.email);
+        if (profile.phone) body.append('phone_number', profile.phone);
+        const res = await fetch(`${API_BASE}/auth/update`, {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}` },
+          body,
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json?.message || 'Failed to update profile');
+        updateUser({ name: profile.name, email: profile.email });
+      } else if (activeTab === 'security') {
+        if (!security.currentPassword || !security.newPassword || !security.confirmPassword) {
+          throw new Error('Please fill in all password fields');
+        }
+        if (security.newPassword !== security.confirmPassword) {
+          throw new Error('New passwords do not match');
+        }
+        const res = await fetch(`${API_BASE}/auth/change-password`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            currentPassword: security.currentPassword,
+            newPassword: security.newPassword,
+            confirmPassword: security.confirmPassword,
+          }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json?.message || 'Failed to change password');
+        setSecurity({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      }
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
-    }, 1000);
+    } catch (err: any) {
+      alert(err.message || 'Save failed');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const tabs = [
@@ -711,8 +760,20 @@ export default function Settings() {
 
                         />
                       </div>
+                      {states.length > 0 && (
+                        <select
+                          value={newCityState}
+                          onChange={(e) => setNewCityState(e.target.value)}
+                          className="bg-[#09090B] border border-white/5 rounded-[20px] px-5 py-5 text-sm text-white focus:outline-none focus:border-orange-400 transition-all appearance-none"
+                        >
+                          <option value="">State...</option>
+                          {states.map((s: any) => (
+                            <option key={s._id} value={s._id}>{s.state_name}</option>
+                          ))}
+                        </select>
+                      )}
                       <button
-                        onClick={() => { if (newCity.trim()) { createCityMutation.mutate(newCity.trim()); setNewCity(''); } }}
+                        onClick={() => { if (newCity.trim()) { createCityMutation.mutate(newCity.trim()); setNewCity(''); setNewCityState(''); } }}
                         className="w-16 h-16 rounded-[28px] bg-orange-400/10 text-orange-400 border border-orange-400/20 hover:bg-orange-400 transition-all hover:text-white flex items-center justify-center shadow-xl active:scale-95"
                       >
                         <Plus className="w-7 h-7" />

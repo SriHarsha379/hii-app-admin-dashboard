@@ -83,6 +83,19 @@ const voteData = [
 
 export default function PollsContests() {
   const { token } = useAuth();
+
+  const { data: cities } = useQuery({
+    queryKey: ['cities'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/city/get_all_cities`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return json.data ?? [];
+    }
+  });
+  const cityOptions = [
+    { label: 'All Cities', value: 'ALL' },
+    ...((Array.isArray(cities) ? cities : []).slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((c: any) => ({ label: c.city_name, value: c.city_name }))),
+  ];
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('polls');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -122,16 +135,16 @@ export default function PollsContests() {
   const [newContest, setNewContest] = useState({ title: '', city: 'ALL', rules: '', reward: '', deadline: '' });
 
   const { data: participants, isLoading: participantsLoading } = useQuery({
-    queryKey: ['contest_participants', selectedContest?.id],
+    queryKey: ['contest_participants', (selectedContest?._id || selectedContest?.id)],
     queryFn: async () => {
-      if (!selectedContest?.id) return [];
+      if (!(selectedContest?._id || selectedContest?.id)) return [];
       const res = await fetch(`${API_BASE}/contests/${selectedContest.id}/participants`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const json = await res.json();
       return json.data ?? [];
     },
-    enabled: !!selectedContest?.id
+    enabled: !!(selectedContest?._id || selectedContest?.id)
   });
 
   const addContestMutation = useMutation({
@@ -371,13 +384,7 @@ export default function PollsContests() {
                         <FilterDropdown
                           value={filterCity}
                           onChange={setFilterCity}
-                          options={[
-                            { label: 'All Cities', value: 'ALL' },
-                            { label: 'Mumbai', value: 'Mumbai' },
-                            { label: 'Delhi', value: 'Delhi' },
-                            { label: 'Bangalore', value: 'Bangalore' },
-                            { label: 'Goa', value: 'Goa' },
-                          ]}
+                          options={cityOptions}
                         />
                       </div>
                     </FilterPanel>
@@ -422,7 +429,7 @@ export default function PollsContests() {
                           <td colSpan={4} className="px-6 py-12 text-center text-xs text-muted-foreground">Loading polls...</td>
                         </tr>
                       ) : sortedPolls.length > 0 ? sortedPolls.map((poll: any) => (
-                        <tr key={poll.id} className="group hover:bg-white/5 transition-colors">
+                        <tr key={(poll._id || poll.id)} className="group hover:bg-white/5 transition-colors">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-primary">
@@ -452,7 +459,7 @@ export default function PollsContests() {
                               <button
                                 onClick={() => {
                                   updatePollStatusMutation.mutate({
-                                    id: poll.id,
+                                    id: (poll._id || poll.id),
                                     status: poll.status === 'ACTIVE' ? 'PENDING' : 'ACTIVE'
                                   });
                                 }}
@@ -467,17 +474,17 @@ export default function PollsContests() {
                                 {poll.status === 'ACTIVE' ? 'Active Pop-up' : 'Activate'}
                               </button>
                               <button
-                                onClick={() => setOpenPollMenuId(openPollMenuId === poll.id ? null : poll.id)}
+                                onClick={() => setOpenPollMenuId(openPollMenuId === poll.id ? null : (poll._id || poll.id))}
                                 className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition-all"
                               >
                                 <MoreHorizontal className="w-4 h-4" />
                               </button>
-                              {openPollMenuId === poll.id && (
+                              {openPollMenuId === (poll._id || poll.id) && (
                                 <>
                                   <div className="fixed inset-0 z-10" onClick={() => setOpenPollMenuId(null)} />
                                   <div className="absolute right-0 top-12 z-20 w-40 rounded-2xl bg-[#0B0B0F] border border-white/10 shadow-2xl overflow-hidden">
                                     <button
-                                      onClick={() => { if (confirm(`Remove "${poll.title}"?`)) deletePollMutation.mutate(poll.id); }}
+                                      onClick={() => { if (confirm(`Remove "${poll.title}"?`)) deletePollMutation.mutate((poll._id || poll.id)); }}
                                       disabled={deletePollMutation.isPending}
                                       className="w-full flex items-center gap-3 px-5 py-3 text-xs font-bold text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50"
                                     >
@@ -558,13 +565,7 @@ export default function PollsContests() {
                   <FilterDropdown
                     value={filterCity}
                     onChange={setFilterCity}
-                    options={[
-                      { label: 'All Cities', value: 'ALL' },
-                      { label: 'Mumbai', value: 'Mumbai' },
-                      { label: 'Delhi', value: 'Delhi' },
-                      { label: 'Bangalore', value: 'Bangalore' },
-                      { label: 'Goa', value: 'Goa' },
-                    ]}
+                    options={cityOptions}
                   />
                 </div>
               </FilterPanel>
@@ -578,7 +579,7 @@ export default function PollsContests() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {sortedContests.map((contest: any) => (
-                <div key={contest.id} className="glass-card p-6 rounded-2xl border border-white/10 space-y-6 group hover:border-primary/40 transition-all">
+                <div key={(contest._id || contest.id)} className="glass-card p-6 rounded-2xl border border-white/10 space-y-6 group hover:border-primary/40 transition-all">
                   <div className="flex justify-between items-start">
                     <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                       <Trophy className="w-6 h-6" />
@@ -592,7 +593,7 @@ export default function PollsContests() {
                       </span>
                       {contest.status === 'PENDING' && (
                         <button
-                          onClick={() => updateContestStatusMutation.mutate({ id: contest.id, status: 'ACTIVE' })}
+                          onClick={() => updateContestStatusMutation.mutate({ id: (contest._id || contest.id), status: 'ACTIVE' })}
                           className="text-[10px] px-2 py-1 rounded-lg font-bold border border-primary/20 bg-primary/10 text-primary hover:bg-primary/20 transition-all uppercase"
                         >
                           Activate
@@ -601,7 +602,7 @@ export default function PollsContests() {
                       {/* FIXED: contests had no remove action anywhere on
                           the card at all. */}
                       <button
-                        onClick={() => { if (confirm(`Remove "${contest.title}"?`)) deleteContestMutation.mutate(contest.id); }}
+                        onClick={() => { if (confirm(`Remove "${contest.title}"?`)) deleteContestMutation.mutate((contest._id || contest.id)); }}
                         disabled={deleteContestMutation.isPending}
                         className="text-[10px] px-2 py-1 rounded-lg font-bold border border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/10 transition-all uppercase disabled:opacity-50 flex items-center gap-1"
                       >
@@ -677,10 +678,9 @@ export default function PollsContests() {
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50 appearance-none"
                     >
                       <option value="ALL">All Cities</option>
-                      <option value="Mumbai">Mumbai</option>
-                      <option value="Delhi">Delhi</option>
-                      <option value="Bangalore">Bangalore</option>
-                      <option value="Goa">Goa</option>
+                      {(Array.isArray(cities) ? cities : []).slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((c: any) => (
+                        <option key={c._id} value={c.city_name}>{c.city_name}</option>
+                      ))}
                     </select>
                     <ChevronRight className="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground rotate-90 pointer-events-none" />
                   </div>
@@ -778,10 +778,9 @@ export default function PollsContests() {
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50 appearance-none"
                     >
                       <option value="ALL">All Cities</option>
-                      <option value="Mumbai">Mumbai</option>
-                      <option value="Delhi">Delhi</option>
-                      <option value="Bangalore">Bangalore</option>
-                      <option value="Goa">Goa</option>
+                      {(Array.isArray(cities) ? cities : []).slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((c: any) => (
+                        <option key={c._id} value={c.city_name}>{c.city_name}</option>
+                      ))}
                     </select>
                     <ChevronRight className="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground rotate-90 pointer-events-none" />
                   </div>
@@ -882,7 +881,7 @@ export default function PollsContests() {
                     <div className="py-12 text-center text-sm text-muted-foreground">Loading participants...</div>
                   ) : participants?.length > 0 ? (
                     participants.map((participant: any) => (
-                      <div key={participant.id} className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-4">
+                      <div key={(participant._id || participant.id)} className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">

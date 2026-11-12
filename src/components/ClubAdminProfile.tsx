@@ -99,7 +99,11 @@ export default function ClubAdminProfile() {
   });
 
   const eventList = Array.isArray(events) ? events : [];
-  const clubEvents = eventList.filter(e => e.club_id === clubData?.id || e.venue === clubData?.name);
+  const vendorId = clubData?._id || clubData?.id;
+  const clubEvents = eventList.filter((e: any) => {
+    const evVendorId = typeof e.vendor_id === 'object' ? e.vendor_id?._id : e.vendor_id;
+    return String(evVendorId) === String(vendorId) || e.venue === clubData?.name;
+  });
 
   const liveEvents = clubEvents.filter(e => e.status === 'LIVE' || e.status === 'ACTIVE');
   const upcomingEvents = clubEvents.filter(e => {
@@ -130,7 +134,7 @@ export default function ClubAdminProfile() {
           <div className="relative shrink-0">
             <div className="w-48 h-64 rounded-[40px] overflow-hidden border-2 border-primary/20 group-hover:border-primary transition-all duration-700 shadow-2xl bg-black/40">
               <img
-                src={venueForClub?.venue_image ? assetUrl(venueForClub.venue_image) : (clubData?.portrait_url || clubData?.logo || `https://api.dicebear.com/7.x/identicon/svg?seed=${clubData?.name || 'Club'}`)}
+                src={venueForClub?.venue_image ? assetUrl(venueForClub.venue_image) : (clubData?.venue_image || clubData?.portrait_url || clubData?.logo || `https://api.dicebear.com/7.x/identicon/svg?seed=${clubData?.name || 'Club'}`)}
                 alt={clubData?.name}
                 className="w-full h-full object-cover"
               />

@@ -65,6 +65,8 @@ import EventProfilePreview from '../components/EventProfilePreview';
 import { Layout as LayoutIcon } from 'lucide-react';
 
 import { API_BASE } from '../lib/apiConfig';
+const UPLOADS_BASE = API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads');
+const eventImgUrl = (f?: string | null) => !f ? '' : (/^https?:\/\//i.test(f) ? f : `${UPLOADS_BASE}/${f}`);
 const statusColors: any = {
   ACTIVE:    'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   PAST:      'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
@@ -307,10 +309,17 @@ export default function Events() {
       // stored as venue_name; city is a populated { city_name } object).
       return raw.map((e: any) => ({
         ...e,
-        title: e.title || e.venue_name || e.event_name || '',
-        city: (typeof e.city_id === 'object' && e.city_id) ? (e.city_id.city_name || '')
-              : (e.city || (typeof e.city === 'string' ? e.city : '')),
-        date: e.date || e.start_date || '',
+        title:         e.title || e.venue_name || e.event_name || '',
+        city:          (typeof e.city_id === 'object' && e.city_id) ? (e.city_id.city_name || '') : (e.city || ''),
+        date:          e.date || e.start_date || '',
+        // venue_image is the backend field name — map to poster_url so all
+        // existing image references (eventImgUrl(event.poster_url)) work
+        poster_url:    e.venue_image || e.poster_url || '',
+        // gallery_images is the backend field — map to landscape_urls
+        landscape_urls: Array.isArray(e.gallery_images) && e.gallery_images.length
+          ? e.gallery_images
+          : (Array.isArray(e.landscape_urls) ? e.landscape_urls : []),
+        description:   e.about || e.description || '',
       }));
     },
   });
@@ -771,7 +780,7 @@ export default function Events() {
               >
                 <div className="aspect-video relative overflow-hidden">
                   {event.landscape_urls?.[0] || event.poster_url ? (
-                    <img src={event.landscape_urls?.[0] || event.poster_url} alt={event.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    <img src={eventImgUrl(event.landscape_urls?.[0] || event.poster_url)} alt={event.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                   ) : (
                     <div className="w-full h-full bg-white/5 flex items-center justify-center"><Calendar className="w-12 h-12 text-white/15" /></div>
                   )}
@@ -858,7 +867,7 @@ export default function Events() {
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10 flex-shrink-0 bg-white/5 flex items-center justify-center">
                             {event.poster_url
-                              ? <img src={event.poster_url} alt="" className="w-full h-full object-cover" />
+                              ? <img src={eventImgUrl(event.poster_url)} alt="" className="w-full h-full object-cover" />
                               : <Calendar className="w-4 h-4 text-white/20" />}
                           </div>
                           <div>
@@ -929,7 +938,7 @@ export default function Events() {
                 <div className="relative" style={{ aspectRatio: '16/8' }}>
                   {selectedEvent.landscape_urls?.[0] || selectedEvent.poster_url ? (
                     <img
-                      src={selectedEvent.landscape_urls?.[0] || selectedEvent.poster_url}
+                      src={eventImgUrl(selectedEvent.landscape_urls?.[0] || selectedEvent.poster_url)}
                       alt={selectedEvent.title}
                       className="w-full h-full object-cover"
                     />

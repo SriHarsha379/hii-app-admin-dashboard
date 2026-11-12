@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '../lib/utils';
+import { API_BASE } from '../lib/apiConfig';
 import { 
   X, 
   Heart, 
@@ -22,9 +23,11 @@ interface EventProfilePreviewProps {
 export default function EventProfilePreview({ onClose, eventData, hideCloseButton }: EventProfilePreviewProps) {
   const data = React.useMemo(() => {
     const base = eventData || {};
+    const UPLOADS_BASE = API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads');
+  const toUrl = (f: any) => !f ? '' : (/^https?:\/\//i.test(f) ? f : UPLOADS_BASE + '/' + f);
     return {
       name: base.title || base.name || 'Untitled event',
-      portrait_url: base.portrait_url || base.poster_url || '',
+      portrait_url: toUrl(base.portrait_url || base.poster_url || ''),
       tags: Array.isArray(base.genre) ? base.genre : (base.genre ? [base.genre] : []),
       date: base.date ? (isNaN(new Date(base.date).getTime()) ? base.date : new Date(base.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })) : 'Date not set',
       time: base.start_time ? `${base.start_time}${base.end_time ? ` – ${base.end_time}` : ''}` : 'Time not set',
@@ -33,8 +36,13 @@ export default function EventProfilePreview({ onClose, eventData, hideCloseButto
       followers: String(base.likes || 0),
       capacity: base.capacity || 'Not set',
       about: base.description || base.about || 'No description available.',
-      gallery: Array.isArray(base.gallery) ? base.gallery : (Array.isArray(base.landscape_urls) ? base.landscape_urls.filter(Boolean) : []),
-      lineup: Array.isArray(base.lineup) ? base.lineup : []
+      gallery: (
+        Array.isArray(base.gallery_images) && base.gallery_images.length ? base.gallery_images :
+        Array.isArray(base.gallery) && base.gallery.length ? base.gallery :
+        Array.isArray(base.landscape_urls) ? base.landscape_urls : []
+      ).filter(Boolean).map(toUrl),
+      lineup: Array.isArray(base.artists) && base.artists.length ? base.artists
+        : Array.isArray(base.lineup) ? base.lineup : []
     };
   }, [eventData]);
 
@@ -183,7 +191,7 @@ export default function EventProfilePreview({ onClose, eventData, hideCloseButto
                 <div key={i} className="flex items-center justify-between p-3 rounded-3xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors group">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 rounded-2xl overflow-hidden border border-white/10 bg-black/40">
-                      <img src={artist.image} alt={artist.name} className="w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
+                      <img src={toUrl(artist.image)} alt={artist.name} className="w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
                     </div>
                     <div>
                       <p className="text-[11px] font-black text-white uppercase tracking-tight">{artist.name}</p>
