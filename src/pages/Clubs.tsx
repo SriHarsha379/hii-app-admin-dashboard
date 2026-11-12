@@ -382,7 +382,74 @@ export default function Clubs() {
       }
       const [start_time, end_time] = activeDays[0].time.split(' - ').map((s: string) => s.trim());
 
-      const vendorId = selectedClub ? (selectedClub.vendor_id || selectedClub._id) : venueFormData.vendor_id;
+      let vendorId = selectedClub ? (selectedClub.vendor_id || selectedClub._id) : venueFormData.vendor_id;
+
+      // Auto-create a Vendor when none is selected so the club appears in the
+      // listing immediately — the listing reads from /vendor/get_all_vendors,
+      // not /venue/get_all_venues, so without a Vendor record the new club is
+      // invisible no matter how many times the form is submitted.
+      if (!vendorId && !isEditingVenue) {
+        if (!venueFormData.name) throw new Error('Enter a club name');
+
+        const selectedCity = Array.isArray(cities)
+          ? cities.find((c: any) => c._id === venueFormData.city)
+          : null;
+        if (!selectedCity) throw new Error('Select a city before saving');
+
+        // Scenario check before hitting the backend:
+        // 1. Vendor doesn't exist            → create vendor + venue (falls through below)
+        // 2. Vendor exists, no venue yet     → reuse vendor, create venue
+        // 3. Vendor exists + has venue       → block with clear error, don't duplicate
+        const existingVendorWithName = Array.isArray(vendorsForVenue)
+          ? vendorsForVenue.find((v: any) => v.name === venueFormData.name)
+          : null;
+        if (existingVendorWithName) {
+          const alreadyHasVenue = getVenueForVendor(existingVendorWithName._id || existingVendorWithName.id);
+          if (alreadyHasVenue) {
+            // Scenario 3: block save entirely — editing is the right action here
+            throw new Error(
+              `A club named "${venueFormData.name}" already exists and already has a venue. Use the Edit button on that club to update it instead.`
+            );
+          }
+          // Scenario 2: vendor exists but no venue yet — reuse it
+          vendorId = existingVendorWithName._id || existingVendorWithName.id;
+        }
+
+        if (!vendorId) {
+        const stateId =
+          typeof selectedCity.state_id === 'object'
+            ? selectedCity.state_id?._id
+            : selectedCity.state_id;
+
+        const vendorBody = new FormData();
+        vendorBody.append('name',           venueFormData.name);
+        vendorBody.append('email',          venueFormData.email || `${venueFormData.name.toLowerCase().replace(/\s+/g, '')}@hii.life`);
+        vendorBody.append('phone_number',   venueFormData.phone || '');
+        vendorBody.append('city',           venueFormData.city);
+        if (stateId) vendorBody.append('state', stateId);
+        vendorBody.append('address',        venueFormData.address || '');
+        vendorBody.append('password',       Math.random().toString(36).slice(-10) + 'Hii1!');
+        vendorBody.append('vendor_type',    'owner');
+        vendorBody.append('contact_person', venueFormData.contactName || '');
+        vendorBody.append('capacity',       venueFormData.capacity    || '');
+        vendorBody.append('description',    venueFormData.description || '');
+
+        const vendorRes = await fetch(`${API_BASE}/vendor/add_vendor`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: vendorBody,
+        });
+
+        const vendorJson = await vendorRes.json().catch(() => ({}));
+        if (!vendorRes.ok || vendorJson?.success === false) {
+          throw new Error(apiErrorMessage(vendorJson, 'Failed to auto-create vendor account for this club'));
+        }
+
+        vendorId = vendorJson?.data?._id;
+        if (!vendorId) throw new Error('Vendor was created but returned no ID — check the backend response');
+        } // end if (!vendorId)
+      }
+
       if (!vendorId) throw new Error('Select a vendor/organiser for this venue');
       if (!venueFormData.city) throw new Error('Select a city');
       if (!venueFormData.address) throw new Error('Pick a location on the map (address is required)');
@@ -410,8 +477,11 @@ export default function Clubs() {
       if (venuePortraitFile) body.append('venue_image', venuePortraitFile);
       venueLandscapeFiles.forEach((f) => { if (f) body.append('gallery_images', f); });
 
-      const url    = isEditingVenue && selectedClub ? `${API_BASE}/venue/update_venue/${selectedClub._id}` : `${API_BASE}/venue/create_venue`;
-      const method = isEditingVenue && selectedClub ? 'PUT' : 'POST';
+      const existingVenueForVendor = vendorId ? getVenueForVendor(vendorId) : null;
+      const isUpdate = (isEditingVenue && selectedClub) || Boolean(existingVenueForVendor);
+      const updateId = selectedClub?._id || existingVenueForVendor?._id;
+      const url    = isUpdate ? `${API_BASE}/venue/update_venue/${updateId}` : `${API_BASE}/venue/create_venue`;
+      const method = isUpdate ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
         method,
@@ -425,6 +495,7 @@ export default function Clubs() {
       }
 
       queryClient.invalidateQueries({ queryKey: ['clubs'] });
+      queryClient.invalidateQueries({ queryKey: ['mongo-vendors'] });
       setIsCreatingClub(false);
       resetVenueForm();
     } catch (err: any) {
