@@ -423,15 +423,17 @@ export default function Clubs() {
 
         const vendorBody = new FormData();
         vendorBody.append('name',           venueFormData.name);
-        vendorBody.append('email',          venueFormData.email || `${venueFormData.name.toLowerCase().replace(/\s+/g, '')}@hii.life`);
-        vendorBody.append('phone_number',   venueFormData.phone || '');
+        const _slug = venueFormData.name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
+        const _uid  = Date.now().toString().slice(-6);
+        vendorBody.append('email', venueFormData.email || `${_slug}${_uid}@hii.life`);
+        vendorBody.append('phone_number', venueFormData.phone || `00000${Date.now().toString().slice(-7)}`);
         vendorBody.append('city',           venueFormData.city);
         if (stateId) vendorBody.append('state', stateId);
         vendorBody.append('address',        venueFormData.address || '');
         vendorBody.append('password',       Math.random().toString(36).slice(-10) + 'Hii1!');
         vendorBody.append('vendor_type',    'owner');
         vendorBody.append('contact_person', venueFormData.contactName || '');
-        if (venueFormData.capacity) vendorBody.append('capacity', venueFormData.capacity);
+        if (venueFormData.capacity && Number(venueFormData.capacity) > 0) vendorBody.append('capacity', String(Number(venueFormData.capacity)));
         vendorBody.append('description',    venueFormData.description || '');
 
         const vendorRes = await fetch(`${API_BASE}/vendor/add_vendor`, {
@@ -1512,7 +1514,7 @@ export default function Clubs() {
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center">
                             {club.portrait_url
-                              ? <img src={club.portrait_url} alt="" className="w-full h-full object-cover" />
+                              ? <img src={adAssetUrlForClub((() => { const _v = getVenueForVendor(club._id || club.id); return _v?.venue_image || club.portrait_url; })())} alt="" className="w-full h-full object-cover" />
                               : <Building2 className="w-4 h-4 text-white/20" />}
                           </div>
                           <div>
