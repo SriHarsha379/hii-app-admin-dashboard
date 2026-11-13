@@ -48,6 +48,8 @@ export default function ClaimClubForm() {
   }, []);
   const [portraitImage, setPortraitImage] = useState<string | null>(null);
   const [landscapeImage, setLandscapeImage] = useState<string | null>(null);
+  const [portraitFile, setPortraitFile] = useState<File | null>(null);
+  const [landscapeFile, setLandscapeFile] = useState<File | null>(null);
 
   const { data: club, isLoading: isLoadingClub } = useQuery({
     queryKey: ['club', clubId],
@@ -98,12 +100,9 @@ export default function ClaimClubForm() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'portrait' | 'landscape') => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (type === 'portrait') setPortraitImage(reader.result as string);
-        else setLandscapeImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      const url = URL.createObjectURL(file);
+      if (type === 'portrait') { setPortraitImage(url); setPortraitFile(file); }
+      else { setLandscapeImage(url); setLandscapeFile(file); }
     }
   };
 
@@ -206,6 +205,7 @@ export default function ClaimClubForm() {
         body.append('contact_person', formData.contactPerson);
         body.append('capacity', formData.capacity);
         body.append('description', formData.description);
+        if (portraitFile) body.append('business_image', portraitFile);
         const res = await fetch(`${API_BASE}/vendor/update_vendor/${club._id}`, {
           method: 'PUT',
           headers: { Authorization: `Bearer ${token}` },
