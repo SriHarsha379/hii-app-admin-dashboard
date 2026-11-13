@@ -28,7 +28,7 @@ import { cn, apiErrorMessage } from '../lib/utils';
 import { FormSection, RefinedField } from '../components/RefinedForm';
 
 import { API_BASE } from '../lib/apiConfig';
-export default function ClaimClubForm() {
+export default function ClaimOrganiserForm() {
   const navigate = useNavigate();
   const { clubId } = useParams();
   const { token, updateUser } = useAuth();

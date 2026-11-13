@@ -285,7 +285,8 @@ export default function Layout() {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Search failed');
-      return res.json();
+      const json = await res.json();
+      return Array.isArray(json.data) ? json.data : [];
     },
     enabled: searchQuery.length > 0,
   });
