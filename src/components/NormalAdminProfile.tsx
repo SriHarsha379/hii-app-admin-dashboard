@@ -243,11 +243,7 @@ export default function NormalAdminProfile() {
                 >
                   <div className="aspect-[16/9] relative overflow-hidden">
                     <img
-                      src={
-                        event.landscape_urls?.[0] ||
-                        event.poster_url ||
-                        `https://picsum.photos/seed/${event._id || event.id}/800/450`
-                      }
+                      src={(() => { const _u = (f) => !f ? '' : (/^https?:\/\//i.test(f) ? f : `${API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads/')}${f}`); return _u(event.poster_url) || _u(event.landscape_urls?.[0]); })()}
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                       alt={event.title}
                     />

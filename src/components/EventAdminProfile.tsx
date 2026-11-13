@@ -43,7 +43,13 @@ export default function EventAdminProfile() {
       const res = await fetch(`${API_BASE}/events/list`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return res.json();
+      const json = await res.json();
+      return (Array.isArray(json.data) ? json.data : []).map((e: any) => ({
+        ...e,
+        title: e.title || e.venue_name || '',
+        date: e.date || e.start_date || '',
+        poster_url: e.venue_image || e.poster_url || '',
+      }));
     }
   });
 
@@ -53,7 +59,8 @@ export default function EventAdminProfile() {
       const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return res.json();
+      const json = await res.json();
+      return json.data ?? [];
     }
   });
 
@@ -187,7 +194,7 @@ export default function EventAdminProfile() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {liveEvents.length > 0 ? liveEvents.map(event => (
                     <motion.div
-                      key={event.id}
+                      key={event._id || event.id}
                       onClick={() => setSelectedEvent(event)}
                       className="group relative bg-[#121218] rounded-[40px] border border-white/5 overflow-hidden hover:border-primary/50 transition-all cursor-pointer p-8 flex flex-col gap-8"
                     >
@@ -235,7 +242,7 @@ export default function EventAdminProfile() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                   {upcomingEvents.map((event, index) => (
                     <motion.div
-                      key={event.id}
+                      key={event._id || event.id}
                       onClick={() => setSelectedEvent(event)}
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
@@ -268,7 +275,7 @@ export default function EventAdminProfile() {
                 <div className="space-y-4">
                   {pastEvents.map((event, index) => (
                     <motion.div
-                      key={event.id}
+                      key={event._id || event.id}
                       onClick={() => setSelectedEvent(event)}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -324,7 +331,7 @@ export default function EventAdminProfile() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {associatedClubs.map((club: any, index: number) => (
               <motion.div
-                key={club.id}
+                key={club._id || club.id}
                 onClick={() => setSelectedClub(club)}
                 whileHover={{ y: -10 }}
                 className="group relative bg-gradient-to-br from-[#121218] to-[#0B0B0F] rounded-[40px] border border-white/5 p-8 flex flex-col items-center justify-center text-center gap-6 cursor-pointer hover:border-primary/50 transition-all overflow-hidden"
@@ -336,7 +343,7 @@ export default function EventAdminProfile() {
                 <div className="relative">
                   <div className="w-28 h-28 rounded-[32px] overflow-hidden border-2 border-white/10 group-hover:border-primary/50 transition-all duration-500 shadow-2xl">
                     <img
-                      src={club.logo || `https://api.dicebear.com/7.x/initials/svg?seed=${club.name}`}
+                      src={club.business_image ? (club.business_image.startsWith('http') ? club.business_image : `${API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads/')}${club.business_image}`) : `https://api.dicebear.com/7.x/initials/svg?seed=${club.name}`}
                       className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"
                       alt=""
                     />
@@ -447,15 +454,15 @@ export default function EventAdminProfile() {
                       <div className="grid grid-cols-3 gap-4">
                         <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
                           <p className="text-[8px] text-white/30 uppercase font-bold tracking-widest mb-1">Peak Attendance</p>
-                          <p className="text-lg font-black text-white">4.2k</p>
+                          <p className="text-lg font-black text-white">{selectedEvent.attendees ?? '—'}</p>
                         </div>
                         <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
                           <p className="text-[8px] text-white/30 uppercase font-bold tracking-widest mb-1">Scan Velocity</p>
-                          <p className="text-lg font-black text-emerald-400">12/min</p>
+                          <p className="text-lg font-black text-emerald-400">—</p>
                         </div>
                         <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
                           <p className="text-[8px] text-white/30 uppercase font-bold tracking-widest mb-1">Engagement</p>
-                          <p className="text-lg font-black text-blue-400">88%</p>
+                          <p className="text-lg font-black text-blue-400">—</p>
                         </div>
                       </div>
                     </div>
