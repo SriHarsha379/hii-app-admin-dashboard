@@ -172,7 +172,7 @@ export default function App() {
               <Route path="support-activity" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'NORMAL_ADMIN']}><SupportActivity /></ProtectedRoute>} />
               <Route path="contact-support" element={<ProtectedRoute allowedRoles={['CLUB_ADMIN', 'EVENT_ADMIN']}><ContactSupport /></ProtectedRoute>} />
               <Route path="activity-logs" element={<ProtectedRoute requireSuperAdmin><ActivityLogs /></ProtectedRoute>} />
-              <Route path="analytics" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'EVENT_ADMIN']}><Analytics /></ProtectedRoute>} />
+              <Route path="analytics" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'EVENT_ADMIN', 'CLUB_ADMIN']}><Analytics /></ProtectedRoute>} />
               <Route path="settings" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><Settings /></ProtectedRoute>} />
               <Route path="manage-filters" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'NORMAL_ADMIN']}><ManageFilters /></ProtectedRoute>} />
               {/* Hidden for now, same reason as the sidebar link above —
@@ -180,7 +180,7 @@ export default function App() {
               <Route path="recommendations" element={<Navigate to="/" replace />} />
               <Route path="admins" element={<ProtectedRoute requireSuperAdmin><Admins /></ProtectedRoute>} />
               <Route path="account-settings" element={<ProtectedRoute allowedRoles={['CLUB_ADMIN']}><AccountSettings /></ProtectedRoute>} />
-              <Route path="bookings" element={<ProtectedRoute allowedRoles={['CLUB_ADMIN']}><Bookings /></ProtectedRoute>} />
+              <Route path="bookings" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CLUB_ADMIN']}><Bookings /></ProtectedRoute>} />
               <Route path="event-account-settings" element={<ProtectedRoute allowedRoles={['EVENT_ADMIN']}><EventAccountSettings /></ProtectedRoute>} />
               <Route path="event-profile" element={<ProtectedRoute allowedRoles={['EVENT_ADMIN']}><EventAdminProfilePage /></ProtectedRoute>} />
               <Route path="club-profile" element={<ProtectedRoute allowedRoles={['CLUB_ADMIN']}><ClubProfilePage /></ProtectedRoute>} />

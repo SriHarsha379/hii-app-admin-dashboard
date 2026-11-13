@@ -481,7 +481,7 @@ export default function Clubs() {
 
       const existingVenueForVendor = vendorId ? getVenueForVendor(vendorId) : null;
       const isUpdate = (isEditingVenue && selectedClub) || Boolean(existingVenueForVendor);
-      const updateId = selectedClub?._id || existingVenueForVendor?._id;
+      const updateId = selectedClub?.venue_id || existingVenueForVendor?._id;
       const url    = isUpdate ? `${API_BASE}/venue/update_venue/${updateId}` : `${API_BASE}/venue/create_venue`;
       const method = isUpdate ? 'PUT' : 'POST';
 

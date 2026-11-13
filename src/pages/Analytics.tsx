@@ -93,7 +93,7 @@ export default function Analytics() {
   const { data: extendedStats } = useQuery({
     queryKey: ['analytics-extended', timeRange, ownVendorForAnalytics?._id],
     queryFn: async () => {
-      const rangeParam = timeRange === '24h' ? '7d' : timeRange; // backend supports 7d/30d/90d/all
+      const rangeParam = timeRange === '24h' ? '7d' : timeRange; // backend min is 7d; 24h shows last 7d
       const params = new URLSearchParams({ range: rangeParam });
       if (ownVendorForAnalytics?._id) params.set('vendor_id', ownVendorForAnalytics._id);
       const res = await fetch(`${API_BASE}/analytics/extended?${params}`, {
@@ -178,7 +178,22 @@ export default function Analytics() {
               </button>
             ))}
           </div>
-          <button className="p-2.5 rounded-2xl bg-white/5 border border-white/10 text-muted-foreground hover:text-white transition-all">
+          <button
+            onClick={() => {
+              const csv = [
+                ['Metric','Value'],
+                ['Total Users', totalUsers],
+                ['Total Events', totalEvents],
+                ['Total Clubs', totalClubs],
+              ].map(r => r.join(',')).join('\n');
+              const a = document.createElement('a');
+              a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+              a.download = `analytics-${new Date().toISOString().slice(0,10)}.csv`;
+              a.click();
+            }}
+            className="p-2.5 rounded-2xl bg-white/5 border border-white/10 text-muted-foreground hover:text-white transition-all"
+            title="Export analytics as CSV"
+          >
             <Download className="w-4 h-4" />
           </button>
         </div>

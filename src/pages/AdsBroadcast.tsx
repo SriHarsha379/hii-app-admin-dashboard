@@ -769,11 +769,13 @@ export default function AdsBroadcast() {
                         <td colSpan={4} className="px-6 py-12 text-center text-xs text-muted-foreground">No featured events found.</td>
                       </tr>
                     ) : filteredFeaturedEvents.map((event: any) => (
-                      <tr key={event.id} className="group hover:bg-white/5 transition-colors">
+                      <tr key={event._id || event.id} className="group hover:bg-white/5 transition-colors">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10">
-                              <img src={`https://picsum.photos/seed/event${event.id}/100/100`} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              {event.venue_image
+                                ? <img src={adAssetUrl(event.venue_image)} alt="" className="w-full h-full object-cover" />
+                                : <Calendar className="w-5 h-5 text-white/20" />}
                             </div>
                             <div>
                               <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{event.title}</p>
@@ -1011,21 +1013,7 @@ export default function AdsBroadcast() {
 
               <div className="glass-card p-6 rounded-2xl border border-white/10 space-y-4">
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">Recent History</h3>
-                <div className="space-y-3">
-                  {[
-                    { label: 'Weekend Promo', date: '2h ago', status: 'SENT' },
-                    { label: 'System Update', date: '1d ago', status: 'SENT' },
-                    { label: 'New Club Alert', date: '3d ago', status: 'SENT' },
-                  ].map((item) => (
-                    <div key={item.label} className="p-3 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between">
-                      <div>
-                        <p className="text-xs font-bold text-white">{item.label}</p>
-                        <p className="text-[10px] text-muted-foreground font-medium">{item.date}</p>
-                      </div>
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    </div>
-                  ))}
-                </div>
+                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest py-4 text-center">Broadcast history not yet tracked by the backend.</p>
               </div>
             </div>
           </motion.div>

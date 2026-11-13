@@ -40,16 +40,20 @@ export default function Bookings() {
   });
   const myVendor = Array.isArray(clubs) ? clubs.find((c: any) => c.name === user?.organisation) : null;
 
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
   const { data: bookings, isLoading } = useQuery({
-    queryKey: ['bookings', myVendor?._id],
+    queryKey: ['bookings', myVendor?._id, isSuperAdmin],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/booking/get_all_booking?vendor_id=${myVendor._id}`, {
+      const url = isSuperAdmin
+        ? `${API_BASE}/booking/get_all_booking`
+        : `${API_BASE}/booking/get_all_booking?vendor_id=${myVendor!._id}`;
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();
       return Array.isArray(json.data) ? json.data : [];
     },
-    enabled: Boolean(myVendor?._id),
+    enabled: isSuperAdmin || Boolean(myVendor?._id),
   });
 
   const updateStatusMutation = useMutation({
