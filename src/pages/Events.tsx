@@ -272,6 +272,9 @@ export default function Events() {
   const [isViewingFeatured, setIsViewingFeatured] = useState(false);
   const [deleteTarget,   setDeleteTarget]   = useState<any>(null);
   const [isDeleting,     setIsDeleting]     = useState(false);
+  // ISSUE 19 FIX: client-side load-more pagination
+  const LIST_PAGE_SIZE = 25;
+  const [listPage, setListPage] = useState(1);
   const [creationStep,   setCreationStep]   = useState(1);
   const [modalKey,       setModalKey]       = useState(0); // increment to force modal remount
 
@@ -396,6 +399,8 @@ export default function Events() {
     body.append('venue_name', eventFormData.title);
     body.append('city_id', eventFormData.city);
     body.append('category_ids', JSON.stringify(eventFormData.event_type || []));
+    // ISSUE 12 FIX: genre was silently discarded — now sent to backend
+    body.append('genre', JSON.stringify(eventFormData.genre || []));
     body.append('start_time', eventFormData.start_time);
     body.append('end_time', eventFormData.end_time);
     body.append('address', eventFormData.address);
@@ -405,9 +410,24 @@ export default function Events() {
     body.append('latitude', eventFormData.latitude || '0');
     body.append('longitude', eventFormData.longitude || '0');
     if (eventFormData.vendor_id) body.append('vendor_id', eventFormData.vendor_id);
-    if (posterFile) body.append('venue_image', posterFile);
-    if (landscapeFile) body.append('event_layout_images', landscapeFile);
-    galleryFiles.forEach((f) => { if (f) body.append('gallery_images', f); });
+    // ISSUE 17 FIX: send existing URLs back when no new file selected
+    if (posterFile) {
+      body.append('venue_image', posterFile);
+    } else if (eventFormData.poster_url) {
+      body.append('existing_poster_url', eventFormData.poster_url);
+    }
+    if (landscapeFile) {
+      body.append('event_layout_images', landscapeFile);
+    } else if (eventFormData.landscape_url) {
+      body.append('existing_landscape_url', eventFormData.landscape_url);
+    }
+    galleryFiles.forEach((f, i) => {
+      if (f) {
+        body.append('gallery_images', f);
+      } else if (eventFormData.gallery_urls?.[i]) {
+        body.append('existing_gallery_urls', eventFormData.gallery_urls[i]);
+      }
+    });
     return body;
   };
 
@@ -570,12 +590,18 @@ export default function Events() {
       : <ArrowUpDown className="w-3 h-3 opacity-50" />;
 
   // ── CSV Export ─────────────────────────────────────────────────────────────
+  // ISSUE 20 FIX: RFC 4180 CSV escaping
+  const csvEsc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+
   const exportData = () => {
     const headers = ['Title', 'City', 'Date', 'Status', 'Attendance', 'Genre'];
     const rows = filteredEvents.map((e: any) => [
-      `"${e.title || ''}"`, `"${e.city || ''}"`, `"${e.date || ''}"`,
-      `"${e.status || ''}"`, `"${e.attendance || 0}"`,
-      `"${Array.isArray(e.genre) ? e.genre.join(', ') : (e.genre || '')}"`,
+      csvEsc(e.title),
+      csvEsc(e.city),
+      csvEsc(e.date),
+      csvEsc(e.status),
+      csvEsc(e.attendance ?? 0),
+      csvEsc(Array.isArray(e.genre) ? e.genre.join(', ') : (e.genre || '')),
     ]);
     const csv  = [headers.join(','), ...rows.map((r: string[]) => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -1380,7 +1406,7 @@ export default function Events() {
                           )}
                         </div>
                         <div className="space-y-3">
-                          <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Genres <span className="text-white/20 normal-case tracking-normal">(not yet stored by the backend — for your own notes)</span></label>
+                          <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Genres <span className="text-white/20 normal-case tracking-normal"></span></label>
                           <MultiSelectDropdown options={genres?.map((g: any) => ({ label: g.name, value: g.name })) || []} value={eventFormData.genre} onChange={(val) => setEventFormData({ ...eventFormData, genre: val })} placeholder="Select genres" />
                         </div>
                         <div className="space-y-3">

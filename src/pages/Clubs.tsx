@@ -102,7 +102,7 @@ const statusColors: any = {
 export default function Clubs() {
   const { token, user } = useAuth();
   const navigate = useNavigate();
-  const { setIsClubProfileOpen } = useOutletContext<{ setIsClubProfileOpen: (open: boolean) => void }>();
+  // ISSUE 30 FIX — removed orphaned useOutletContext (setIsClubProfileOpen was never called).
   const queryClient = useQueryClient();
 
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
@@ -133,6 +133,7 @@ export default function Clubs() {
     // that leaves the discount at 0 simply won't show that option to
     // members at all — see book_venue_table.dart on the app side.
     table_reservation_fee: '', bill_discount_percentage: '', tax_percentage: '',
+    latitude: '', longitude: '', // ISSUE 26 FIX — missing from initial state
   });
   const [workingHours, setWorkingHours] = useState<any[]>([
     { day: 'Monday',    time: '10:00 PM - 04:00 AM', active: false },
@@ -361,7 +362,7 @@ export default function Clubs() {
       resetEventForm();
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'Failed to save event. Please try again.');
+      setSubmitError(err.message || 'Failed to save event. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -472,9 +473,16 @@ export default function Clubs() {
       body.append('latitude', venueFormData.latitude || '');
       body.append('longitude', venueFormData.longitude || '');
       body.append('about', venueFormData.description || '');
+      // ISSUE 29 FIX — validate before submitting, not silently clamp after.
+      const discount = Number(venueFormData.bill_discount_percentage);
+      const tax      = Number(venueFormData.tax_percentage);
+      if (venueFormData.bill_discount_percentage !== '' && (isNaN(discount) || discount < 0 || discount > 100))
+        throw new Error('Bill discount must be between 0 and 100.');
+      if (venueFormData.tax_percentage !== '' && (isNaN(tax) || tax < 0 || tax > 100))
+        throw new Error('Tax percentage must be between 0 and 100.');
       body.append('table_reservation_fee', venueFormData.table_reservation_fee || '0');
-      body.append('bill_discount_percentage', String(Math.max(0, Math.min(100, Number(venueFormData.bill_discount_percentage) || 0))));
-      body.append('tax_percentage', venueFormData.tax_percentage || '0');
+      body.append('bill_discount_percentage', String(discount || 0));
+      body.append('tax_percentage', String(tax || 0));
       if (!isEditingVenue) body.append('vendor_id', vendorId);
       if (venuePortraitFile) body.append('venue_image', venuePortraitFile);
       venueLandscapeFiles.forEach((f) => { if (f) body.append('gallery_images', f); });
@@ -502,7 +510,7 @@ export default function Clubs() {
       resetVenueForm();
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'Failed to save venue. Please try again.');
+      setSubmitError(err.message || 'Failed to save venue. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -762,7 +770,28 @@ export default function Clubs() {
     setWorkingHours(newHours);
   };
 
-  const exportData = () => console.log('Exporting data...', filteredClubs);
+  // ISSUE 21 FIX — real CSV export replacing the console.log stub.
+  const exportData = () => {
+    const csvEsc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const headers = ['Name', 'City', 'Status', 'Verified', 'Type', 'Capacity', 'Created'];
+    const rows = filteredClubs.map((c: any) => {
+      const city = typeof c.city === 'object' ? c.city?.city_name : c.city;
+      return [
+        csvEsc(c.name), csvEsc(city), csvEsc(c.status),
+        csvEsc(c.is_verified ? 'Yes' : 'No'), csvEsc(c.type || c.venue_type),
+        csvEsc(c.capacity), csvEsc(c.createdAt?.slice(0, 10)),
+      ].join(',');
+    });
+    const csv  = [headers.join(','), ...rows].join('
+');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `clubs-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // The Feature/Unfeature endpoints operate on Venue documents, whose _id
   // is NOT the same as the vendor (club account) _id used elsewhere on

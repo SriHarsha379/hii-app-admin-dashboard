@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Lock, Mail, User, Zap, ArrowRight, Loader2, Building2, Layers, ShieldCheck } from 'lucide-react';
 import { motion } from 'motion/react';
 import { API_BASE } from '../lib/apiConfig';
+import { validatePassword } from '../lib/passwordPolicy';
 
 // Public self-serve sign-up for a brand-new Club or Event organiser who
 // doesn't have an account yet at all — distinct from the existing
@@ -34,6 +35,10 @@ export default function Signup() {
       setError('Passwords do not match.');
       return;
     }
+
+    // ISSUE 7 FIX: enforce shared password policy
+    const pwError = validatePassword(password);
+    if (pwError) { setError(pwError); return; }
 
     setIsLoading(true);
     try {

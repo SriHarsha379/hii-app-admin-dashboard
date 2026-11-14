@@ -6,6 +6,7 @@ interface User {
   email: string;
   role: 'SUPER_ADMIN' | 'EVENT_ADMIN' | 'CITY_ADMIN' | 'CLUB_ADMIN' | 'ADMIN' | 'NORMAL_ADMIN';
   organisation?: string;
+  vendorId?: string;
   avatar?: string;
 }
 
@@ -18,27 +19,46 @@ interface AuthContextType {
   isLoading: boolean;
 }
 
+// ISSUE 2 FIX: check JWT exp before restoring session
+function isTokenExpired(token: string): boolean {
+  try {
+    const b64 = token.split('.')[1];
+    if (!b64) return true;
+    const payload = JSON.parse(atob(b64.replace(/-/g, '+').replace(/_/g, '/')));
+    if (typeof payload.exp !== 'number') return false;
+    return payload.exp * 1000 < Date.now();
+  } catch {
+    return true;
+  }
+}
+
+const TOKEN_KEY = 'hii_admin_token';
+const USER_KEY  = 'hii_admin_user';
+const storage   = sessionStorage;
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser]           = useState<User | null>(null);
+  const [token, setToken]         = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Restore session from localStorage on mount so a page refresh doesn't
-    // force the user back to the login page.
     try {
-      const savedToken = localStorage.getItem('hii_admin_token');
-      const savedUser  = localStorage.getItem('hii_admin_user');
+      const savedToken = storage.getItem(TOKEN_KEY);
+      const savedUser  = storage.getItem(USER_KEY);
       if (savedToken && savedUser) {
-        setToken(savedToken);
-        setUser(JSON.parse(savedUser));
+        if (isTokenExpired(savedToken)) {
+          storage.removeItem(TOKEN_KEY);
+          storage.removeItem(USER_KEY);
+        } else {
+          setToken(savedToken);
+          setUser(JSON.parse(savedUser));
+        }
       }
     } catch {
-      // Corrupt localStorage value — clear it and fall through to login
-      localStorage.removeItem('hii_admin_token');
-      localStorage.removeItem('hii_admin_user');
+      storage.removeItem(TOKEN_KEY);
+      storage.removeItem(USER_KEY);
     } finally {
       setIsLoading(false);
     }
@@ -47,24 +67,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const login = (newToken: string, newUser: User) => {
     setToken(newToken);
     setUser(newUser);
-    localStorage.setItem('hii_admin_token', newToken);
-    localStorage.setItem('hii_admin_user', JSON.stringify(newUser));
+    storage.setItem(TOKEN_KEY, newToken);
+    storage.setItem(USER_KEY, JSON.stringify(newUser));
   };
 
   const updateUser = (data: Partial<User>) => {
     setUser(prev => {
       if (!prev) return null;
-      const updatedUser = { ...prev, ...data };
-      localStorage.setItem('hii_admin_user', JSON.stringify(updatedUser));
-      return updatedUser;
+      const updated = { ...prev, ...data };
+      storage.setItem(USER_KEY, JSON.stringify(updated));
+      return updated;
     });
   };
 
   const logout = () => {
     setToken(null);
     setUser(null);
-    localStorage.removeItem('hii_admin_token');
-    localStorage.removeItem('hii_admin_user');
+    storage.removeItem(TOKEN_KEY);
+    storage.removeItem(USER_KEY);
   };
 
   return (

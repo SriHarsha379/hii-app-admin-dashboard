@@ -99,17 +99,28 @@ export default function Users() {
   const [banningUser, setBanningUser] = useState<any>(null);
   const [banReason, setBanReason] = useState('');
 
-  const { data: users, isLoading } = useQuery({
-    queryKey: ['users'],
+  // ISSUE 16 FIX: pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 50;
+
+  // ISSUE 16 FIX: paginated fetch
+  const { data: usersData, isLoading } = useQuery({
+    queryKey: ['users', currentPage],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/users/get_all_user`, {
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: String(PAGE_SIZE),
+      });
+      const res = await fetch(`${API_BASE}/user/get_all_user?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const json = await res.json();
-      // Backend returns { success, message, data: { users, total, page, limit } }
-      return json.data?.users ?? [];
+      return json.data ?? { users: [], total: 0 };
     }
   });
+  const users = usersData?.users ?? [];
+  const totalUsers = usersData?.total ?? 0;
+  const totalPages = Math.ceil(totalUsers / PAGE_SIZE);
 
   const [searchParams] = useSearchParams();
   useEffect(() => {

@@ -111,23 +111,23 @@ export default function Dashboard() {
   });
 
   // ── Scaffolded queries — disabled until real endpoints are wired in ──────────
-  // TODO: replace `${API_BASE}/TODO_CLUB_OPS` with the real endpoint(s) for staff count,
+  // TODO: replace `${API_BASE}/club/ops` with the real endpoint(s) for staff count,
   // daily entries, guestlists, and VIP bookings. Shape assumed below is a guess —
   // adjust the field names once the response shape is known.
   const { data: clubOps } = useQuery({
     queryKey: ['clubOps'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/TODO_CLUB_OPS`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/club/ops`, { headers: { Authorization: `Bearer ${token}` } });
       return res.json();
     },
     enabled: false, // flip to `user?.role === 'CLUB_ADMIN'` once the endpoint exists
   });
 
-  // TODO: replace `${API_BASE}/TODO_CONVERSION_RATE` with the real conversion-rate endpoint.
+  // TODO: replace `${API_BASE}/analytics/conversion` with the real conversion-rate endpoint.
   const { data: conversion } = useQuery({
     queryKey: ['conversionRate'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/TODO_CONVERSION_RATE`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/analytics/conversion`, { headers: { Authorization: `Bearer ${token}` } });
       return res.json();
     },
     enabled: false, // flip on once the endpoint exists

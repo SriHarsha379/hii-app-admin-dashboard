@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Lock, ArrowRight, Loader2, ShieldCheck, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { API_BASE } from '../lib/apiConfig';
+import { validatePassword } from '../lib/passwordPolicy';
 import { cn, apiErrorMessage } from '../lib/utils';
 
 export default function ResetPassword() {
@@ -27,10 +28,9 @@ export default function ResetPassword() {
       setError('This reset link is invalid. Please request a new one.');
       return;
     }
-    if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters.');
-      return;
-    }
+    // ISSUES 7 & 14 FIX: use shared password policy
+    const pwError = validatePassword(newPassword);
+    if (pwError) { setError(pwError); return; }
     if (newPassword !== confirmPassword) {
       setError('Passwords do not match.');
       return;

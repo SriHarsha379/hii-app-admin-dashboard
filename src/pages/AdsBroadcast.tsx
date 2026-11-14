@@ -106,7 +106,7 @@ export default function AdsBroadcast() {
   const [selectedChannels, setSelectedChannels] = useState<string[]>(['push']);
   const [isSending, setIsSending] = useState(false);
   const [broadcastData, setBroadcastData] = useState({
-    audience: 'All Active Users (12.4k)',
+    audience: 'All Verified Users',
     city: 'ALL',
     subject: '',
     content: ''
@@ -419,7 +419,7 @@ export default function AdsBroadcast() {
     onSuccess: () => {
       setIsSending(false);
       setBroadcastStatus({ type: 'success', message: 'Broadcast sent to all verified users.' });
-      setBroadcastData({ audience: 'All Active Users (12.4k)', city: 'ALL', subject: '', content: '' });
+      setBroadcastData({ audience: 'All Verified Users', city: 'ALL', subject: '', content: '' });
     },
     onError: (err: any) => {
       setIsSending(false);
@@ -892,7 +892,7 @@ export default function AdsBroadcast() {
                       onChange={(e) => setBroadcastData({ ...broadcastData, audience: e.target.value })}
                       className="w-full bg-[#09090B] border border-white/5 rounded-[24px] px-8 py-6 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 appearance-none font-medium"
                     >
-                      <option>All Users (12.4k)</option>
+                      <option>All Verified Users</option>
                       <option>Club Owners (42)</option>
                       <option>Premium Users (2.1k)</option>
                       <option>Inactive Users (840)</option>
@@ -1075,10 +1075,13 @@ export default function AdsBroadcast() {
                     </FormSection>
 
                     <FormSection title="Targeting" icon={<Shield className="w-4 h-4" />}>
-                      <div className="flex items-start gap-2 mb-6 px-1">
-                        <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                        <p className="text-[10px] text-amber-400/80 font-medium leading-relaxed">
-                          City and audience targeting aren't enforced by the backend yet — every ad shows to all users everywhere until that's built. These fields are for your own campaign notes for now.
+                      {/* ISSUE 25 FIX — prominent banner, fields disabled until backend supports targeting */}
+                      <div className="flex items-center gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 mb-6">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                        <p className="text-xs font-bold text-amber-400">
+                          Targeting is not yet active. All ads currently show to every user
+                          regardless of city or audience selection. These fields are saved
+                          for your records only.
                         </p>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
