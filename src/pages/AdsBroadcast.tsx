@@ -1128,7 +1128,11 @@ export default function AdsBroadcast() {
                               const file = e.target.files?.[0];
                               if (!file) return;
                               setAdImageFile(file);
-                              setAdFormData((prev) => ({ ...prev, imageUrl: URL.createObjectURL(file) }));
+                              // ISSUE 28 FIX: revoke previous blob before creating new one
+                              setAdFormData((prev) => {
+                                if (prev.imageUrl?.startsWith('blob:')) URL.revokeObjectURL(prev.imageUrl);
+                                return { ...prev, imageUrl: URL.createObjectURL(file) };
+                              });
                             }}
                           />
                           {adFormData.imageUrl ? (
@@ -1204,7 +1208,11 @@ export default function AdsBroadcast() {
                               const file = e.target.files?.[0];
                               if (!file) return;
                               setAdVideoFile(file);
-                              setAdFormData((prev) => ({ ...prev, videoUrl: URL.createObjectURL(file) }));
+                              // ISSUE 28 FIX: revoke previous video blob
+                              setAdFormData((prev) => {
+                                if (prev.videoUrl?.startsWith('blob:')) URL.revokeObjectURL(prev.videoUrl);
+                                return { ...prev, videoUrl: URL.createObjectURL(file) };
+                              });
                             }}
                           />
                           <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-primary/20 transition-all shrink-0">

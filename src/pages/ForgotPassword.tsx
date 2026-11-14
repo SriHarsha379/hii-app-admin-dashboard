@@ -161,7 +161,7 @@ export default function ForgotPassword() {
 
         <div className="mt-8 text-center">
           <p className="text-[10px] text-white/20 font-medium uppercase tracking-[0.3em]">
-            &copy; 2024 Hii App Production • All Rights Reserved
+            &copy; {new Date().getFullYear()} Hii App Production • All Rights Reserved
           </p>
         </div>
       </motion.div>

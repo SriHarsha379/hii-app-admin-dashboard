@@ -89,11 +89,18 @@ function ImageUploadZone({
 }: { label: string; hint: string; value: string; onChange: (url: string) => void; onFileChange: (file: File | null) => void; aspect: string }) {
   const inputRef   = useRef<HTMLInputElement>(null);
   const [error, setError] = useState('');
+  const prevUrlRef = useRef<string>('');
 
   const handleFile = (file: File) => {
     setError('');
+    // ISSUE 15 FIX: revoke previous blob URL before creating a new one
+    if (prevUrlRef.current?.startsWith('blob:')) {
+      URL.revokeObjectURL(prevUrlRef.current);
+    }
+    const url = URL.createObjectURL(file);
+    prevUrlRef.current = url;
     onFileChange(file);
-    onChange(URL.createObjectURL(file));
+    onChange(url);
   };
 
   return (
