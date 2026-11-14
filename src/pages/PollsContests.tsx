@@ -74,12 +74,7 @@ import {
   Cell
 } from 'recharts';
 
-const voteData = [
-  { name: 'Option A', votes: 420, color: '#4F46E5' },
-  { name: 'Option B', votes: 310, color: '#9333EA' },
-  { name: 'Option C', votes: 150, color: '#EC4899' },
-  { name: 'Option D', votes: 80, color: '#F59E0B' },
-];
+// voteData computed below from real poll data (Issue 41)
 
 export default function PollsContests() {
   const { token } = useAuth();
@@ -103,6 +98,7 @@ export default function PollsContests() {
   const [sortField, setSortField] = useState('end_date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [filterCity, setFilterCity] = useState('ALL');
+  const [selectedPollId, setSelectedPollId] = useState<string | null>(null);
 
   const { data: polls, isLoading: pollsLoading } = useQuery({
     queryKey: ['polls'],
@@ -265,6 +261,10 @@ export default function PollsContests() {
   // first, since none of it existed.
   const [openPollMenuId, setOpenPollMenuId] = useState<string | null>(null);
   const [openContestMenuId, setOpenContestMenuId] = useState<string | null>(null);
+  const [confirmDeletePollId, setConfirmDeletePollId] = useState<string | null>(null);
+  const [confirmDeleteContestId, setConfirmDeleteContestId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState('');
+  const [statusError, setStatusError] = useState('');
 
   const deletePollMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -280,7 +280,7 @@ export default function PollsContests() {
       queryClient.invalidateQueries({ queryKey: ['polls'] });
       setOpenPollMenuId(null);
     },
-    onError: (err: any) => alert(err.message || 'Failed to remove poll'),
+    onError: (err: any) => setDeleteError(err.message || 'Failed to remove poll'),
   });
 
   const deleteContestMutation = useMutation({
@@ -297,7 +297,7 @@ export default function PollsContests() {
       queryClient.invalidateQueries({ queryKey: ['contests'] });
       setOpenContestMenuId(null);
     },
-    onError: (err: any) => alert(err.message || 'Failed to remove contest'),
+    onError: (err: any) => setDeleteError(err.message || 'Failed to remove contest'),
   });
 
   const exportData = () => {
@@ -330,6 +330,15 @@ export default function PollsContests() {
     newOptions[index] = value;
     setNewPoll({ ...newPoll, options: newOptions });
   };
+
+  const _selPoll = sortedPolls.find((p: any) => (p._id||p.id) === selectedPollId) || sortedPolls[0];
+  const voteData = Array.isArray(_selPoll?.options)
+    ? _selPoll.options.map((opt: any, i: number) => ({
+        name: opt.text || opt.label || `Option ${i+1}`,
+        votes: opt.votes ?? opt.vote_count ?? 0,
+        color: ['#4F46E5','#9333EA','#EC4899','#F59E0B','#10B981'][i % 5],
+      }))
+    : [];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
@@ -484,7 +493,7 @@ export default function PollsContests() {
                                   <div className="fixed inset-0 z-10" onClick={() => setOpenPollMenuId(null)} />
                                   <div className="absolute right-0 top-12 z-20 w-40 rounded-2xl bg-[#0B0B0F] border border-white/10 shadow-2xl overflow-hidden">
                                     <button
-                                      onClick={() => { if (confirm(`Remove "${poll.title}"?`)) deletePollMutation.mutate((poll._id || poll.id)); }}
+                                      onClick={() => { setConfirmDeletePollId(poll._id || poll.id); }}
                                       disabled={deletePollMutation.isPending}
                                       className="w-full flex items-center gap-3 px-5 py-3 text-xs font-bold text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50"
                                     >
@@ -602,7 +611,7 @@ export default function PollsContests() {
                       {/* FIXED: contests had no remove action anywhere on
                           the card at all. */}
                       <button
-                        onClick={() => { if (confirm(`Remove "${contest.title}"?`)) deleteContestMutation.mutate((contest._id || contest.id)); }}
+                        onClick={() => { setConfirmDeleteContestId(contest._id || contest.id); }}
                         disabled={deleteContestMutation.isPending}
                         className="text-[10px] px-2 py-1 rounded-lg font-bold border border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/10 transition-all uppercase disabled:opacity-50 flex items-center gap-1"
                       >
@@ -913,6 +922,43 @@ export default function PollsContests() {
           </>
         )}
       </AnimatePresence>
+    </div>
+  );
+
+      {deleteError && (
+        <div className="fixed bottom-6 right-6 z-[300] bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold px-5 py-3 rounded-2xl flex items-center gap-3 shadow-2xl">
+          <span>&#9888;</span> {deleteError}
+          <button onClick={() => setDeleteError('')} className="ml-2 text-red-400/60 hover:text-red-400">&#10005;</button>
+        </div>
+      )}
+      {statusError && (
+        <div className="fixed bottom-20 right-6 z-[300] bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold px-5 py-3 rounded-2xl flex items-center gap-3 shadow-2xl">
+          <span>&#9888;</span> {statusError}
+          <button onClick={() => setStatusError('')} className="ml-2 text-red-400/60 hover:text-red-400">&#10005;</button>
+        </div>
+      )}
+      {confirmDeletePollId && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="glass-card w-full max-w-sm rounded-3xl border border-red-500/20 p-8 space-y-6">
+            <p className="text-sm text-white/70">Remove this poll? This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDeletePollId(null)} className="flex-1 py-3 rounded-2xl bg-white/5 border border-white/10 text-white/60 text-xs font-black uppercase">Cancel</button>
+              <button onClick={() => { deletePollMutation.mutate(confirmDeletePollId); setConfirmDeletePollId(null); }} className="flex-1 py-3 rounded-2xl bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-black uppercase">Remove</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmDeleteContestId && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="glass-card w-full max-w-sm rounded-3xl border border-red-500/20 p-8 space-y-6">
+            <p className="text-sm text-white/70">Remove this contest? This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDeleteContestId(null)} className="flex-1 py-3 rounded-2xl bg-white/5 border border-white/10 text-white/60 text-xs font-black uppercase">Cancel</button>
+              <button onClick={() => { deleteContestMutation.mutate(confirmDeleteContestId); setConfirmDeleteContestId(null); }} className="flex-1 py-3 rounded-2xl bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-black uppercase">Remove</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

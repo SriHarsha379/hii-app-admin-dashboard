@@ -38,7 +38,7 @@ export default function Bookings() {
       return json.data ?? [];
     },
   });
-  const myVendor = Array.isArray(clubs) ? clubs.find((c: any) => c.name === user?.organisation) : null;
+  const myVendor = Array.isArray(clubs) ? clubs.find((c: any) => (c._id || c.id) === user?.vendorId || c.name === user?.organisation) : null;
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
   const { data: bookings, isLoading } = useQuery({

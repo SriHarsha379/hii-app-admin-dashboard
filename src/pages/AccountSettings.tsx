@@ -31,6 +31,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { cn, apiErrorMessage } from '../lib/utils';
 import { FormSection, RefinedField } from '../components/RefinedForm';
+import { LocationPicker } from '../components/LocationPicker';
 import ClubVenueMedia from '../components/ClubVenueMedia';
 
 import { API_BASE } from '../lib/apiConfig';
@@ -52,6 +53,8 @@ export default function AccountSettings() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [location, setLocation] = React.useState({ address: '', latitude: '', longitude: '' });
+  const [saveError, setSaveError] = useState('');
 
   // Form State
   const [initialFormData, setInitialFormData] = useState(EMPTY_FORM_DATA);
@@ -70,7 +73,7 @@ export default function AccountSettings() {
     enabled: Boolean(token)
   });
 
-  const myVendor = Array.isArray(clubs) ? clubs.find((item: any) => item.name === user?.organisation) : null;
+  const myVendor = Array.isArray(clubs) ? clubs.find((item: any) => (item._id || item.id) === user?.vendorId || item.name === user?.organisation) : null;
 
   useEffect(() => {
     const club = myVendor;
@@ -91,6 +94,7 @@ export default function AccountSettings() {
     };
     setInitialFormData(next);
     setFormData(next);
+    setLocation({ address: club.address || '', latitude: club.latitude ? String(club.latitude) : '', longitude: club.longitude ? String(club.longitude) : '' });
   }, [clubs, user]);
 
   const queryClient = useQueryClient();
@@ -184,7 +188,7 @@ export default function AccountSettings() {
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 3000);
     } catch (err: any) {
-      alert(err.message || 'Failed to save changes');
+      setSaveError(err.message || 'Failed to save changes');
     }
   };
 
@@ -206,7 +210,9 @@ export default function AccountSettings() {
         phone_number: formData.phone,
         email: formData.email,
         city: formData.city,
-        address: formData.address,
+        address: location.address || formData.address,
+        latitude: location.latitude,
+        longitude: location.longitude,
       });
       setInitialFormData((prev: any) => ({
         ...prev,
@@ -219,12 +225,18 @@ export default function AccountSettings() {
       }));
       setShowApprovalDialog(false);
     } catch (err: any) {
-      alert(err.message || 'Failed to save changes');
+      setSaveError(err.message || 'Failed to save changes');
     }
   };
 
   return (
     <div className="space-y-16 animate-in fade-in slide-in-from-bottom-4 duration-1000 pb-32">
+      {saveError && (
+        <div className="fixed bottom-6 right-6 z-[300] bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold px-5 py-3 rounded-2xl flex items-center gap-3 shadow-2xl">
+          <span>&#9888;</span> {saveError}
+          <button onClick={() => setSaveError("")} className="ml-2 text-red-400/60 hover:text-red-400">&#10005;</button>
+        </div>
+      )}
       {/* Header Enhancement */}
       <div className="relative flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pb-8">
         <div className="space-y-4 relative z-10">

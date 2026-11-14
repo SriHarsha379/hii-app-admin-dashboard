@@ -38,6 +38,7 @@ import { FilterDropdown } from '../components/FilterDropdown';
 import { useQuery } from '@tanstack/react-query';
 
 import { API_BASE } from '../lib/apiConfig';
+import { validatePassword } from '../lib/passwordPolicy';
 
 const initialForm = {
   name: '',
@@ -259,10 +260,19 @@ export default function ClubOnboarding() {
   // used successfully on Events.tsx and Clubs.tsx.
   const [portraitFiles, setPortraitFiles] = useState<File[]>([]);
   const [landscapeFiles, setLandscapeFiles] = useState<File[]>([]);
+  const portraitBlobUrls = React.useRef<string[]>([]);
+  const landscapeBlobUrls = React.useRef<string[]>([]);
+  React.useEffect(() => {
+    return () => {
+      portraitBlobUrls.current.forEach((u) => URL.revokeObjectURL(u));
+      landscapeBlobUrls.current.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, []);
 
   const handlePortraitUpload = (file: File) => {
     setUploadError(null);
     const url = URL.createObjectURL(file);
+    portraitBlobUrls.current.push(url);
     setPortraitFiles((f) => [...f, file]);
     setVenueFormData((f) => ({
       ...f,
@@ -274,6 +284,7 @@ export default function ClubOnboarding() {
   const handleLandscapeUpload = (file: File) => {
     setUploadError(null);
     const url = URL.createObjectURL(file);
+    landscapeBlobUrls.current.push(url);
     setLandscapeFiles((f) => [...f, file]);
     setVenueFormData((f) => ({ ...f, landscape_urls: [...f.landscape_urls, url] }));
   };
@@ -308,7 +319,8 @@ export default function ClubOnboarding() {
       if (!venueFormData.email) errors.email = 'Email is required.';
       if (!venueFormData.phone) errors.phone = 'Phone number is required.';
       else if (!isPhone10(venueFormData.phone)) errors.phone = 'Enter a valid 10-digit phone number.';
-      if (!venueFormData.password || venueFormData.password.length < 6) errors.password = 'At least 6 characters required.';
+      const _pwErr1 = validatePassword(venueFormData.password);
+      if (_pwErr1) errors.password = _pwErr1;
       if (venueFormData.password !== venueFormData.confirmPassword) errors.confirmPassword = 'Passwords do not match.';
       if (!emailVerified || emailChangedSinceVerify) errors.email = errors.email || 'Please verify your email before continuing.';
     }
@@ -356,9 +368,8 @@ export default function ClubOnboarding() {
       } else if (!isPhone10(venueFormData.phone)) {
         errors.phone = 'Enter a valid 10-digit phone number.';
       }
-      if (!venueFormData.password || venueFormData.password.length < 6) {
-        errors.password = 'At least 6 characters required.';
-      }
+      const _pwErr2 = validatePassword(venueFormData.password);
+      if (_pwErr2) { errors.password = _pwErr2; }
       if (venueFormData.password !== venueFormData.confirmPassword) {
         errors.confirmPassword = 'Passwords do not match.';
       }
@@ -1023,6 +1034,7 @@ export default function ClubOnboarding() {
                           )}
                           <button
                             onClick={() => {
+                              if (url.startsWith('blob:')) { URL.revokeObjectURL(url); portraitBlobUrls.current = portraitBlobUrls.current.filter(u => u !== url); }
                               const next = venueFormData.portraits.filter((_: any, i: number) => i !== idx);
                               setVenueFormData({
                                 ...venueFormData,
