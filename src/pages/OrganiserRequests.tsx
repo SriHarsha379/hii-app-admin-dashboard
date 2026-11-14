@@ -37,6 +37,7 @@ export default function OrganiserRequests() {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
 
   const { data: pending, isLoading } = useQuery({
     queryKey: ['organiser-requests'],
@@ -74,7 +75,9 @@ export default function OrganiserRequests() {
       if (!res.ok) throw new Error('Failed to approve');
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['organiser-requests'] }),
+    onMutate:  (id) => setApprovingId(id),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['organiser-requests'] }); setApprovingId(null); },
+    onError:   ()  => setApprovingId(null),
   });
 
   const rejectMutation = useMutation({
@@ -173,10 +176,10 @@ export default function OrganiserRequests() {
                     </button>
                     <button
                       onClick={() => approveMutation.mutate(v._id)}
-                      disabled={approveMutation.isPending}
+                      disabled={approvingId === v._id}
                       className="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:bg-emerald-500/20 transition-all flex items-center gap-1.5 disabled:opacity-50"
                     >
-                      {approveMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Approve
+                      {approvingId === v._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Approve
                     </button>
                   </div>
                 </div>

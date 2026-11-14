@@ -29,6 +29,7 @@ import {
 import { cn } from '../lib/utils';
 import { FormSection, RefinedField } from '../components/RefinedForm';
 import { API_BASE } from '../lib/apiConfig';
+import { validatePassword } from '../lib/passwordPolicy';
 
 const UPLOADS_BASE = API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads');
 const avatarUrl = (filename?: string | null) => {
@@ -62,7 +63,7 @@ export default function Settings() {
       const filename = json?.data?.profile_image;
       if (filename) updateUser({ avatar: avatarUrl(filename) });
     },
-    onError: (err: any) => alert(err.message || 'Failed to update photo'),
+    onError: (err: any) => setAvatarError(err.message || 'Failed to update photo'),
   });
 
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,7 +108,7 @@ export default function Settings() {
       return res.json();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-cities'] }),
-    onError: (e: any) => alert(e.message || 'Failed to add city'),
+    onError: (e: any) => setCityError(e.message || 'Failed to add city'),
   });
   const deleteCityMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -118,7 +119,7 @@ export default function Settings() {
       return res.json();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-cities'] }),
-    onError: (e: any) => alert(e.message || 'Failed to delete city'),
+    onError: (e: any) => setCityError(e.message || 'Failed to delete city'),
   });
 
   // FIXED: these toggles used `defaultChecked` (uncontrolled) with no
@@ -227,6 +228,8 @@ export default function Settings() {
   };
 
   const [newCity, setNewCity] = useState('');
+  const [cityError, setCityError] = useState('');
+  const [avatarError, setAvatarError] = useState('');
 
   const [profile, setProfile] = useState({
     name: user?.name || '',
@@ -434,6 +437,11 @@ export default function Settings() {
                     </div>
                   </div>
 
+                  {profileError && (
+                    <div className="flex items-center gap-2 text-red-400 text-xs font-bold py-2">
+                      <span>⚠</span> {profileError}
+                    </div>
+                  )}
                   <FormSection title="Profile Details" icon={<User className="w-4 h-4" />}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                       <RefinedField
@@ -492,7 +500,12 @@ export default function Settings() {
                   </div>
 
                   <div className="p-10 rounded-[40px] bg-red-500/5 border border-red-500/10 space-y-12">
-                    <FormSection title="Update Password" icon={<Lock className="w-4 h-4" />}>
+                    {securityError && (
+                    <div className="flex items-center gap-2 text-red-400 text-xs font-bold py-2 mb-4">
+                      <span>⚠</span> {securityError}
+                    </div>
+                  )}
+                  <FormSection title="Update Password" icon={<Lock className="w-4 h-4" />}>
                       <div className="grid grid-cols-1 gap-10 max-w-xl">
                         <RefinedField
                           label="Current Password"

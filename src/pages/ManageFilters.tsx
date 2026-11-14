@@ -82,6 +82,7 @@ export default function ManageFilters() {
   const [newItemLat, setNewItemLat] = useState('');
   const [newItemLng, setNewItemLng] = useState('');
   const [formError, setFormError] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const tabs: { id: TabId; label: string; icon: any }[] = [
     { id: 'cities', label: 'Cities', icon: MapPin },
@@ -446,13 +447,27 @@ export default function ManageFilters() {
                         {item.is_active ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     )}
-                    <button
-                      onClick={() => deleteItemMutation.mutate(item._id || item.id)}
-                      disabled={deleteItemMutation.isPending}
-                      className="p-2 rounded-lg hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {deletingId === (item._id || item.id) ? (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => { deleteItemMutation.mutate(item._id || item.id); setDeletingId(null); }}
+                          className="px-2 py-1 rounded-lg bg-red-500/20 text-red-400 text-[9px] font-black uppercase tracking-widest hover:bg-red-500/30 transition-all">
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => setDeletingId(null)}
+                          className="px-2 py-1 rounded-lg bg-white/5 text-white/50 text-[9px] font-black uppercase tracking-widest hover:bg-white/10 transition-all">
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setDeletingId(item._id || item.id)}
+                        className="p-2 rounded-lg hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ));

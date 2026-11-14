@@ -35,32 +35,50 @@ const actionIcons: any = {
 export default function ActivityLogs() {
   const { token } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo,   setDateTo]   = useState('');
+  const [logPage,  setLogPage]  = useState(1);
+  const LOG_PAGE_SIZE = 50;
 
-  const { data: logs, isLoading } = useQuery({
-    queryKey: ['activity-logs'],
+  const { data: logsData, isLoading } = useQuery({
+    queryKey: ['activity-logs', logPage, searchTerm, dateFrom, dateTo],
     queryFn: async () => {
-      // NOTE: was hitting `${API_BASE}/activity-logs` with no sub-path — the
-      // backend had no model, controller, or route for activity logs at all
-      // until now. Real endpoint is `/activity-logs/get_all`.
-      const res = await fetch(`${API_BASE}/activity-logs/get_all`, {
+      // ISSUE 37 FIX: paginated fetch with server-side search + date range
+      const params = new URLSearchParams({
+        page:  String(logPage),
+        limit: String(LOG_PAGE_SIZE),
+        ...(searchTerm && { search: searchTerm }),
+        ...(dateFrom    && { from:   dateFrom }),
+        ...(dateTo      && { to:     dateTo }),
+      });
+      const res = await fetch(`${API_BASE}/activity-logs/get_all?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const json = await res.json();
-      return json.data?.logs ?? [];
+      return json.data ?? { logs: [], total: 0 };
     }
   });
+  const logs = logsData?.logs ?? [];
+  const totalLogs = logsData?.total ?? 0;
+  const totalLogPages = Math.ceil(totalLogs / LOG_PAGE_SIZE);
 
-  const filteredData = (Array.isArray(logs) ? logs : [])?.filter((item: any) => {
+  const filteredData = (Array.isArray(logs) ? logs : []).filter((item: any) => {
     return item.admin_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
            item.action?.toLowerCase().includes(searchTerm.toLowerCase()) ||
            item.resource?.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
+  // ISSUE 40 FIX: RFC 4180 CSV escaping
+  const csvEsc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+
   const exportData = () => {
-    const headers = ['Admin', 'Action', 'Resource', 'Date'];
+    const headers = ['Admin', 'Action', 'Resource', 'Details', 'Date'];
     const rows = filteredData.map((item: any) => [
-      `"${item.admin_name || ''}"`, `"${item.action || ''}"`, `"${item.resource || ''}"`,
-      `"${item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}"`,
+      csvEsc(item.admin_name),
+      csvEsc(item.action),
+      csvEsc(item.resource),
+      csvEsc(item.details),
+      csvEsc(item.createdAt ? new Date(item.createdAt).toLocaleString() : ''),
     ]);
     const csv  = [headers.join(','), ...rows.map((r: string[]) => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });

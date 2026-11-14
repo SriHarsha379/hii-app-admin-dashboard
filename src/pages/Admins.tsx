@@ -69,6 +69,7 @@ import UserProfilePreview from '../components/UserProfilePreview';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { API_BASE } from '../lib/apiConfig';
+import { validatePassword } from '../lib/passwordPolicy';
 const roleColors: any = {
   'SUPER_ADMIN': 'bg-purple-500/10 text-purple-400 border-purple-500/20',
   'ADMIN': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
@@ -91,6 +92,7 @@ export default function Admins() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [newAdmin, setNewAdmin] = useState({ name: '', email: '', role: 'NORMAL_ADMIN', password: '' });
+  const [addError, setAddError] = useState('');
 
   const { data: admins, isLoading } = useQuery({
     queryKey: ['admins'],
@@ -132,6 +134,8 @@ export default function Admins() {
   // had zero support for deactivating or removing an admin account
   // through the dashboard; added real endpoints for both.
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const toggleStatusMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -147,7 +151,7 @@ export default function Admins() {
       queryClient.invalidateQueries({ queryKey: ['admins'] });
       setOpenMenuId(null);
     },
-    onError: (err: any) => alert(err.message || 'Failed to update admin status'),
+    onError: (err: any) => setMutationError(err.message || 'Failed to update admin status'),
   });
 
   const deleteAdminMutation = useMutation({
@@ -164,7 +168,7 @@ export default function Admins() {
       queryClient.invalidateQueries({ queryKey: ['admins'] });
       setOpenMenuId(null);
     },
-    onError: (err: any) => alert(err.message || 'Failed to remove admin'),
+    onError: (err: any) => setMutationError(err.message || 'Failed to remove admin'),
   });
 
   const filteredAdmins = (Array.isArray(admins) ? admins : [])?.filter((a: any) => {
@@ -300,7 +304,7 @@ export default function Admins() {
                 </tr>
               ) : filteredAdmins.map((admin: any) => (
                 <tr
-                  key={admin.id}
+                  key={admin._id || admin.id}
                   onClick={() => setSelectedAdmin(admin)}
                   className="group hover:bg-white/5 transition-colors cursor-pointer"
                 >
@@ -330,7 +334,7 @@ export default function Admins() {
                   </td>
                   <td className="px-6 py-4 text-right relative">
                     <button
-                      onClick={() => setOpenMenuId(openMenuId === admin._id ? null : admin._id)}
+                      onClick={() => setOpenMenuId(openMenuId === (admin._id || admin.id) ? null : admin._id)}
                       className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition-all"
                     >
                       <MoreHorizontal className="w-4 h-4" />
@@ -348,7 +352,7 @@ export default function Admins() {
                             {admin.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                           </button>
                           <button
-                            onClick={() => { if (confirm(`Remove ${admin.name}? This can't be undone from here.`)) deleteAdminMutation.mutate(admin._id); }}
+                            onClick={() => setConfirmDeleteId(admin._id)}
                             disabled={deleteAdminMutation.isPending}
                             className="w-full flex items-center gap-3 px-5 py-3 text-xs font-bold text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50"
                           >
@@ -463,15 +467,27 @@ export default function Admins() {
                 </div>
               </div>
 
+              {addError && (
+                <div className="flex items-center gap-2 text-red-400 text-xs font-bold py-2">
+                  <span>⚠</span> {addError}
+                </div>
+              )}
               <div className="flex gap-3 pt-4">
                 <button
-                  onClick={() => setIsAddModalOpen(false)}
+                  onClick={() => { setIsAddModalOpen(false); setAddError(''); }}
                   className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-[11px] font-black uppercase tracking-widest hover:bg-white/10 transition-all"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={() => addAdminMutation.mutate(newAdmin)}
+                  onClick={() => {
+                    setAddError('');
+                    if (!newAdmin.name.trim()) { setAddError('Name is required.'); return; }
+                    if (!newAdmin.email.trim()) { setAddError('Email is required.'); return; }
+                    const pwErr = validatePassword(newAdmin.password);
+                    if (pwErr) { setAddError(pwErr); return; }
+                    addAdminMutation.mutate(newAdmin);
+                  }}
                   disabled={addAdminMutation.isPending}
                   className="flex-1 py-3 rounded-xl bg-gradient-to-br from-primary to-purple-600 text-[11px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
@@ -479,6 +495,35 @@ export default function Admins() {
                   {addAdminMutation.isPending ? 'Adding...' : 'Add Admin'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+    {mutationError && (
+        <div className="fixed bottom-6 right-6 z-[300] bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold px-5 py-3 rounded-2xl flex items-center gap-3 shadow-2xl">
+          <span>⚠</span> {mutationError}
+          <button onClick={() => setMutationError('')} className="ml-2 text-red-400/60 hover:text-red-400">✕</button>
+        </div>
+      )}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="glass-card w-full max-w-sm rounded-3xl border border-red-500/20 p-8 space-y-6">
+            <p className="text-sm text-white/70">
+              Remove <span className="text-white font-bold">
+                {(Array.isArray(admins) ? admins : []).find((a: any) => a._id === confirmDeleteId)?.name}
+              </span>? This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDeleteId(null)}
+                className="flex-1 py-3 rounded-2xl bg-white/5 border border-white/10 text-white/60 text-[11px] font-black uppercase tracking-widest hover:bg-white/10 transition-all">
+                Cancel
+              </button>
+              <button
+                onClick={() => { deleteAdminMutation.mutate(confirmDeleteId); setConfirmDeleteId(null); }}
+                disabled={deleteAdminMutation.isPending}
+                className="flex-1 py-3 rounded-2xl bg-red-500/20 border border-red-500/30 text-red-400 text-[11px] font-black uppercase tracking-widest hover:bg-red-500/30 transition-all disabled:opacity-50">
+                Remove
+              </button>
             </div>
           </div>
         </div>
