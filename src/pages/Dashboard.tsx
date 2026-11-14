@@ -221,12 +221,7 @@ export default function Dashboard() {
           </>
         )}
         {/* Conversion Rate hidden until backend endpoint exists
-        <MetricCard
-          title="Conversion Rate"
-          value={conversion?.rate != null ? `${conversion.rate}%` : '—'}
-          icon={TrendingUp}
-          updateText="Awaiting endpoint"
-        /> */
+        {/* Conversion Rate hidden — no backend endpoint yet */}
       </div>
 
       {/* Growth Chart — real data only, built from the users/events/clubs
@@ -241,7 +236,7 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-          <div className="h-[300px]">
+          <div style={{minWidth:0}} className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <AreaChart data={growthChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
@@ -287,7 +282,7 @@ export default function Dashboard() {
               />
             </div>
             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">Breakdown by lifecycle stage — Upcoming, Live, Completed, Cancelled</p>
-            <div className="h-[240px]">
+            <div style={{minWidth:0}} className="h-[240px]">
               {eventStatusData.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No events yet</div>
               ) : (
@@ -315,7 +310,7 @@ export default function Dashboard() {
               />
             </div>
             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">Active (visible to users) vs. Inactive (hidden)</p>
-            <div className="h-[240px]">
+            <div style={{minWidth:0}} className="h-[240px]">
               {clubStatusData.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No clubs yet</div>
               ) : (

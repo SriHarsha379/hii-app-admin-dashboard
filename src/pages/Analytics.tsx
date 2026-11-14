@@ -255,7 +255,7 @@ export default function Analytics() {
               </p>
             </div>
           </div>
-          <div className="h-[320px]">
+          <div style={{minWidth:0}} className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <AreaChart data={growthChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
@@ -295,7 +295,7 @@ export default function Analytics() {
           <div className="glass-card p-6 rounded-2xl">
             <h3 className="text-sm font-black text-white uppercase tracking-wider mb-1">Events by Status</h3>
             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">From the events already loaded</p>
-            <div className="h-[260px]">
+            <div style={{minWidth:0}} className="h-[260px]">
               {eventStatusData.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No events yet</div>
               ) : (
@@ -317,7 +317,7 @@ export default function Analytics() {
           <div className="glass-card p-6 rounded-2xl">
             <h3 className="text-sm font-black text-white uppercase tracking-wider mb-1">Top Cities by Clubs</h3>
             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">From the clubs already loaded</p>
-            <div className="h-[260px]">
+            <div style={{minWidth:0}} className="h-[260px]">
               {clubsByCityData.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No clubs yet</div>
               ) : (

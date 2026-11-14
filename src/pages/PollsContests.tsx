@@ -512,7 +512,7 @@ export default function PollsContests() {
             <div className="space-y-6">
               <div className="glass-card p-6 rounded-2xl border border-white/10 space-y-6">
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">Vote Distribution</h3>
-                <div className="h-[250px] w-full">
+                <div style={{minWidth:0}} className="h-[250px] w-full">
                   <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <BarChart data={voteData} layout="vertical">
                       <XAxis type="number" hide />

@@ -155,8 +155,6 @@ export default function Settings() {
   // existed for 2FA on admin accounts whatsoever. Built real TOTP-based
   // 2FA (RFC 6238, compatible with Google Authenticator/Authy/etc).
   const [twoFaStep, setTwoFaStep] = useState<'idle' | 'setup' | 'disable'>('idle');
-  const [setupSecret, setSetupSecret] = useState('');
-  const [setupCode, setSetupCode] = useState('');
   const [disablePassword, setDisablePassword] = useState('');
   const [twoFaError, setTwoFaError] = useState('');
 
@@ -230,6 +228,8 @@ export default function Settings() {
   const [newCity, setNewCity] = useState('');
   const [cityError, setCityError] = useState('');
   const [avatarError, setAvatarError] = useState('');
+  const [securityError, setSecurityError] = useState('');
+  const [profileError, setProfileError] = useState('');
 
   const [profile, setProfile] = useState({
     name: user?.name || '',
@@ -290,7 +290,7 @@ export default function Settings() {
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (err: any) {
-      alert(err.message || 'Save failed');
+      setProfileError(err.message || 'Save failed');
     } finally {
       setIsSaving(false);
     }

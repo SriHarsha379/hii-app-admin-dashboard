@@ -161,7 +161,7 @@ export default function Ticketing() {
                   </div>
                 </div>
               </div>
-              <div className="h-[300px]">
+              <div style={{minWidth:0}} className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <AreaChart data={salesData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <defs>
@@ -218,7 +218,7 @@ export default function Ticketing() {
           <div className="space-y-6">
             <div className="glass-card p-6 rounded-2xl">
               <h3 className="text-sm font-black text-white uppercase tracking-wider mb-6">Guest Stats</h3>
-              <div className="h-[200px] relative">
+              <div style={{minWidth:0}} className="h-[200px] relative">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <PieChart>
                     <Pie
