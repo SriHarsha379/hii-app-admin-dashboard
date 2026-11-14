@@ -195,7 +195,8 @@ export default function Recommendations() {
       const res = await fetch(`${API_BASE}/recommendations?${params}`, {
         headers: { Authorization: `Bearer ${token}`},
       });
-      return res.json();
+      const json = await res.json();
+      return Array.isArray(json.data) ? json.data : (Array.isArray(json) ? json : []);
     },
   });
 
@@ -205,7 +206,8 @@ export default function Recommendations() {
       const res = await fetch(`${API_BASE}/recommendations/preview`, {
         headers: { Authorization: `Bearer ${token}`},
       });
-      return res.json();
+      const json = await res.json();
+      return Array.isArray(json.data) ? json.data : (Array.isArray(json) ? json : []);
     },
     enabled: activeTab === 'preview',
   });
@@ -352,7 +354,7 @@ export default function Recommendations() {
   };
 
   const selectResource = (item: any) => {
-    const label = form.type === 'event' ? item.venue_name : item.name;
+    const label = form.type === 'event' ? (item.title || item.venue_name) : item.name;
     setForm((f) => ({ ...f, resource_id: item._id, resource_label: label }));
     setSearchQuery(label);
     setSearchResults([]);
@@ -688,7 +690,7 @@ export default function Recommendations() {
                               </div>
                             ) : (
                               searchResults.map((item: any) => {
-                                const label = form.type === 'event' ? item.venue_name : item.name;
+                                const label = form.type === 'event' ? (item.title || item.venue_name) : item.name;
                                 return (
                                   <button
                                     key={item._id}
