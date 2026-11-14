@@ -1,4 +1,5 @@
 import React from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { Clock, LogOut, RefreshCw } from 'lucide-react';
 
@@ -12,6 +13,7 @@ import { Clock, LogOut, RefreshCw } from 'lucide-react';
 // matching vendor record isn't verified yet.
 export default function PendingApproval() {
   const { user, logout } = useAuth();
+  const queryClient = useQueryClient();
 
   return (
     <div className="min-h-screen bg-[#0B0B0F] flex items-center justify-center p-4">
@@ -28,7 +30,7 @@ export default function PendingApproval() {
         </div>
         <div className="flex flex-col gap-3">
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['own-vendor-status'] })}
             className="w-full py-3.5 rounded-2xl bg-primary text-white text-[11px] font-black uppercase tracking-widest hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
           >
             <RefreshCw className="w-4 h-4" /> Check Status

@@ -167,7 +167,7 @@ export default function App() {
               <Route path="organiser-requests" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'NORMAL_ADMIN']}><OrganiserRequests /></ProtectedRoute>} />
               <Route path="events" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'EVENT_ADMIN', 'NORMAL_ADMIN']}><Events /></ProtectedRoute>} />
               <Route path="clubs" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CLUB_ADMIN', 'NORMAL_ADMIN']}><Clubs /></ProtectedRoute>} />
-              <Route path="ticketing" element={<Ticketing />} />
+              <Route path="ticketing" element={<ProtectedRoute><Ticketing /></ProtectedRoute>} />
               <Route path="ads-broadcast" element={<ProtectedRoute requireSuperAdmin><AdsBroadcast /></ProtectedRoute>} />
               <Route path="polls-contests" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'NORMAL_ADMIN']}><PollsContests /></ProtectedRoute>} />
               <Route path="support-activity" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'NORMAL_ADMIN']}><SupportActivity /></ProtectedRoute>} />

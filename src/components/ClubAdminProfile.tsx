@@ -49,7 +49,7 @@ export default function ClubAdminProfile() {
     }
   });
 
-  const clubData = (Array.isArray(clubs) ? clubs : []).find(c => c.name === user?.organisation) || (Array.isArray(clubs) ? clubs[0] : null);
+  const clubData = (Array.isArray(clubs) ? clubs : []).find(c => (c._id || c.id) === user?.vendorId || c.name === user?.organisation) || (Array.isArray(clubs) ? clubs[0] : null);
 
   const { data: venues } = useQuery({
     queryKey: ['venues-club-admin'],
@@ -368,7 +368,7 @@ export default function ClubAdminProfile() {
                           <Users2 className="w-4 h-4 text-primary" />
                           <div className="text-center">
                             <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest block">RSVPs</span>
-                            <span className="text-lg font-black text-white">{event.attendees || '452'}</span>
+                            <span className="text-lg font-black text-white">{event.attendees ?? event.rsvp_count ?? '—'}</span>
                           </div>
                         </div>
                         <div className="p-4 rounded-3xl bg-white/5 border border-white/5 flex flex-col items-center gap-2">
@@ -439,7 +439,7 @@ export default function ClubAdminProfile() {
                         <h4 className="text-xl font-black text-white uppercase tracking-tight truncate">{event.title}</h4>
                         <div className="flex items-center gap-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
                            <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-primary" /> {event.start_time || '10 PM'}</span>
-                           <span className="flex items-center gap-1.5"><Heart className="w-3.5 h-3.5 text-red-500 fill-red-500" /> {Math.floor(Math.random() * 100) + 20}</span>
+                           <span className="flex items-center gap-1.5"><Heart className="w-3.5 h-3.5 text-red-500 fill-red-500" /> {event.likes_count ?? 0}</span>
                         </div>
                       </div>
                     </motion.div>
@@ -478,7 +478,7 @@ export default function ClubAdminProfile() {
                       </div>
                       <div className="flex items-center gap-12">
                         <div className="text-right hidden sm:block">
-                          <span className="text-xl font-black text-white tracking-tighter">{event.attendees || '1.1k'}</span>
+                          <span className="text-xl font-black text-white tracking-tighter">{event.attendees ?? event.rsvp_count ?? '—'}</span>
                           <p className="text-[8px] text-muted-foreground font-black uppercase tracking-widest">Attendees</p>
                         </div>
                         <div className="text-right">

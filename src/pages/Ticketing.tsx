@@ -341,8 +341,10 @@ export default function Ticketing() {
                 className="hidden"
                 ref={fileInputRef}
                 onChange={(e) => {
+                  // Issue 67: CSV import not yet implemented — backend has no endpoint
                   if (e.target.files && e.target.files.length > 0) {
-                    alert(`Uploaded ${e.target.files[0].name}`);
+                    alert(`"${e.target.files[0].name}" selected but CSV import is not yet available. This feature is coming soon.`);
+                    e.target.value = '';
                   }
                 }}
               />
@@ -362,7 +364,7 @@ export default function Ticketing() {
                 className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 transition-colors flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
-                Add Guest
+                Add Guest (Coming Soon)
               </button>
             </div>
           </div>
@@ -512,7 +514,7 @@ export default function Ticketing() {
                 onClick={() => setIsTierModalOpen(false)}
                 className="px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-secondary text-sm font-bold text-white hover:opacity-90 transition-opacity"
               >
-                Save Tier
+                Save Tier (Coming Soon)
               </button>
             </div>
           </motion.div>
@@ -576,7 +578,7 @@ export default function Ticketing() {
                 onClick={() => setIsGuestModalOpen(false)}
                 className="px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-secondary text-[10px] font-black uppercase tracking-widest text-white hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
               >
-                Add Guest
+                Add Guest (Coming Soon)
               </button>
             </div>
           </motion.div>
