@@ -77,14 +77,15 @@ const ProtectedRoute = ({
   // set locally, with zero backend verification. Generalized to cover
   // both roles the same way.
   const { data: ownVendorStatus, isLoading: vendorCheckLoading } = useQuery({
-    queryKey: ['own-vendor-status', user?.organisation],
+    queryKey: ['own-vendor-status'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/vendor/my-status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const json = await res.json();
-      const list = Array.isArray(json.data) ? json.data : [];
-      return list.find((v: any) => v.name === user?.organisation) || null;
+      return json.data ?? null;
     },
-    enabled: (user?.role === 'CLUB_ADMIN' || user?.role === 'EVENT_ADMIN') && Boolean(user?.organisation),
+    enabled: (user?.role === 'CLUB_ADMIN' || user?.role === 'EVENT_ADMIN') && Boolean(token),
   });
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-[#0B0B0F] text-white font-bold uppercase tracking-widest text-xs">Loading...</div>;

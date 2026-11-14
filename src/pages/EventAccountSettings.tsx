@@ -59,9 +59,14 @@ export default function EventAccountSettings() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
   const profileImageInputRef = React.useRef<HTMLInputElement>(null);
+  const prevPreviewUrlEAS = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    return () => { if (prevPreviewUrlEAS.current) URL.revokeObjectURL(prevPreviewUrlEAS.current); };
+  }, []);
 
   const handleProfileImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -89,7 +94,7 @@ export default function EventAccountSettings() {
     enabled: Boolean(token)
   });
 
-  const myVendor = Array.isArray(vendors) ? vendors.find((v: any) => v.name === user?.organisation) : null;
+  const myVendor = Array.isArray(vendors) ? vendors.find((v: any) => (v._id || v.id) === user?.vendorId || v.name === user?.organisation) : null;
 
   const updateVendorMutation = useMutation({
     mutationFn: async (fields: Record<string, any>) => {
@@ -215,7 +220,7 @@ export default function EventAccountSettings() {
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 3000);
     } catch (err: any) {
-      alert(err.message || 'Failed to save changes');
+      setSaveError(err.message || 'Failed to save changes');
     }
   };
 
@@ -230,7 +235,7 @@ export default function EventAccountSettings() {
   // promising that. Implementing the full "requires re-approval" workflow
   // is a separate, larger decision — not scope-creeping into it here.
   const handleConfirmSubmitForReview = async () => {
-    if (formData.businessPhone && !isPhone10(formData.businessPhone)) { alert('Enter a valid 10-digit phone number'); return; }
+    if (formData.businessPhone && !isPhone10(formData.businessPhone)) { setSaveError('Enter a valid 10-digit phone number'); return; }
     try {
       // FIXED: hasBox1Changes tracked edits to companyType, businessEmail,
       // businessPhone, and website — but this payload only ever sent
@@ -258,7 +263,7 @@ export default function EventAccountSettings() {
       }));
       setShowApprovalDialog(false);
     } catch (err: any) {
-      alert(err.message || 'Failed to save changes');
+      setSaveError(err.message || 'Failed to save changes');
     }
   };
 
@@ -270,6 +275,12 @@ export default function EventAccountSettings() {
 
   return (
     <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
+      {saveError && (
+        <div className="fixed bottom-6 right-6 z-[300] bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold px-5 py-3 rounded-2xl flex items-center gap-3 shadow-2xl">
+          <span>&#9888;</span> {saveError}
+          <button onClick={() => setSaveError("")} className="ml-2 text-red-400/60 hover:text-red-400">&#10005;</button>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-4 border-b border-white/5 relative z-30">
         <div className="flex items-center gap-4">

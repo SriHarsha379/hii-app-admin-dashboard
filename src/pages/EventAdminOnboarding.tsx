@@ -30,6 +30,7 @@ import { useAuth } from '../context/AuthContext';
 import { FormSection, RefinedField } from '../components/RefinedForm';
 import { useQuery } from '@tanstack/react-query';
 import { API_BASE } from '../lib/apiConfig';
+import { validatePassword } from '../lib/passwordPolicy';
 
 const INITIAL_DATA = {
   fullName: '',
@@ -72,6 +73,10 @@ export default function EventAdminOnboarding() {
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
   const profileImageInputRef = React.useRef<HTMLInputElement>(null);
+  const prevPreviewUrlEAO = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    return () => { if (prevPreviewUrlEAO.current) URL.revokeObjectURL(prevPreviewUrlEAO.current); };
+  }, []);
 
 
   const handleProfileImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -248,10 +253,8 @@ export default function EventAdminOnboarding() {
       setSubmitError('Select a city.');
       return;
     }
-    if (!formData.password || formData.password.length < 6) {
-      setSubmitError('Choose a password of at least 6 characters.');
-      return;
-    }
+    const _pwErr53 = validatePassword(formData.password);
+    if (_pwErr53) { setSubmitError(_pwErr53); return; }
     if (formData.password !== formData.confirmPassword) {
       setSubmitError('Passwords do not match.');
       return;
