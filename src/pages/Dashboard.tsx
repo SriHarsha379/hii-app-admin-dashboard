@@ -220,12 +220,13 @@ export default function Dashboard() {
             )}
           </>
         )}
+        {/* Conversion Rate hidden until backend endpoint exists
         <MetricCard
           title="Conversion Rate"
           value={conversion?.rate != null ? `${conversion.rate}%` : '—'}
           icon={TrendingUp}
           updateText="Awaiting endpoint"
-        />
+        /> */
       </div>
 
       {/* Growth Chart — real data only, built from the users/events/clubs
