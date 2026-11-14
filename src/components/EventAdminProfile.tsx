@@ -82,7 +82,7 @@ export default function EventAdminProfile() {
   // ClubAdminProfile — used to show real verification status instead of
   // assuming the admin is already approved just because they have a
   // dashboard session.
-  const ownVendorData = (Array.isArray(clubs) ? clubs : []).find((c: any) => c.name === user?.organisation) || null;
+  const ownVendorData = (Array.isArray(clubs) ? clubs : []).find((c: any) => (c._id || c.id) === user?.vendorId || c.name === user?.organisation) || null;
 
   return (
     <div className="space-y-12 animate-in fade-in duration-700 pb-20">
@@ -475,19 +475,19 @@ export default function EventAdminProfile() {
                         <div className="relative z-10">
                           <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Live Attendance</p>
                           <div className="flex items-center justify-between mt-4">
-                            <span className="text-6xl font-black text-white">{selectedEvent.attendees || '2.4k'}</span>
+                            <span className="text-6xl font-black text-white">{selectedEvent.attendees ?? '—'}</span>
                             <Users2 className="w-12 h-12 text-white/20" />
                           </div>
                           <div className="mt-6 w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
                             <motion.div
                               initial={{ width: 0 }}
-                              animate={{ width: '75%' }}
+                              animate={{ width: selectedEvent.capacity_percentage ? `${selectedEvent.capacity_percentage}%` : '0%' }}
                               className="h-full bg-primary shadow-[0_0_15px_rgba(255,45,154,0.5)]"
                             />
                           </div>
                           <div className="flex justify-between items-center mt-2 group">
-                             <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest group-hover:text-primary transition-colors">75% Capacity Reached</span>
-                             <span className="text-[9px] font-bold text-primary uppercase tracking-widest">Target: 3.2k</span>
+                             <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest group-hover:text-primary transition-colors">{selectedEvent.capacity_percentage ? `${selectedEvent.capacity_percentage}% Capacity` : "Capacity data unavailable"}</span>
+                             <span className="text-[9px] font-bold text-primary uppercase tracking-widest">{selectedEvent.max_capacity ? `Target: ${selectedEvent.max_capacity}` : ""}</span>
                           </div>
                         </div>
                       </div>
