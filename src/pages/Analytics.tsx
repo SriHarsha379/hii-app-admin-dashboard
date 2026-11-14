@@ -71,7 +71,7 @@ export default function Analytics() {
     queryFn: async () => {
       // NOTE: was hitting the bare `${API_BASE}/users` (404, no unwrap) —
       // same fix already applied on the Users and Dashboard pages.
-      const res = await fetch(`${API_BASE}/users/get_all_user`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/user/get_all_user`, { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json();
       return json.data?.users ?? [];
     },
@@ -152,6 +152,23 @@ export default function Analytics() {
     // real, slightly smaller set of KPIs beats padding the row with a made-up
     // number.
   ];
+
+  // FIX 1: real CSV export for Analytics
+  const csvEsc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const exportAnalytics = () => {
+    const headers = ['Label', 'Value'];
+    const rows = kpiCards
+      .filter((s: any) => s.roles.includes(user?.role || ''))
+      .map((s: any) => [csvEsc(s.label), csvEsc(s.value)]);
+    const csv  = [headers.join(','), ...rows.map((r: string[]) => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `analytics-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700">

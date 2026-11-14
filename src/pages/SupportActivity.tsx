@@ -489,8 +489,11 @@ export default function SupportActivity() {
                           <p className="text-xs text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</p>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <button className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition-all">
-                            <MoreHorizontal className="w-4 h-4" />
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSelectedItem(item); }}
+                            className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-white hover:bg-white/10 transition-all"
+                          >
+                            View
                           </button>
                         </td>
                       </tr>

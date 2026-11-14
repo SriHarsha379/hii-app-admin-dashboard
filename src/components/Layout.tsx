@@ -672,13 +672,15 @@ export default function Layout() {
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
               <input
                 type="text"
-                placeholder="Search anything..."
+                placeholder="Search (coming soon)..."
                 value={searchQuery}
                 onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setIsSearchOpen(true);
+                  // FIX 5: search disabled until backend route exists
+                  // setSearchQuery(e.target.value);
+                  // setIsSearchOpen(true);
                 }}
-                onFocus={() => setIsSearchOpen(true)}
+                onFocus={() => { /* search not yet available */ }}
+                readOnly
                 className="bg-white/10 border border-white/15 rounded-xl pl-9 pr-10 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary/50 w-full transition-all hover:bg-white/15"
               />
               <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 text-[10px] text-muted-foreground border border-white/10 rounded px-1.5 bg-white/5 font-mono">
@@ -871,7 +873,16 @@ export default function Layout() {
                             this just needs to trigger that fetch and
                             refresh the badge count. */}
                         <button
-                          onClick={() => queryClient.invalidateQueries({ queryKey: ['notifications'] })}
+                          onClick={async () => {
+                            // FIX 4: call backend mark-all-read endpoint then refresh
+                            try {
+                              await fetch(`${API_BASE}/notification/mark_all_read`, {
+                                method: 'POST',
+                                headers: { Authorization: `Bearer ${token}` },
+                              });
+                            } catch {}
+                            queryClient.invalidateQueries({ queryKey: ['notifications'] });
+                          }}
                           className="text-[10px] font-black text-primary uppercase tracking-widest hover:text-white transition-colors w-full text-center"
                         >
                           Mark all as read
@@ -890,6 +901,8 @@ export default function Layout() {
               onClick={() => {
                 if (user?.role === 'CLUB_ADMIN') navigate('/club-profile');
                 else if (user?.role === 'EVENT_ADMIN') navigate('/event-profile');
+                // FIX 3: SUPER_ADMIN and NORMAL_ADMIN now navigate to settings
+                else if (user?.role === 'SUPER_ADMIN' || user?.role === 'NORMAL_ADMIN') navigate('/settings');
               }}
               className="flex items-center gap-3 pl-2 group cursor-pointer shrink-0"
             >
