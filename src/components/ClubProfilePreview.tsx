@@ -187,8 +187,8 @@ export default function ClubProfilePreview({ club, onClose, onEdit, hideCloseBut
             <div className="flex items-center gap-3">
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               <div>
-                <p className="text-[9px] font-black text-white uppercase tracking-widest">Status: Open</p>
-                <p className="text-[7px] font-bold text-white/30 uppercase tracking-[0.15em]">Verified Club</p>
+                <p className="text-[9px] font-black text-white uppercase tracking-widest">{club?.is_active ? "Open" : "Closed"}</p>
+                <p className="text-[7px] font-bold text-white/30 uppercase tracking-[0.15em]">{club?.is_verified ? "Verified Club" : "Pending Review"}</p>
               </div>
             </div>
             <div className="h-8 w-px bg-white/10" />

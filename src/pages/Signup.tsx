@@ -31,6 +31,8 @@ export default function Signup() {
     e.preventDefault();
     setError('');
 
+    const _pwErr = validatePassword(password);
+    if (_pwErr) { setError(_pwErr); return; }
     if (password !== confirmPassword) {
       setError('Passwords do not match.');
       return;

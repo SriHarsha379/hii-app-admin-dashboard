@@ -134,8 +134,8 @@ export default function EventProfilePreview({ onClose, eventData, hideCloseButto
             <div className="flex items-center gap-3">
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               <div>
-                <p className="text-[9px] font-black text-white uppercase tracking-widest">Status: Active</p>
-                <p className="text-[7px] font-bold text-white/30 uppercase tracking-[0.15em]">Verified Event</p>
+                <p className="text-[9px] font-black text-white uppercase tracking-widest">{eventData?.status || "Active"}</p>
+                <p className="text-[7px] font-bold text-white/30 uppercase tracking-[0.15em]">{eventData?.is_verified ? "Verified Event" : "Event"}</p>
               </div>
             </div>
             <div className="h-8 w-px bg-white/10" />
