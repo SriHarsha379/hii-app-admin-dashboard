@@ -102,7 +102,7 @@ export default function ClubAdminProfile() {
   const vendorId = clubData?._id || clubData?.id;
   const clubEvents = eventList.filter((e: any) => {
     const evVendorId = typeof e.vendor_id === 'object' ? e.vendor_id?._id : e.vendor_id;
-    return String(evVendorId) === String(vendorId) || e.venue === clubData?.name;
+    return String(evVendorId) === String(vendorId) || e.venue_name === clubData?.name;
   });
 
   const liveEvents = clubEvents.filter(e => e.status === 'LIVE' || e.status === 'ACTIVE');

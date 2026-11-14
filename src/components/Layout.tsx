@@ -389,7 +389,7 @@ export default function Layout() {
     event: { label: 'Events', route: '/events' },
     user:  { label: 'Users',  route: '/users'  },
   };
-  const TYPE_ORDER = ['club', 'event', 'user'];
+  const TYPE_ORDER = ['club', 'event', 'user', 'admin'];
 
   const currentPage = location.pathname.split('/')[1] || 'overview';
 
