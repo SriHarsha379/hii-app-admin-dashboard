@@ -185,7 +185,7 @@ export default function ClaimOrganiserForm() {
       <div className="min-h-screen bg-[#0B0B0F] flex items-center justify-center p-6">
         <div className="text-center space-y-4">
           <p className="text-white/60">Organiser not found.</p>
-          <button onClick={() => navigate('/event-onboarding')} className="text-primary hover:underline">Go back</button>
+          <button onClick={() => navigate('/pending-approval')} className="text-primary hover:underline">Go back</button>
         </div>
       </div>
     );
@@ -217,7 +217,7 @@ export default function ClaimOrganiserForm() {
         </div>
 
         <button
-          onClick={() => navigate('/event-onboarding')}
+          onClick={() => navigate('/pending-approval')}
           className="text-primary font-black uppercase tracking-widest text-xs hover:underline pt-4 relative z-10"
         >
           Go back to login screen
@@ -421,7 +421,7 @@ export default function ClaimOrganiserForm() {
         {/* Action Controls */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6 pt-12 border-t border-white/5">
           <button
-            onClick={() => navigate('/event-onboarding')}
+            onClick={() => navigate('/pending-approval')}
             className="w-full sm:w-auto px-12 py-5 rounded-[24px] bg-white/5 border border-white/10 text-[11px] font-black uppercase tracking-[0.2em] text-white/40 hover:text-white hover:bg-white/10 transition-all flex items-center justify-center gap-4 active:scale-95 shadow-xl"
           >
             <ChevronLeft className="w-5 h-5" />
