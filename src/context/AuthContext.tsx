@@ -16,6 +16,7 @@ interface AuthContextType {
   login: (token: string, user: User) => void;
   updateUser: (data: Partial<User>) => void;
   logout: () => void;
+  authFetch: (input: RequestInfo, init?: RequestInit) => Promise<Response>;
   isLoading: boolean;
 }
 
@@ -87,8 +88,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     storage.removeItem(USER_KEY);
   };
 
+  const authFetch = async (input: RequestInfo, init?: RequestInit): Promise<Response> => {
+    const res = await fetch(input, init);
+    if (res.status === 401) logout();
+    return res;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, login, updateUser, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, token, login, updateUser, logout, authFetch, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

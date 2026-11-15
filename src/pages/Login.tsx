@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Lock, Mail, Zap, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { API_BASE } from '../lib/apiConfig';
+import { cn } from '../lib/utils';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -247,5 +248,3 @@ navigate('/');
     </div>
   );
 }
-
-const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');

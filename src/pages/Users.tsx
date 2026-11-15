@@ -196,6 +196,26 @@ export default function Users() {
     }
   };
 
+  const exportUsers = () => {
+    const headers = ['Name', 'Email', 'Status', 'City', 'Verified', 'Joined'];
+    const rows = filteredUsers.map((u: any) => [
+      '"' + (u.name  || '').replace(/"/g, '""') + '"',
+      '"' + (u.email || '').replace(/"/g, '""') + '"',
+      '"' + (u.status || 'ACTIVE') + '"',
+      '"' + (u.city  || '').replace(/"/g, '""') + '"',
+      '"' + (u.is_verified ? 'Yes' : 'No') + '"',
+      '"' + (u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '') + '"',
+    ]);
+    const csv  = [headers.join(','), ...rows.map((r: string[]) => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = 'users-' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
@@ -206,6 +226,12 @@ export default function Users() {
             Monitor and manage your users
           </div>
         </div>
+        <button
+          onClick={exportUsers}
+          className="px-5 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2"
+        >
+          <Download className="w-3.5 h-3.5" /> Export CSV
+        </button>
       </div>
 
       {/* Top Stats — was computed from the full unfiltered `users` array

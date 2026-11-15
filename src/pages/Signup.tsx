@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Lock, Mail, User, Zap, ArrowRight, Loader2, Building2, Layers, ShieldCheck } from 'lucide-react';
+import { Lock, Mail, User, Zap, ArrowRight, Loader2, Building2, Layers, ShieldCheck, Eye } from 'lucide-react';
 import { motion } from 'motion/react';
 import { API_BASE } from '../lib/apiConfig';
 import { validatePassword } from '../lib/passwordPolicy';
@@ -24,6 +24,8 @@ export default function Signup() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPw, setShowPw]       = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -33,6 +35,10 @@ export default function Signup() {
 
     const _pwErr = validatePassword(password);
     if (_pwErr) { setError(_pwErr); return; }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
     if (password !== confirmPassword) {
       setError('Passwords do not match.');
       return;

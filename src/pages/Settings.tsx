@@ -24,7 +24,8 @@ import {
   Layers,
   ChevronRight,
   ChevronDown,
-  Phone
+  Phone,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { FormSection, RefinedField } from '../components/RefinedForm';
@@ -155,6 +156,8 @@ export default function Settings() {
   // existed for 2FA on admin accounts whatsoever. Built real TOTP-based
   // 2FA (RFC 6238, compatible with Google Authenticator/Authy/etc).
   const [twoFaStep, setTwoFaStep] = useState<'idle' | 'setup' | 'disable'>('idle');
+  const [setupSecret, setSetupSecret] = useState('');
+  const [setupCode, setSetupCode]     = useState('');
   const [disablePassword, setDisablePassword] = useState('');
   const [twoFaError, setTwoFaError] = useState('');
 
@@ -226,6 +229,7 @@ export default function Settings() {
   };
 
   const [newCity, setNewCity] = useState('');
+  const [deleteCityTarget, setDeleteCityTarget] = useState<any>(null);
   const [cityError, setCityError] = useState('');
   const [avatarError, setAvatarError] = useState('');
   const [securityError, setSecurityError] = useState('');
@@ -799,7 +803,7 @@ export default function Settings() {
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: index * 0.05 }}
-                          key={index}
+                          key={city._id || city.city_name}
                           className="group flex items-center justify-between p-6 rounded-[32px] bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-white/10 transition-all shadow-md group"
                         >
                           <div className="flex items-center gap-5">
@@ -812,7 +816,7 @@ export default function Settings() {
                             </div>
                           </div>
                           <button
-                            onClick={() => { if (confirm('Delete this city?')) deleteCityMutation.mutate(city._id); }}
+                            onClick={() => setDeleteCityTarget(city)}
                             className="w-10 h-10 rounded-xl hover:bg-red-500/10 text-white/10 hover:text-red-400 transition-all flex items-center justify-center"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -838,6 +842,25 @@ export default function Settings() {
           </div>
         </div>
       </div>
+
+
+      {deleteCityTarget && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="glass-card w-full max-w-md rounded-3xl border border-red-500/20 p-8 space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400"><MapPin className="w-6 h-6" /></div>
+              <div><h3 className="text-base font-black text-white uppercase">Delete City</h3><p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">Cannot be undone</p></div>
+            </div>
+            <p className="text-sm text-white/60">Delete <span className="text-white font-bold">{deleteCityTarget.city_name}</span>? This may affect events and venues linked to this city.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteCityTarget(null)} className="flex-1 py-3 rounded-2xl bg-white/5 border border-white/10 text-[11px] font-black uppercase text-white/60 hover:text-white transition-all">Cancel</button>
+              <button onClick={() => { deleteCityMutation.mutate(deleteCityTarget._id); setDeleteCityTarget(null); }} disabled={deleteCityMutation.isPending} className="flex-1 py-3 rounded-2xl bg-red-500/20 border border-red-500/30 text-[11px] font-black uppercase text-red-400 hover:bg-red-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                {deleteCityMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

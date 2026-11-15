@@ -74,12 +74,7 @@ import {
   Cell
 } from 'recharts';
 
-const voteData = [
-  { name: 'Option A', votes: 420, color: '#4F46E5' },
-  { name: 'Option B', votes: 310, color: '#9333EA' },
-  { name: 'Option C', votes: 150, color: '#EC4899' },
-  { name: 'Option D', votes: 80, color: '#F59E0B' },
-];
+
 
 export default function PollsContests() {
   const { token } = useAuth();
@@ -135,16 +130,16 @@ export default function PollsContests() {
   const [newContest, setNewContest] = useState({ title: '', city: 'ALL', rules: '', reward: '', deadline: '' });
 
   const { data: participants, isLoading: participantsLoading } = useQuery({
-    queryKey: ['contest_participants', (selectedContest?._id || selectedContest?.id)],
+    queryKey: ['contest_participants', (selectedContest?._id || selectedContest?._id || selectedContest?.id)],
     queryFn: async () => {
-      if (!(selectedContest?._id || selectedContest?.id)) return [];
+      if (!(selectedContest?._id || selectedContest?._id || selectedContest?.id)) return [];
       const res = await fetch(`${API_BASE}/contests/${selectedContest.id}/participants`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const json = await res.json();
       return json.data ?? [];
     },
-    enabled: !!(selectedContest?._id || selectedContest?.id)
+    enabled: !!(selectedContest?._id || selectedContest?._id || selectedContest?.id)
   });
 
   const addContestMutation = useMutation({
@@ -263,8 +258,19 @@ export default function PollsContests() {
   // FIXED: kebab menus on both poll and contest rows had no dropdown, no
   // actions at all — required building the entire backend for this page
   // first, since none of it existed.
-  const [openPollMenuId, setOpenPollMenuId] = useState<string | null>(null);
-  const [openContestMenuId, setOpenContestMenuId] = useState<string | null>(null);
+
+  const { data: citiesForPolls } = useQuery({
+    queryKey: ['cities'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/city/get_all_cities`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      return json.data ?? [];
+    },
+  });
+    const [openPollMenuId, setOpenPollMenuId]         = useState<string | null>(null);
+  const [openContestMenuId, setOpenContestMenuId]   = useState<string | null>(null);
+  const [deletePollTarget, setDeletePollTarget]     = useState<any>(null);
+  const [deleteContestTarget, setDeleteContestTarget] = useState<any>(null);
 
   const deletePollMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -429,7 +435,7 @@ export default function PollsContests() {
                           <td colSpan={4} className="px-6 py-12 text-center text-xs text-muted-foreground">Loading polls...</td>
                         </tr>
                       ) : sortedPolls.length > 0 ? sortedPolls.map((poll: any) => (
-                        <tr key={(poll._id || poll.id)} className="group hover:bg-white/5 transition-colors">
+                        <tr key={(poll._id || poll._id || poll.id)} className="group hover:bg-white/5 transition-colors">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-primary">
@@ -459,7 +465,7 @@ export default function PollsContests() {
                               <button
                                 onClick={() => {
                                   updatePollStatusMutation.mutate({
-                                    id: (poll._id || poll.id),
+                                    id: (poll._id || poll._id || poll.id),
                                     status: poll.status === 'ACTIVE' ? 'PENDING' : 'ACTIVE'
                                   });
                                 }}
@@ -474,17 +480,17 @@ export default function PollsContests() {
                                 {poll.status === 'ACTIVE' ? 'Active Pop-up' : 'Activate'}
                               </button>
                               <button
-                                onClick={() => setOpenPollMenuId(openPollMenuId === poll.id ? null : (poll._id || poll.id))}
+                                onClick={() => setOpenPollMenuId(openPollMenuId === poll._id || poll.id ? null : (poll._id || poll._id || poll.id))}
                                 className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition-all"
                               >
                                 <MoreHorizontal className="w-4 h-4" />
                               </button>
-                              {openPollMenuId === (poll._id || poll.id) && (
+                              {openPollMenuId === (poll._id || poll._id || poll.id) && (
                                 <>
                                   <div className="fixed inset-0 z-10" onClick={() => setOpenPollMenuId(null)} />
                                   <div className="absolute right-0 top-12 z-20 w-40 rounded-2xl bg-[#0B0B0F] border border-white/10 shadow-2xl overflow-hidden">
                                     <button
-                                      onClick={() => { if (confirm(`Remove "${poll.title}"?`)) deletePollMutation.mutate((poll._id || poll.id)); }}
+                                      onClick={() => setDeletePollTarget(poll)}
                                       disabled={deletePollMutation.isPending}
                                       className="w-full flex items-center gap-3 px-5 py-3 text-xs font-bold text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50"
                                     >
@@ -512,40 +518,19 @@ export default function PollsContests() {
             <div className="space-y-6">
               <div className="glass-card p-6 rounded-2xl border border-white/10 space-y-6">
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">Vote Distribution</h3>
-                <div style={{minWidth:0}} className="h-[250px] w-full">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                    <BarChart data={voteData} layout="vertical">
-                      <XAxis type="number" hide />
-                      <YAxis
-                        dataKey="name"
-                        type="category"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
-                        width={80}
-                      />
-                      <Tooltip
-                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                        contentStyle={{ backgroundColor: '#111118', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '12px' }}
-                      />
-                      <Bar dataKey="votes" radius={[0, 4, 4, 0]} barSize={20}>
-                        {voteData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="space-y-3">
-                  {voteData.map((item) => (
-                    <div key={item.name} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></div>
-                        <span className="text-xs text-muted-foreground font-medium">{item.name}</span>
-                      </div>
-                      <span className="text-xs font-bold text-white">{item.votes}</span>
-                    </div>
-                  ))}
+                <div className="h-[250px] w-full">
+                  {sortedPolls.length === 0 ? (
+                    <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No poll data yet</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                      <BarChart data={sortedPolls.slice(0,6).map((p: any) => ({ name: p.title?.slice(0,15) || "Poll", votes: p.votes ?? 0 }))} layout="vertical">
+                        <XAxis type="number" hide />
+                        <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: 600 }} width={120} />
+                        <Tooltip cursor={{ fill: "rgba(255,255,255,0.05)" }} contentStyle={{ backgroundColor: "#111118", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", fontSize: "12px" }} />
+                        <Bar dataKey="votes" radius={[0, 4, 4, 0]} barSize={20} fill="#4F46E5" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </div>
             </div>
@@ -579,7 +564,7 @@ export default function PollsContests() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {sortedContests.map((contest: any) => (
-                <div key={(contest._id || contest.id)} className="glass-card p-6 rounded-2xl border border-white/10 space-y-6 group hover:border-primary/40 transition-all">
+                <div key={(contest._id || contest._id || contest.id)} className="glass-card p-6 rounded-2xl border border-white/10 space-y-6 group hover:border-primary/40 transition-all">
                   <div className="flex justify-between items-start">
                     <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                       <Trophy className="w-6 h-6" />
@@ -593,7 +578,7 @@ export default function PollsContests() {
                       </span>
                       {contest.status === 'PENDING' && (
                         <button
-                          onClick={() => updateContestStatusMutation.mutate({ id: (contest._id || contest.id), status: 'ACTIVE' })}
+                          onClick={() => updateContestStatusMutation.mutate({ id: (contest._id || contest._id || contest.id), status: 'ACTIVE' })}
                           className="text-[10px] px-2 py-1 rounded-lg font-bold border border-primary/20 bg-primary/10 text-primary hover:bg-primary/20 transition-all uppercase"
                         >
                           Activate
@@ -602,7 +587,7 @@ export default function PollsContests() {
                       {/* FIXED: contests had no remove action anywhere on
                           the card at all. */}
                       <button
-                        onClick={() => { if (confirm(`Remove "${contest.title}"?`)) deleteContestMutation.mutate((contest._id || contest.id)); }}
+                        onClick={() => setDeleteContestTarget(contest)}
                         disabled={deleteContestMutation.isPending}
                         className="text-[10px] px-2 py-1 rounded-lg font-bold border border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/10 transition-all uppercase disabled:opacity-50 flex items-center gap-1"
                       >
@@ -913,6 +898,43 @@ export default function PollsContests() {
           </>
         )}
       </AnimatePresence>
+
+
+      {deletePollTarget && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="glass-card w-full max-w-md rounded-3xl border border-red-500/20 p-8 space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400"><AlertCircle className="w-6 h-6" /></div>
+              <div><h3 className="text-base font-black text-white uppercase">Remove Poll</h3><p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">Cannot be undone</p></div>
+            </div>
+            <p className="text-sm text-white/60">Remove <span className="text-white font-bold">"{deletePollTarget.title}"</span>?</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeletePollTarget(null)} className="flex-1 py-3 rounded-2xl bg-white/5 border border-white/10 text-[11px] font-black uppercase text-white/60 hover:text-white transition-all">Cancel</button>
+              <button onClick={() => { deletePollMutation.mutate(deletePollTarget._id || deletePollTarget.id); setDeletePollTarget(null); }} disabled={deletePollMutation.isPending} className="flex-1 py-3 rounded-2xl bg-red-500/20 border border-red-500/30 text-[11px] font-black uppercase text-red-400 hover:bg-red-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                {deletePollMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteContestTarget && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="glass-card w-full max-w-md rounded-3xl border border-red-500/20 p-8 space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400"><AlertCircle className="w-6 h-6" /></div>
+              <div><h3 className="text-base font-black text-white uppercase">Remove Contest</h3><p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">Cannot be undone</p></div>
+            </div>
+            <p className="text-sm text-white/60">Remove <span className="text-white font-bold">"{deleteContestTarget.title}"</span>?</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteContestTarget(null)} className="flex-1 py-3 rounded-2xl bg-white/5 border border-white/10 text-[11px] font-black uppercase text-white/60 hover:text-white transition-all">Cancel</button>
+              <button onClick={() => { deleteContestMutation.mutate(deleteContestTarget._id || deleteContestTarget.id); setDeleteContestTarget(null); }} disabled={deleteContestMutation.isPending} className="flex-1 py-3 rounded-2xl bg-red-500/20 border border-red-500/30 text-[11px] font-black uppercase text-red-400 hover:bg-red-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                {deleteContestMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

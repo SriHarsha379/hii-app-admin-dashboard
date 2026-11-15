@@ -25,7 +25,6 @@ import {
   Facebook,
   Youtube,
   Upload,
-  CheckSquare,
   FileText
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';

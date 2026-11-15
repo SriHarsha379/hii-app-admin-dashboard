@@ -153,12 +153,15 @@ export default function Clubs() {
   const venuePortraitRef = useRef<HTMLInputElement>(null);
 
   const [activeEventsTab, setActiveEventsTab] = useState<'Upcoming' | 'Past' | 'Active'>('Upcoming');
+  const [deletingClubEvent, setDeletingClubEvent] = useState<any>(null);
+  const [isDeletingClubEv, setIsDeletingClubEv]   = useState(false);
   const [selectedEvent, setSelectedEvent]     = useState<any>(null);
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
   const [isEditingEvent, setIsEditingEvent]   = useState(false);
   const [isPreviewing, setIsPreviewing]       = useState(false);
   const [creationStep, setCreationStep]       = useState(1);
   const [isSubmitting, setIsSubmitting]       = useState(false);
+  const [submitError, setSubmitError]         = useState('');
 
   const [eventFormData, setEventFormData] = useState<any>({
     title: '', city: '', venue_id: '', genre: [], event_type: [],
@@ -574,6 +577,35 @@ export default function Clubs() {
       queryClient.invalidateQueries({ queryKey: ['featured-venues'] });
     },
   });
+
+  const [deleteVenueTarget, setDeleteVenueTarget] = React.useState<any>(null);
+  const [isDeletingVenue, setIsDeletingVenue]       = React.useState(false);
+
+  const deleteVenueMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`${API_BASE}/venue/delete_venue/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to delete venue');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clubs'] });
+      queryClient.invalidateQueries({ queryKey: ['venues-for-clubs'] });
+      setDeleteVenueTarget(null);
+    },
+  });
+
+  const handleDeleteVenue = async () => {
+    if (!deleteVenueTarget) return;
+    setIsDeletingVenue(true);
+    try {
+      const venue = getVenueForVendor(deleteVenueTarget._id || deleteVenueTarget.id);
+      const idToDelete = venue?._id || deleteVenueTarget._id || deleteVenueTarget.id;
+      await deleteVenueMutation.mutateAsync(idToDelete);
+    } catch { } finally { setIsDeletingVenue(false); }
+  };
 
   const unfeatureVenueMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -1237,7 +1269,26 @@ export default function Clubs() {
         </AnimatePresence>
 
         <AnimatePresence>
-          {selectedEvent && !isCreatingEvent && isPreviewing && !selectedEvent.showAnalytics && (
+          {deletingClubEvent && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="glass-card w-full max-w-md rounded-3xl border border-red-500/20 overflow-hidden shadow-2xl p-8 space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 shrink-0"><AlertCircle className="w-6 h-6" /></div>
+                <div><h3 className="text-base font-black text-white uppercase tracking-tight">Delete Event</h3><p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">This action cannot be undone</p></div>
+              </div>
+              <p className="text-sm text-white/60 leading-relaxed">Are you sure you want to delete <span className="text-white font-bold">"{deletingClubEvent.title}"</span>?</p>
+              <div className="flex items-center gap-3">
+                <button onClick={() => setDeletingClubEvent(null)} className="flex-1 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-[11px] font-black uppercase tracking-widest text-white/60 hover:text-white hover:bg-white/10 transition-all">Cancel</button>
+                <button disabled={isDeletingClubEv} onClick={async () => { setIsDeletingClubEv(true); try { await fetch(`${API_BASE}/events/delete_event/${deletingClubEvent._id || deletingClubEvent.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }); queryClient.invalidateQueries({ queryKey: ['events-admin'] }); setDeletingClubEvent(null); } catch(err) { console.error(err); } finally { setIsDeletingClubEv(false); } }} className="flex-1 py-3.5 rounded-2xl bg-red-500/20 border border-red-500/30 text-[11px] font-black uppercase tracking-widest text-red-400 hover:bg-red-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                  {isDeletingClubEv ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  {isDeletingClubEv ? 'Deleting...' : 'Delete Event'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {selectedEvent && !isCreatingEvent && isPreviewing && !selectedEvent.showAnalytics && (
             <motion.button
               initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
               onClick={() => { setSelectedEvent(null); setIsPreviewing(false); }}
@@ -1507,6 +1558,9 @@ export default function Clubs() {
                     <button onClick={(e) => { e.stopPropagation(); openEditVenue(withVenueData(club)); }} className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-white transition-all" title="Edit venue">
                       <Edit2 className="w-4 h-4" />
                     </button>
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteVenueTarget(club); }} className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors" title="Delete venue">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                   </div>
                 </div>
               </motion.div>
@@ -2064,6 +2118,25 @@ export default function Clubs() {
       </AnimatePresence>
 
       {/* Feature Modal */}
+      {deleteVenueTarget && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="glass-card w-full max-w-md rounded-3xl border border-red-500/20 overflow-hidden shadow-2xl p-8 space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 shrink-0"><AlertCircle className="w-6 h-6" /></div>
+              <div><h3 className="text-base font-black text-white uppercase tracking-tight">Delete Venue</h3><p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">This action cannot be undone</p></div>
+            </div>
+            <p className="text-sm text-white/60 leading-relaxed">Are you sure you want to delete <span className="text-white font-bold">"{deleteVenueTarget.name}"</span>?</p>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setDeleteVenueTarget(null)} className="flex-1 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-[11px] font-black uppercase tracking-widest text-white/60 hover:text-white hover:bg-white/10 transition-all">Cancel</button>
+              <button onClick={handleDeleteVenue} disabled={isDeletingVenue} className="flex-1 py-3.5 rounded-2xl bg-red-500/20 border border-red-500/30 text-[11px] font-black uppercase tracking-widest text-red-400 hover:bg-red-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                {isDeletingVenue ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                {isDeletingVenue ? 'Deleting...' : 'Delete Venue'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       <FeatureClubModal
         isOpen={isFeaturingClub}
         onClose={() => setIsFeaturingClub(false)}

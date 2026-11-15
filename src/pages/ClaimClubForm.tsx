@@ -46,10 +46,10 @@ export default function ClaimClubForm() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-  const [portraitImage, setPortraitImage] = useState<string | null>(null);
+  const [portraitImage, setPortraitImage]   = useState<string | null>(null);
   const [landscapeImage, setLandscapeImage] = useState<string | null>(null);
-  const [portraitFile, setPortraitFile] = useState<File | null>(null);
-  const [landscapeFile, setLandscapeFile] = useState<File | null>(null);
+  const [portraitFile, setPortraitFile]     = useState<File | null>(null);
+  const [landscapeFile, setLandscapeFile]   = useState<File | null>(null);
 
   const { data: club, isLoading: isLoadingClub } = useQuery({
     queryKey: ['club', clubId],
@@ -208,6 +208,8 @@ export default function ClaimClubForm() {
         if (portraitFile) body.append('business_image', portraitFile);
         if (portraitFile)  body.append('business_image', portraitFile);
         if (landscapeFile) body.append('landscape_image', landscapeFile);
+        if (portraitFile)  body.append('venue_image', portraitFile);
+        if (landscapeFile) body.append('gallery_images', landscapeFile);
         const res = await fetch(`${API_BASE}/vendor/update_vendor/${club._id}`, {
           method: 'PUT',
           headers: { Authorization: `Bearer ${token}` },
@@ -299,7 +301,7 @@ export default function ClaimClubForm() {
           onClick={() => navigate('/pending-approval')}
           className="text-primary font-black uppercase tracking-widest text-xs hover:underline pt-4 relative z-10"
         >
-          Go back to login screen
+          View Approval Status
         </button>
       </motion.div>
     );

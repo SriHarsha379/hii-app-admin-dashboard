@@ -66,7 +66,7 @@ import { FilterDropdown } from '../components/FilterDropdown';
 import { FilterPanel } from '../components/FilterPanel';
 
 import UserProfilePreview from '../components/UserProfilePreview';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'motion/react';
 
 import { API_BASE } from '../lib/apiConfig';
 import { validatePassword } from '../lib/passwordPolicy';
@@ -134,6 +134,8 @@ export default function Admins() {
   // had zero support for deactivating or removing an admin account
   // through the dashboard; added real endpoints for both.
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [deleteAdminTarget, setDeleteAdminTarget] = React.useState<any>(null);
+  const [isDeletingAdmin, setIsDeletingAdmin]       = React.useState(false);
   const [mutationError, setMutationError] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 

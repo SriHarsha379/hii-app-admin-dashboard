@@ -893,9 +893,9 @@ export default function AdsBroadcast() {
                       className="w-full bg-[#09090B] border border-white/5 rounded-[24px] px-8 py-6 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 appearance-none font-medium"
                     >
                       <option>All Verified Users</option>
-                      <option>Club Owners (42)</option>
-                      <option>Premium Users (2.1k)</option>
-                      <option>Inactive Users (840)</option>
+                      <option value="club_owners">Club Owners</option>
+                      <option value="premium">Premium Users</option>
+                      <option value="inactive">Inactive Users</option>
                     </select>
                     <p className="text-[9px] text-white/20 font-medium ml-1">Segmented targeting isn't available yet — every broadcast currently goes to all verified users.</p>
                   </div>

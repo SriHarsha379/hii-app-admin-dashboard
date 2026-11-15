@@ -59,9 +59,18 @@ import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import ClubProfilePreview from './ClubProfilePreview';
 import EventProfilePreview from './EventProfilePreview';
-import RightClubProfile from './RightClubProfile';
 
 import { API_BASE } from '../lib/apiConfig';
+
+function timeAgo(raw: string | undefined | null): string {
+  if (!raw) return '';
+  const diff = Date.now() - new Date(raw).getTime();
+  if (isNaN(diff)) return raw;
+  if (diff < 60000)  return 'just now';
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  return `${Math.floor(diff / 86400000)}d ago`;
+}
 
 // Where a dashboard notification leads when clicked (actions are set by the
 // backend - see utility/adminNotify.js). null = just a message, no page.
@@ -197,7 +206,7 @@ function RightSidebar({ isOpen, toggle, currentPage, notifications }: { isOpen: 
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs text-white leading-snug truncate group-hover:text-primary transition-colors">{n.title || n.message}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{n.createdAt}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{timeAgo(n.createdAt)}</p>
                   </div>
                 </div>
               ))}
@@ -687,60 +696,7 @@ export default function Layout() {
                 <Command className="w-2.5 h-2.5" /> K
               </div>
 
-              <AnimatePresence>
-                {isSearchOpen && searchQuery && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="absolute top-full mt-2 w-full left-0 bg-[#09090B] border border-white/10 rounded-2xl shadow-[0_40px_80px_rgba(0,0,0,0.85)] ring-1 ring-white/5 overflow-hidden z-50"
-                  >
-                    {isSearching ? (
-                      <div className="p-4 text-center text-sm text-muted-foreground">Searching...</div>
-                    ) : searchResults && searchResults.length > 0 ? (
-                          <div className="max-h-[400px] overflow-y-auto scrollbar-hide p-2">
-                            {TYPE_ORDER
-                              .map((t) => ({ t, items: searchResults.filter((r: any) => r.type === t) }))
-                              .filter((g) => g.items.length > 0)
-                              .map(({ t, items }) => (
-                                <div key={t} className="mb-1">
-                                  <div className="px-3 pt-2 pb-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                    {TYPE_META[t]?.label ?? t}
-                                  </div>
-                                  {items.map((result: any) => (
-                                    <button
-                                      key={`${result.type}-${result.id}`}
-                                      onClick={() => {
-                                        const base = TYPE_META[result.type]?.route ?? result.link;
-                                        navigate(`${base}?focus=${result.id}`);
-                                        setIsSearchOpen(false);
-                                        setSearchQuery('');
-                                      }}
-                                      className="w-full text-left px-3 py-2 hover:bg-white/10 rounded-lg flex items-center justify-between group transition-colors"
-                                    >
-                                      <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-[10px] font-bold text-primary border border-primary/20 uppercase">
-                                          {String(result.title || '?').charAt(0)}
-                                        </div>
-                                        <div>
-                                          <div className="text-sm font-medium text-white group-hover:text-primary transition-colors">{result.title}</div>
-                                          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                                            {result.role || TYPE_META[result.type]?.label?.replace(/s$/, '') || result.type}
-                                          </div>
-                                        </div>
-                                      </div>
-                                      <ChevronRight className="w-3 h-3 text-muted-foreground group-hover:text-primary transition-transform group-hover:translate-x-1" />
-                                    </button>
-                                  ))}
-                                </div>
-                              ))}
-                          </div>
-                        ) : searchQuery ? (
-                      <div className="p-4 text-center text-sm text-muted-foreground">No results found for "{searchQuery}"</div>
-                    ) : null}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              
             </div>
           </div>
 
@@ -840,7 +796,7 @@ export default function Layout() {
                                 </p>
                                 <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-2">
                                   {/* backend already sends a friendly "2 hours ago" */}
-                                  <span>{n.createdAt || n.time || ''}</span>
+                                  <span>{timeAgo(n.createdAt || n.time)}</span>
                                   {notificationLink(n) && (
                                     <span className="text-primary font-bold group-hover:underline">Open ›</span>
                                   )}

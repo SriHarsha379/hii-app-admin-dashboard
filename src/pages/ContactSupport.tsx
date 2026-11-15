@@ -22,8 +22,19 @@ export default function ContactSupport() {
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/support-requests/categories`, { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json();
-      const lists = json.data || {};
-      return (Object.values(lists)[0] as string[]) || [];
+      const lists: Record<string, string[]> = json.data || {};
+      const roleKey = token
+        ? (() => {
+            try {
+              const payload = JSON.parse(atob((token as string).split('.')[1] || ''));
+              const role = payload?.role || '';
+              if (role === 'CLUB_ADMIN') return 'club';
+              if (role === 'EVENT_ADMIN') return 'organiser';
+              return 'member';
+            } catch { return 'member'; }
+          })()
+        : 'member';
+      return lists[roleKey] || (Object.values(lists)[0] as string[]) || [];
     },
   });
 

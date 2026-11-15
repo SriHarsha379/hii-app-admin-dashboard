@@ -82,6 +82,8 @@ export default function ManageFilters() {
   const [newItemLat, setNewItemLat] = useState('');
   const [newItemLng, setNewItemLng] = useState('');
   const [formError, setFormError] = useState('');
+  const [deleteTarget, setDeleteTarget]       = React.useState<any>(null);
+  const [isDeletingItem, setIsDeletingItem]   = React.useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const tabs: { id: TabId; label: string; icon: any }[] = [
@@ -475,6 +477,41 @@ export default function ManageFilters() {
           </div>
         </div>
       </div>
+
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="glass-card w-full max-w-md rounded-3xl border border-red-500/20 overflow-hidden shadow-2xl p-8 space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-white uppercase tracking-tight">Delete {activeTab === 'cities' ? 'City' : activeTab === 'genres' ? 'Genre' : 'Category'}</h3>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">This cannot be undone</p>
+              </div>
+            </div>
+            <p className="text-sm text-white/60 leading-relaxed">
+              Delete <span className="text-white font-bold">"{deleteTarget[config.nameField]}"</span>? This may affect events or venues that reference it.
+            </p>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-[11px] font-black uppercase tracking-widest text-white/60 hover:text-white hover:bg-white/10 transition-all">Cancel</button>
+              <button
+                disabled={isDeletingItem}
+                onClick={async () => {
+                  setIsDeletingItem(true);
+                  try { await deleteItemMutation.mutateAsync(deleteTarget._id || deleteTarget.id); setDeleteTarget(null); }
+                  catch { } finally { setIsDeletingItem(false); }
+                }}
+                className="flex-1 py-3.5 rounded-2xl bg-red-500/20 border border-red-500/30 text-[11px] font-black uppercase tracking-widest text-red-400 hover:bg-red-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isDeletingItem ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                {isDeletingItem ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

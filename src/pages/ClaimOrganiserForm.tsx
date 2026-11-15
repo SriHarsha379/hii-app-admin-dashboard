@@ -68,7 +68,6 @@ export default function ClaimOrganiserForm() {
   // apply to an event organiser account, only Basic Details/Contact
   // Info/Business Details (registration number, tax ID, description),
   // which are all genuine Vendor fields and read correctly on their own.
-  const portraitInputRef = React.useRef<HTMLInputElement>(null);
 
   // Form State
   const [formData, setFormData] = useState({

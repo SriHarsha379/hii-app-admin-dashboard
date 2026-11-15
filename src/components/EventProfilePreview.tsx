@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '../lib/utils';
 import { API_BASE } from '../lib/apiConfig';
-import { 
+import {
   X, 
   Heart, 
   Calendar as CalendarIcon, 
@@ -14,6 +14,13 @@ import {
   ArrowRight
 } from 'lucide-react';
 
+const toUrl = (filename?: string | null): string => {
+  if (!filename) return "";
+  if (filename.indexOf("http") === 0) return filename;
+  return filename;
+};
+
+
 interface EventProfilePreviewProps {
   onClose: () => void;
   eventData?: any;
@@ -24,7 +31,7 @@ export default function EventProfilePreview({ onClose, eventData, hideCloseButto
   const data = React.useMemo(() => {
     const base = eventData || {};
     const UPLOADS_BASE = API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads');
-  const toUrl = (f: any) => !f ? '' : (/^https?:\/\//i.test(f) ? f : UPLOADS_BASE + '/' + f);
+  
     return {
       name: base.title || base.name || 'Untitled event',
       portrait_url: toUrl(base.portrait_url || base.poster_url || ''),

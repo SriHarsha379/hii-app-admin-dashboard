@@ -317,7 +317,7 @@ export default function EventAdminOnboarding() {
   // want to wait.
   useEffect(() => {
     if (!isSuccess) return;
-    const timer = setTimeout(() => navigate('/event-profile'), 4000);
+    const timer = setTimeout(() => navigate('/pending-approval'), 4000);
     return () => clearTimeout(timer);
   }, [isSuccess, navigate]);
 
@@ -366,7 +366,7 @@ export default function EventAdminOnboarding() {
             transition={{ delay: 0.4 }}
           >
             <button
-              onClick={() => navigate('/event-profile')}
+              onClick={() => navigate('/pending-approval')}
               className="px-12 py-5 rounded-[24px] bg-primary text-white text-[12px] font-black uppercase tracking-[0.3em] hover:bg-primary/90 transition-all shadow-[0_20px_50px_rgba(255,45,154,0.4)] flex items-center gap-4 mx-auto group active:scale-95"
             >
               View Profile

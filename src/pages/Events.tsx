@@ -417,6 +417,9 @@ export default function Events() {
     body.append('latitude', eventFormData.latitude || '0');
     body.append('longitude', eventFormData.longitude || '0');
     if (eventFormData.vendor_id) body.append('vendor_id', eventFormData.vendor_id);
+    if (Array.isArray(eventFormData.genre) && eventFormData.genre.length) {
+      body.append('genre', JSON.stringify(eventFormData.genre));
+    }
     // ISSUE 17 FIX: send existing URLs back when no new file selected
     if (posterFile) {
       body.append('venue_image', posterFile);
@@ -653,7 +656,9 @@ export default function Events() {
     const filled = {
       id:            eventId(event),
       title:         event.title        || '',
-      city:          event.city         || '',
+      city:          (typeof event.city === 'object' && event.city)
+                       ? (event.city._id || event.city.id || '')
+                       : (event.city || ''),
       venue_id:      getVendorId(event),
       vendor_id:     getVendorId(event),
       genre:         Array.isArray(event.genre)      ? event.genre      : (event.genre      ? [event.genre]      : []),

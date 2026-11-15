@@ -28,6 +28,7 @@ export default function Bookings() {
   const { token, user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [cancelTarget, setCancelTarget]   = useState<any>(null);
   const queryClient = useQueryClient();
 
   const { data: clubs } = useQuery({
@@ -79,8 +80,39 @@ export default function Bookings() {
     return matchesSearch && matchesStatus;
   });
 
-  const confirmedCount = list.filter((b: any) => b.status === 'confirmed').length;
-  const totalRevenue = list.reduce((sum: number, b: any) => sum + (b.total || 0), 0);
+  const confirmedCount = filtered.filter((b: any) => b.status === 'confirmed').length;
+  const totalRevenue   = filtered.reduce((sum: number, b: any) => sum + (b.total || 0), 0);
+
+
+  const exportBookings = () => {
+    const headers = ['Guest', 'Email', 'Event/Venue', 'Amount', 'Payment', 'Status', 'Booking Type'];
+    const rows = filtered.map((b: any) => [
+      '"' + ((b.user?.first_name || '') + ' ' + (b.user?.last_name || '')).trim().replace(/"/g, '""') + '"',
+      '"' + (b.user?.email || '').replace(/"/g, '""') + '"',
+      '"' + (b.event_id?.venue_name || b.venue_id?.venue_name || '').replace(/"/g, '""') + '"',
+      '"' + (b.total || 0) + '"',
+      '"' + (b.payment_status || '') + '"',
+      '"' + (b.status || '') + '"',
+      '"' + (b.booking_type || '') + '"',
+    ]);
+    const csv  = [headers.join(','), ...rows.map((r: string[]) => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = 'bookings-' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  if (!myVendor && !isLoading) {
+    return (
+      <div className="glass-card rounded-2xl p-16 text-center space-y-3">
+        <Ticket className="w-10 h-10 text-white/10 mx-auto" />
+        <p className="text-sm font-black text-white/50">No venue linked to your account yet.</p>
+        <p className="text-xs text-white/30">Complete your club setup first — bookings will appear here once your venue is verified.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -94,6 +126,9 @@ export default function Bookings() {
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Ticket purchases &amp; venue bookings for your venue</p>
           </div>
         </div>
+        <button onClick={exportBookings} className="px-5 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2">
+          <Ticket className="w-3.5 h-3.5" /> Export CSV
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -201,7 +236,7 @@ export default function Bookings() {
                           <CheckCircle2 className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => updateStatusMutation.mutate({ id: b._id, status: 'cancelled' })}
+                          onClick={() => setCancelTarget(b)}
                           disabled={updateStatusMutation.isPending}
                           title="Cancel booking"
                           className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors disabled:opacity-50"
@@ -217,6 +252,37 @@ export default function Bookings() {
           </table>
         )}
       </div>
+
+
+      {cancelTarget && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="glass-card w-full max-w-md rounded-3xl border border-red-500/20 overflow-hidden shadow-2xl p-8 space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 shrink-0">
+                <XCircle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-white uppercase tracking-tight">Cancel Booking</h3>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">This action cannot be undone</p>
+              </div>
+            </div>
+            <p className="text-sm text-white/60 leading-relaxed">
+              Cancel booking for <span className="text-white font-bold">{cancelTarget.user?.first_name} {cancelTarget.user?.last_name}</span>?
+            </p>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setCancelTarget(null)} className="flex-1 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-[11px] font-black uppercase tracking-widest text-white/60 hover:text-white hover:bg-white/10 transition-all">Keep</button>
+              <button
+                disabled={updateStatusMutation.isPending}
+                onClick={() => { updateStatusMutation.mutate({ id: cancelTarget._id, status: 'cancelled' }); setCancelTarget(null); }}
+                className="flex-1 py-3.5 rounded-2xl bg-red-500/20 border border-red-500/30 text-[11px] font-black uppercase tracking-widest text-red-400 hover:bg-red-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {updateStatusMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                Cancel Booking
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
