@@ -348,7 +348,7 @@ export default function ClubAdminProfile() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {liveEvents.length > 0 ? liveEvents.map(event => (
                     <motion.div
-                      key={event.id}
+                      key={event._id || event.id}
                       onClick={() => setSelectedEvent(event)}
                       className="group relative bg-[#121218] rounded-[40px] border border-white/5 overflow-hidden hover:border-primary/50 transition-all cursor-pointer p-8 flex flex-col gap-8 text-left"
                     >
@@ -416,7 +416,7 @@ export default function ClubAdminProfile() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                   {upcomingEvents.map((event, index) => (
                     <motion.div
-                      key={event.id}
+                      key={event._id || event.id}
                       onClick={() => setSelectedEvent(event)}
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
@@ -457,7 +457,7 @@ export default function ClubAdminProfile() {
                 <div className="space-y-4">
                   {pastEvents.map((event, index) => (
                     <motion.div
-                      key={event.id}
+                      key={event._id || event.id}
                       onClick={() => setSelectedEvent(event)}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}

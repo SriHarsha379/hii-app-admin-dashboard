@@ -21,7 +21,6 @@ import ContactSupport from './pages/ContactSupport';
 import ActivityLogs from './pages/ActivityLogs';
 import Settings from './pages/Settings';
 import ManageFilters from './pages/ManageFilters';
-import Recommendations from './pages/Recommendations';
 
 const queryClient = new QueryClient({
   defaultOptions: {
