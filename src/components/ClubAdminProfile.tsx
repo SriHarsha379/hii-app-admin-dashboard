@@ -272,7 +272,7 @@ export default function ClubAdminProfile() {
                     index === 0 ? "col-span-2 aspect-video" : "aspect-square"
                   )}
                 >
-                  <img src={assetUrl(url)} className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110" alt="" />
+                  <img src={(assetUrl(url)) || null} className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110" alt="" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <Plus className="w-6 h-6 text-white" />
                   </div>

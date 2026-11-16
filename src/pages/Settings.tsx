@@ -412,7 +412,7 @@ export default function Settings() {
                       />
                       <div className="w-32 h-32 rounded-full bg-[#09090B] border-2 border-white/5 p-1 relative overflow-hidden group">
                         {user?.avatar ? (
-                          <img src={user.avatar} alt={user.name} className="w-full h-full rounded-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" />
+                          <img src={(user.avatar) || null} alt={user.name} className="w-full h-full rounded-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" />
                         ) : (
                           <div className="w-full h-full rounded-full flex items-center justify-center bg-white/5">
                             <User className="w-12 h-12 text-white/10" />

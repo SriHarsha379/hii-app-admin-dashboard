@@ -169,7 +169,7 @@ export default function RightClubProfile({ club: initialClub, onUpdate }: RightC
                 {tempData.lineup.map((dj: any, index: number) => (
                   <div key={index} className="p-5 rounded-3xl bg-white/[0.03] border border-white/10 flex items-center gap-5">
                     <div className="w-14 h-14 rounded-2xl border border-white/10 overflow-hidden bg-white/5 shrink-0">
-                      <img src={dj.image} alt="" className="w-full h-full object-cover" />
+                      <img src={(dj.image) || null} alt="" className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 space-y-1">
                       <input 
@@ -260,7 +260,7 @@ export default function RightClubProfile({ club: initialClub, onUpdate }: RightC
       {/* Hero Image */}
       <div className="relative h-64 shrink-0 overflow-hidden">
         <img 
-          src={club.portrait_url} 
+          src={(club.portrait_url) || null} 
           alt={club.name}
           className="w-full h-full object-cover"
         />
@@ -364,7 +364,7 @@ export default function RightClubProfile({ club: initialClub, onUpdate }: RightC
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
             {club.gallery.map((img: string, i: number) => (
               <div key={i} className="w-[14rem] aspect-[16/10] rounded-[2rem] overflow-hidden border border-white/5 shrink-0 shadow-2xl relative group/img">
-                <img src={img} alt="" className="w-full h-full object-cover" />
+                <img src={(img) || null} alt="" className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity" />
               </div>
             ))}
@@ -415,7 +415,7 @@ export default function RightClubProfile({ club: initialClub, onUpdate }: RightC
             {club.lineup.map((dj: any, i: number) => (
               <div key={i} className="flex flex-col items-center gap-3 shrink-0 group/dj">
                 <div className="w-16 h-16 rounded-[1.8rem] overflow-hidden border border-white/10 bg-white/[0.03] shadow-xl transition-all duration-300 group-hover/dj:scale-105">
-                  <img src={dj.image} alt={dj.name} className="w-full h-full object-cover" />
+                  <img src={(dj.image) || null} alt={dj.name} className="w-full h-full object-cover" />
                 </div>
                 <div className="text-center">
                   <p className="text-[10px] font-black text-white tracking-wide uppercase">{dj.name}</p>

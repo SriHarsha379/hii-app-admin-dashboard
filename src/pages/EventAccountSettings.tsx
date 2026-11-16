@@ -465,7 +465,7 @@ export default function EventAccountSettings() {
                     className="mt-2 aspect-square w-28 rounded-[32px] bg-white/5 border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-white/[0.08] hover:border-primary/30 transition-all group/upload relative overflow-hidden"
                   >
                     {profileImagePreview ? (
-                      <img src={profileImagePreview} alt="Profile preview" className="absolute inset-0 w-full h-full object-cover" />
+                      <img src={(profileImagePreview) || null} alt="Profile preview" className="absolute inset-0 w-full h-full object-cover" />
                     ) : (
                       <>
                         <Upload className="w-4 h-4 text-white/20 group-hover/upload:text-primary transition-colors" />

@@ -1032,7 +1032,7 @@ export default function ClubOnboarding() {
                               : "border-white/5 hover:border-white/20"
                           )}
                         >
-                          <img src={url} alt="" className="w-full h-full object-cover transition-transform duration-1000 group-hover/image:scale-110" />
+                          <img src={(url) || null} alt="" className="w-full h-full object-cover transition-transform duration-1000 group-hover/image:scale-110" />
                           <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60" />
                           {venueFormData.portrait_url !== url && (
                             <button
@@ -1097,7 +1097,7 @@ export default function ClubOnboarding() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
                       {venueFormData.landscape_urls.map((url: string, idx: number) => (
                         <div key={url} className="relative aspect-video rounded-[40px] overflow-hidden border border-white/5 bg-[#09090B] group/landscape shadow-2xl">
-                          <img src={url} alt="" className="w-full h-full object-cover transition-transform duration-[2s] group-hover/landscape:scale-[1.15]" />
+                          <img src={(url) || null} alt="" className="w-full h-full object-cover transition-transform duration-[2s] group-hover/landscape:scale-[1.15]" />
                           <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent opacity-60" />
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/landscape:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-md">
                             <button

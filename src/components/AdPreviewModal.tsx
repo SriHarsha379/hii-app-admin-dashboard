@@ -46,7 +46,7 @@ export function AdPreviewModal({ ad, onClose }) {
                   <div className="rounded-[28px] overflow-hidden bg-black relative">
                     {hasVideo ? (
                       <video
-                        src={adAssetUrl(ad.ad_video)}
+                        src={(adAssetUrl(ad.ad_video)) || null}
                         poster={ad.ad_image ? adAssetUrl(ad.ad_image) : undefined}
                         controls
                         playsInline
@@ -54,7 +54,7 @@ export function AdPreviewModal({ ad, onClose }) {
                         style={{ aspectRatio: ad.video_width && ad.video_height ? `${ad.video_width} / ${ad.video_height}` : '9 / 16' }}
                       />
                     ) : ad.ad_image ? (
-                      <img src={adAssetUrl(ad.ad_image)} alt={ad.ad_name || 'Ad'} className="w-full h-auto" />
+                      <img src={(adAssetUrl(ad.ad_image)) || null} alt={ad.ad_name || 'Ad'} className="w-full h-auto" />
                     ) : (
                       <div className="aspect-[9/16] flex items-center justify-center text-white/20">
                         <ImageIcon className="w-10 h-10" />

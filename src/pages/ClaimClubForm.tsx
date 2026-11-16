@@ -538,7 +538,7 @@ export default function ClaimClubForm() {
                     )}
                   >
                     {portraitImage ? (
-                      <img src={portraitImage} className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="Portrait" />
+                      <img src={(portraitImage) || null} className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="Portrait" />
                     ) : (
                       <>
                         <div className={cn(
@@ -579,7 +579,7 @@ export default function ClaimClubForm() {
                     )}
                   >
                     {landscapeImage ? (
-                      <img src={landscapeImage} className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="Landscape" />
+                      <img src={(landscapeImage) || null} className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="Landscape" />
                     ) : (
                       <>
                         <div className={cn(

@@ -123,7 +123,7 @@ export default function ClubProfilePreview({ club, onClose, onEdit, hideCloseBut
         {/* Cover Image Section */}
         <div className="relative h-[480px] shrink-0 overflow-hidden">
           {data.portrait_url ? (
-            <img src={data.portrait_url} alt={data.name} className="w-full h-full object-cover scale-105" referrerPolicy="no-referrer" />
+            <img src={(data.portrait_url) || null} alt={data.name} className="w-full h-full object-cover scale-105" referrerPolicy="no-referrer" />
           ) : (
             <div className="w-full h-full bg-white/5 flex items-center justify-center">
               <MapPin className="w-16 h-16 text-white/15" />
@@ -216,7 +216,7 @@ export default function ClubProfilePreview({ club, onClose, onEdit, hideCloseBut
                   "rounded-3xl overflow-hidden bg-white/5 border border-white/10 shadow-lg",
                   (i === 0 || i === 3) ? "aspect-square" : "aspect-[4/5]"
                 )}>
-                  <img src={img} alt="" className="w-full h-full object-cover hover:scale-110 transition-transform duration-700" referrerPolicy="no-referrer" />
+                  <img src={(img) || null} alt="" className="w-full h-full object-cover hover:scale-110 transition-transform duration-700" referrerPolicy="no-referrer" />
                 </div>
               ))}
             </div>
@@ -252,7 +252,7 @@ export default function ClubProfilePreview({ club, onClose, onEdit, hideCloseBut
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 rounded-2xl overflow-hidden border border-white/10 bg-black/40">
                       {event.poster_url ? (
-                        <img src={eventImg(event.poster_url)} alt={event.title} className="w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
+                        <img src={(eventImg(event.poster_url)) || null} alt={event.title} className="w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
                       ) : (
                         <CalendarDays className="w-5 h-5 text-white/20 m-auto mt-4" />
                       )}

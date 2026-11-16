@@ -337,15 +337,7 @@ export default function ClaimOrganiserForm() {
                       </div>
                     </div>
                   </div>
-                      <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] leading-relaxed">Map Preview</p>
-                    </div>
-                  </div>
                 </div>
-              </div>
-            </FormSection>
-
-            <FormSection title="Contact Information" icon={<Mail className="w-4 h-4" />}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                 <div className="col-span-1 md:col-span-2">
                   <RefinedField
                     label="Email Address"

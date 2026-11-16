@@ -115,7 +115,7 @@ function ImageUploadZone({
       >
         {value && (
           <>
-            <img src={value} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            <img src={(value) || null} alt="" className="absolute inset-0 w-full h-full object-cover" />
             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
               <span className="text-[11px] font-black uppercase text-white tracking-[0.2em]">Change Image</span>
             </div>
@@ -157,7 +157,7 @@ function GalleryUploadZone({ urls, onChange, onFilesChange }: { urls: string[]; 
             <div key={i} className="aspect-square rounded-3xl bg-[#09090B] border border-white/5 flex items-center justify-center hover:bg-white/5 transition-colors cursor-pointer group relative overflow-hidden" onClick={() => ref.current?.click()}>
               {urls[i] ? (
                 <>
-                  <img src={urls[i]} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                  <img src={(urls[i]) || null} alt="" className="absolute inset-0 w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <Upload className="w-5 h-5 text-white" />
                   </div>
@@ -917,7 +917,7 @@ export default function Events() {
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10 flex-shrink-0 bg-white/5 flex items-center justify-center">
                             {event.poster_url
-                              ? <img src={eventImgUrl(event.poster_url)} alt="" className="w-full h-full object-cover" />
+                              ? <img src={(eventImgUrl(event.poster_url)) || null} alt="" className="w-full h-full object-cover" />
                               : <Calendar className="w-4 h-4 text-white/20" />}
                           </div>
                           <div>

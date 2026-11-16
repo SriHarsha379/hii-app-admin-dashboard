@@ -490,7 +490,7 @@ export default function EventAdminOnboarding() {
                   className="aspect-square w-full rounded-[48px] bg-white/[0.02] border-2 border-dashed border-white/5 flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-white/[0.05] hover:border-primary/30 transition-all group/upload relative overflow-hidden"
                 >
                   {profileImagePreview ? (
-                    <img src={profileImagePreview} alt="Profile preview" className="absolute inset-0 w-full h-full object-cover" />
+                    <img src={(profileImagePreview) || null} alt="Profile preview" className="absolute inset-0 w-full h-full object-cover" />
                   ) : (
                     <>
                       <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover/upload:bg-primary/20 transition-all">

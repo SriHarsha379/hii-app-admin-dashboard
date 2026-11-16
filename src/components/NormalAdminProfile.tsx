@@ -116,7 +116,7 @@ export default function NormalAdminProfile() {
 
   const ClubAvatar = ({ club }: { club: any }) => {
     if (club.portrait_url) {
-      return <img src={club.portrait_url} className="w-full h-full object-cover" alt={club.name} />;
+      return <img src={(club.portrait_url) || null} className="w-full h-full object-cover" alt={club.name} />;
     }
     return (
       <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary text-lg font-black">
@@ -139,7 +139,7 @@ export default function NormalAdminProfile() {
           <div className="relative group shrink-0">
             <div className="w-32 h-32 rounded-3xl overflow-hidden border-2 border-primary/20 group-hover:border-primary/50 transition-all duration-500 shadow-2xl bg-primary/10 flex items-center justify-center">
               {user?.avatar ? (
-                <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
+                <img src={(user.avatar) || null} alt="Profile" className="w-full h-full object-cover" />
               ) : (
                 <span className="text-4xl font-black text-primary">{getInitials(user?.name)}</span>
               )}
@@ -243,7 +243,7 @@ export default function NormalAdminProfile() {
                 >
                   <div className="aspect-[16/9] relative overflow-hidden">
                     <img
-                      src={(() => { const _u = (f) => !f ? '' : (/^https?:\/\//i.test(f) ? f : `${API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads/')}${f}`); return _u(event.poster_url) || _u(event.landscape_urls?.[0]); })()}
+                      src={((() => { const _u = (f) => !f ? '' : (/^https?:\/\//i.test(f) ? f : `${API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads/')) || null}${f}`); return _u(event.poster_url) || _u(event.landscape_urls?.[0]); })()}
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                       alt={event.title}
                     />

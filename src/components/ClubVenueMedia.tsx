@@ -140,7 +140,7 @@ export default function ClubVenueMedia() {
                 <input type="file" accept="image/*" className="hidden" onChange={handlePortrait} />
                 {portraitPreview ? (
                   <>
-                    <img src={portraitPreview} alt="" className="w-full h-full object-cover" />
+                    <img src={(portraitPreview) || null} alt="" className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
                       <span className="text-[10px] font-black text-white uppercase tracking-[0.3em]">Change</span>
                     </div>
@@ -159,7 +159,7 @@ export default function ClubVenueMedia() {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {keptGallery.map((f, i) => (
                   <div key={`k-${i}`} className="relative aspect-video rounded-[24px] overflow-hidden border border-white/5 group">
-                    <img src={assetUrl(f)} alt="" className="w-full h-full object-cover" />
+                    <img src={(assetUrl(f)) || null} alt="" className="w-full h-full object-cover" />
                     <button type="button" onClick={() => removeKept(i)} className="absolute top-2 right-2 w-8 h-8 rounded-xl bg-black/70 border border-white/10 flex items-center justify-center text-red-400 opacity-0 group-hover:opacity-100 transition-all">
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -167,7 +167,7 @@ export default function ClubVenueMedia() {
                 ))}
                 {newGalleryPreviews.map((src, i) => (
                   <div key={`n-${i}`} className="relative aspect-video rounded-[24px] overflow-hidden border border-primary/30 group">
-                    <img src={src} alt="" className="w-full h-full object-cover" />
+                    <img src={(src) || null} alt="" className="w-full h-full object-cover" />
                     <span className="absolute bottom-2 left-2 text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-primary/80 text-white">New</span>
                     <button type="button" onClick={() => removeNew(i)} className="absolute top-2 right-2 w-8 h-8 rounded-xl bg-black/70 border border-white/10 flex items-center justify-center text-red-400 opacity-0 group-hover:opacity-100 transition-all">
                       <Trash2 className="w-4 h-4" />

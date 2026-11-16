@@ -638,13 +638,11 @@ export default function Ticketing() {
             </div>
             <div className="p-6 border-t border-white/10 flex justify-end gap-3 shrink-0">
               <button
-                onClick={() => setIsGuestModalOpen(false)}
                 className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 transition-colors"
               >
                 Cancel
               </button>
               <button onClick={async () => { const nameEl  = document.querySelector('[placeholder="John Doe"]') as HTMLInputElement; const emailEl = document.querySelector('[placeholder="john@example.com"]') as HTMLInputElement; const typeEl  = document.querySelector('select') as HTMLSelectElement; const gname = nameEl?.value?.trim(); const gemail = emailEl?.value?.trim(); if (!gname || !gemail) { alert('Enter name and email'); return; } try { const res = await fetch(`${API_BASE}/booking/create_manual_booking`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ guest_name: gname, email: gemail, booking_type: typeEl?.value || 'VIP' }) }); const json = await res.json().catch(() => ({})); if (!res.ok) throw new Error(json?.message || 'Failed to add guest'); queryClient.invalidateQueries({ queryKey: ['all-bookings'] }); setIsGuestModalOpen(false); } catch(err: any) { alert(err.message || 'Failed'); } }}
-                onClick={() => setIsGuestModalOpen(false)}
                 className="px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-secondary text-[10px] font-black uppercase tracking-widest text-white hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
               >
                 Add Guest

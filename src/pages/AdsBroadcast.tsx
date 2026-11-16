@@ -642,7 +642,7 @@ export default function AdsBroadcast() {
                           <div className="flex items-center gap-3">
                             <div className="w-12 h-12 rounded-lg overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center relative">
                               {ad.ad_image ? (
-                                <img src={adAssetUrl(ad.ad_image)} alt="" className="w-full h-full object-cover" />
+                                <img src={(adAssetUrl(ad.ad_image)) || null} alt="" className="w-full h-full object-cover" />
                               ) : (
                                 <Image className="w-5 h-5 text-white/20" />
                               )}
@@ -787,7 +787,7 @@ export default function AdsBroadcast() {
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10">
                               {event.venue_image
-                                ? <img src={adAssetUrl(event.venue_image)} alt="" className="w-full h-full object-cover" />
+                                ? <img src={(adAssetUrl(event.venue_image)) || null} alt="" className="w-full h-full object-cover" />
                                 : <Calendar className="w-5 h-5 text-white/20" />}
                             </div>
                             <div>
@@ -1149,7 +1149,7 @@ export default function AdsBroadcast() {
                             }}
                           />
                           {adFormData.imageUrl ? (
-                            <img src={adFormData.imageUrl} alt="Ad Content" className="w-full h-full object-cover" />
+                            <img src={(adFormData.imageUrl) || null} alt="Ad Content" className="w-full h-full object-cover" />
                           ) : (
                             <>
                               <div className="w-20 h-20 rounded-[32px] bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-primary/20 transition-all shadow-2xl">
@@ -1333,7 +1333,7 @@ export default function AdsBroadcast() {
                                 className="w-full aspect-[3/4] bg-primary/10 rounded-3xl border border-primary/30 flex items-center justify-center relative overflow-hidden group-hover/phone:shadow-[0_0_30px_rgba(255,45,154,0.2)] transition-all"
                               >
                                 {adFormData.imageUrl ? (
-                                  <img src={adFormData.imageUrl} className="w-full h-full object-cover" />
+                                  <img src={(adFormData.imageUrl) || null} className="w-full h-full object-cover" />
                                 ) : (
                                   <p className="text-[8px] text-primary/40 font-black uppercase tracking-widest">Ad Canvas</p>
                                 )}
