@@ -99,7 +99,20 @@ export default function EventAdminOnboarding() {
   // vendor names as the company name is typed, so someone doesn't
   // accidentally create a duplicate account for a company Super Admin has
   // already listed. Same pattern already used on Club registration.
-  const { data: claimableOrganisers } = useQuery({
+  // FIX: categories were hardcoded display strings — fetch real IDs from backend
+  const { data: eventCategories } = useQuery({
+    queryKey: ['eventCategories-onboarding'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/category/get_category`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      const list = Array.isArray(json.data) ? json.data : [];
+      return list.filter((c: any) => c.category_type === 1);
+    },
+  });
+
+    const { data: claimableOrganisers } = useQuery({
     queryKey: ['claimable-organisers'],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, { headers: { Authorization: `Bearer ${token}` } });
@@ -221,11 +234,17 @@ export default function EventAdminOnboarding() {
 
   const handleCategoryToggle = (cat: string) => {
     if (!isEditing) return;
+    // FIX: store the category _id if available from the backend list,
+    // otherwise fall back to the display name (for the hardcoded defaults)
+    const matched = Array.isArray(eventCategories)
+      ? eventCategories.find((c: any) => c.category_name === cat)
+      : null;
+    const val = matched ? matched._id : cat;
     setFormData(prev => ({
       ...prev,
-      categories: prev.categories.includes(cat)
-        ? prev.categories.filter(c => c !== cat)
-        : [...prev.categories, cat]
+      categories: prev.categories.includes(val)
+        ? prev.categories.filter(c => c !== val)
+        : [...prev.categories, val]
     }));
   };
 
@@ -288,6 +307,16 @@ export default function EventAdminOnboarding() {
       // accepts it as "business_image" (a single-file field, same as
       // Club registration's photo).
       if (profileImageFile) body.append('business_image', profileImageFile);
+      // FIX: these 5 fields were collected but never sent to the backend.
+      if (formData.website)         body.append('website',              formData.website);
+      if (formData.companyType)     body.append('company_type',         formData.companyType);
+      if (formData.yearEstablished) body.append('year_established',     formData.yearEstablished);
+      if (formData.categories.length > 0) body.append('category_ids', JSON.stringify(formData.categories));
+      const socials = formData.socialLinks;
+      if (socials.instagram) body.append('social_instagram', socials.instagram);
+      if (socials.linkedin)  body.append('social_linkedin',  socials.linkedin);
+      if (socials.facebook)  body.append('social_facebook',  socials.facebook);
+      if (socials.youtube)   body.append('social_youtube',   socials.youtube);
 
       const res = await fetch(`${API_BASE}/vendor/add_vendor`, {
         method: 'POST',
@@ -637,7 +666,7 @@ export default function EventAdminOnboarding() {
                   {cat}
                 </button>
               ))}
-              {['Nightlife', 'Concerts', 'Festivals', 'Corporate Events', 'Weddings', 'Exhibitions', 'Artist Management']
+              {(Array.isArray(eventCategories) ? eventCategories.map((c: any) => c.category_name) : ['Nightlife', 'Concerts', 'Festivals', 'Corporate Events', 'Weddings', 'Exhibitions', 'Artist Management'])
                 .filter(c => !formData.categories.includes(c))
                 .map(cat => (
                   <button

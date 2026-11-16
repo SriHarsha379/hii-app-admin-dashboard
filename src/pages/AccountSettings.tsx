@@ -39,6 +39,8 @@ const EMPTY_FORM_DATA = {
   venueName: '',
   city: '',
   address: '',
+  latitude: '',
+  longitude: '',
   email: '',
   phone: '',
   contactPerson: '',
@@ -90,7 +92,9 @@ export default function AccountSettings() {
       contactPerson: club.contact_person || user?.name || '',
       venueType: club.vendor_type || '',
       capacity: club.capacity ? String(club.capacity) : '',
-      description: club.description || ''
+      description: club.description || '',
+      latitude:    club.latitude  != null ? String(club.latitude)  : '',
+      longitude:   club.longitude != null ? String(club.longitude) : '',
     };
     setInitialFormData(next);
     setFormData(next);
@@ -141,12 +145,14 @@ export default function AccountSettings() {
 
   // Check for changes in Box 1 (Venue Details)
   const hasBox1Changes =
-    formData.venueName !== initialFormData.venueName ||
-    formData.venueType !== initialFormData.venueType ||
-    formData.phone !== initialFormData.phone ||
-    formData.email !== initialFormData.email ||
-    formData.city !== initialFormData.city ||
-    formData.address !== initialFormData.address;
+    formData.venueName  !== initialFormData.venueName  ||
+    formData.venueType  !== initialFormData.venueType  ||
+    formData.phone      !== initialFormData.phone      ||
+    formData.email      !== initialFormData.email      ||
+    formData.city       !== initialFormData.city       ||
+    formData.address    !== initialFormData.address    ||
+    formData.latitude   !== initialFormData.latitude   ||
+    formData.longitude  !== initialFormData.longitude;
 
   // Check for changes in Box 2 (Specifications)
   const hasBox2Changes =
@@ -169,8 +175,16 @@ export default function AccountSettings() {
   };
 
   const handleDiscardBox2 = () => {
+    // FIX: previously showed the cancel dialog which navigated to '/',
+    // discarding ALL changes and exiting the page. Box 2 "Discard" should
+    // only reset Box 2's three fields, not navigate anywhere.
     if (hasBox2Changes) {
-      setShowCancelDialog(true);
+      setFormData((prev) => ({
+        ...prev,
+        contactPerson: initialFormData.contactPerson,
+        capacity:      initialFormData.capacity,
+        description:   initialFormData.description,
+      }));
     }
   };
 
@@ -216,12 +230,14 @@ export default function AccountSettings() {
       });
       setInitialFormData((prev: any) => ({
         ...prev,
-        venueName: formData.venueName,
-        venueType: formData.venueType,
-        phone: formData.phone,
-        email: formData.email,
-        city: formData.city,
-        address: formData.address,
+        venueName:  formData.venueName,
+        venueType:  formData.venueType,
+        phone:      formData.phone,
+        email:      formData.email,
+        city:       formData.city,
+        address:    formData.address,
+        latitude:   formData.latitude,
+        longitude:  formData.longitude,
       }));
       setShowApprovalDialog(false);
     } catch (err: any) {

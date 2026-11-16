@@ -417,6 +417,11 @@ export default function Events() {
     body.append('latitude', eventFormData.latitude || '0');
     body.append('longitude', eventFormData.longitude || '0');
     if (eventFormData.vendor_id) body.append('vendor_id', eventFormData.vendor_id);
+    // FIX: genre was collected in the form but never appended to the
+    // multipart body, so it was silently discarded on every save.
+    if (Array.isArray(eventFormData.genre) && eventFormData.genre.length > 0) {
+      body.append('genre_ids', JSON.stringify(eventFormData.genre));
+    }
     if (Array.isArray(eventFormData.genre) && eventFormData.genre.length) {
       body.append('genre', JSON.stringify(eventFormData.genre));
     }

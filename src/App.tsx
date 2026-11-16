@@ -142,6 +142,7 @@ import ClaimClubForm from './pages/ClaimClubForm';
 import ClaimOrganiserForm from './pages/ClaimOrganiserForm';
 import EventAdminProfilePage from './pages/EventAdminProfilePage';
 import ClubProfilePage from './pages/ClubProfilePage';
+import ComingSoon from './pages/ComingSoon';
 
 export default function App() {
   return (
@@ -173,11 +174,11 @@ export default function App() {
               <Route path="contact-support" element={<ProtectedRoute allowedRoles={['CLUB_ADMIN', 'EVENT_ADMIN']}><ContactSupport /></ProtectedRoute>} />
               <Route path="activity-logs" element={<ProtectedRoute requireSuperAdmin><ActivityLogs /></ProtectedRoute>} />
               <Route path="analytics" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'EVENT_ADMIN', 'CLUB_ADMIN']}><Analytics /></ProtectedRoute>} />
-              <Route path="settings" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><Settings /></ProtectedRoute>} />
+              <Route path="settings" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'NORMAL_ADMIN', 'CITY_ADMIN']}><Settings /></ProtectedRoute>} />
               <Route path="manage-filters" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'NORMAL_ADMIN']}><ManageFilters /></ProtectedRoute>} />
               {/* Hidden for now, same reason as the sidebar link above —
                   redirects instead of rendering a page with no working backend. */}
-              <Route path="recommendations" element={<Navigate to="/" replace />} />
+              <Route path="recommendations" element={<ComingSoon title="Recommendations" description="AI-powered recommendations are coming soon. This feature will suggest events, clubs, and connections tailored to each user." />} />
               <Route path="admins" element={<ProtectedRoute requireSuperAdmin><Admins /></ProtectedRoute>} />
               <Route path="account-settings" element={<ProtectedRoute allowedRoles={['CLUB_ADMIN']}><AccountSettings /></ProtectedRoute>} />
               <Route path="bookings" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CLUB_ADMIN']}><Bookings /></ProtectedRoute>} />

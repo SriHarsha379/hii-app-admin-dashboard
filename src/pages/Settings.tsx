@@ -260,9 +260,9 @@ export default function Settings() {
     try {
       if (activeTab === 'profile') {
         const body = new FormData();
-        if (profile.name)  body.append('name', profile.name);
+        if (profile.name)  body.append('name',  profile.name);
         if (profile.email) body.append('email', profile.email);
-        if (profile.phone) body.append('phone_number', profile.phone);
+        if (profile.phone) body.append('phone', profile.phone);
         const res = await fetch(`${API_BASE}/auth/update`, {
           method: 'PUT',
           headers: { Authorization: `Bearer ${token}` },
@@ -271,9 +271,10 @@ export default function Settings() {
         const json = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(json?.message || 'Failed to update profile');
         updateUser({ name: profile.name, email: profile.email });
+        refetchAdminDetails();
       } else if (activeTab === 'security') {
-        if (!security.currentPassword || !security.newPassword || !security.confirmPassword) {
-          throw new Error('Please fill in all password fields');
+        if (!security.currentPassword || !security.newPassword) {
+          throw new Error('Enter your current and new password');
         }
         if (security.newPassword !== security.confirmPassword) {
           throw new Error('New passwords do not match');
@@ -282,19 +283,20 @@ export default function Settings() {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
-            currentPassword: security.currentPassword,
-            newPassword: security.newPassword,
-            confirmPassword: security.confirmPassword,
+            old_password: security.currentPassword,
+            new_password: security.newPassword,
           }),
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(json?.message || 'Failed to change password');
         setSecurity({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      } else if (activeTab === 'preferences') {
+        localStorage.setItem('hii_admin_preferences', JSON.stringify(preferences));
       }
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (err: any) {
-      setProfileError(err.message || 'Save failed');
+      alert(err.message || 'Save failed');
     } finally {
       setIsSaving(false);
     }

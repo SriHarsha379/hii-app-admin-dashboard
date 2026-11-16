@@ -133,7 +133,7 @@ export default function PollsContests() {
     queryKey: ['contest_participants', (selectedContest?._id || selectedContest?._id || selectedContest?.id)],
     queryFn: async () => {
       if (!(selectedContest?._id || selectedContest?._id || selectedContest?.id)) return [];
-      const res = await fetch(`${API_BASE}/contests/${selectedContest.id}/participants`, {
+      const res = await fetch(`${API_BASE}/contests/${selectedContest._id || selectedContest.id}/participants`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const json = await res.json();
@@ -198,7 +198,24 @@ export default function PollsContests() {
     return filterCity === 'ALL' || contest.city === filterCity;
   });
 
-  const sortedContests = [...filteredContests].sort((a: any, b: any) => {
+  // Build voteData dynamically from the first active poll's options,
+  // falling back to totals across all polls if no single one is selected.
+  const CHART_COLORS = ['#4F46E5', '#9333EA', '#EC4899', '#F59E0B', '#10B981', '#3B82F6'];
+  const voteData: { name: string; votes: number; color: string }[] = (() => {
+    const pollList = Array.isArray(polls) ? polls : [];
+    if (pollList.length === 0) return [];
+    // Use the first active poll that has options
+    const activePoll = pollList.find((p: any) => p.status === 'ACTIVE' && Array.isArray(p.options) && p.options.length > 0)
+      || pollList.find((p: any) => Array.isArray(p.options) && p.options.length > 0);
+    if (!activePoll) return [{ name: 'Total Votes', votes: pollList.reduce((s: number, p: any) => s + (p.votes || 0), 0), color: CHART_COLORS[0] }];
+    return activePoll.options.map((opt: any, i: number) => ({
+      name: typeof opt === 'string' ? opt : (opt.text || opt.option || `Option ${i + 1}`),
+      votes: typeof opt === 'object' ? (opt.votes || opt.count || 0) : 0,
+      color: CHART_COLORS[i % CHART_COLORS.length],
+    }));
+  })();
+
+    const sortedContests = [...filteredContests].sort((a: any, b: any) => {
     let aValue = a[sortField];
     let bValue = b[sortField];
 
@@ -663,6 +680,9 @@ export default function PollsContests() {
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50 appearance-none"
                     >
                       <option value="ALL">All Cities</option>
+                      {cityOptions.map((c) => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
                       {(Array.isArray(cities) ? cities : []).slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((c: any) => (
                         <option key={c._id} value={c.city_name}>{c.city_name}</option>
                       ))}
@@ -763,6 +783,9 @@ export default function PollsContests() {
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50 appearance-none"
                     >
                       <option value="ALL">All Cities</option>
+                      {cityOptions.map((c) => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
                       {(Array.isArray(cities) ? cities : []).slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((c: any) => (
                         <option key={c._id} value={c.city_name}>{c.city_name}</option>
                       ))}

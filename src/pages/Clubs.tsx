@@ -880,8 +880,8 @@ export default function Clubs() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
             { label: 'Upcoming Events', value: clubEvents.filter((e: any) => new Date(e.date) >= new Date()).length, icon: Calendar, color: 'text-blue-400', bg: 'bg-blue-400/10' },
-            { label: 'Follower Growth', value: '+15.2%', icon: Users, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-            { label: 'Profile Views',   value: '1.2k',  icon: Eye,   color: 'text-purple-400', bg: 'bg-purple-400/10' },
+            { label: 'Past Events', value: clubEvents.filter((e: any) => new Date(e.date) < new Date()).length, icon: Activity, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+            { label: 'Total Events', value: clubEvents.length, icon: Zap, color: 'text-purple-400', bg: 'bg-purple-400/10' },
           ].map((stat) => (
             <div key={stat.label} className="glass-card p-6 rounded-3xl border border-white/5 bg-white/[0.02]">
               <div className={cn('w-12 h-12 rounded-2xl flex items-center justify-center mb-4', stat.bg)}>
@@ -1237,11 +1237,14 @@ export default function Clubs() {
 
                 <div className="p-10 border-t border-white/5 flex items-center justify-between bg-white/[0.02]">
                   <button
-                    onClick={() => setCreationStep((p) => Math.max(1, p - 1))}
-                    disabled={creationStep === 1}
-                    className="px-10 py-5 rounded-[24px] bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-white/60 hover:text-white hover:bg-white/10 transition-all flex items-center gap-4 disabled:opacity-30 active:scale-95"
+                    onClick={() => {
+                      if (creationStep === 1) { setIsCreatingEvent(false); resetEventForm(); }
+                      else setCreationStep((p) => p - 1);
+                    }}
+                    className="px-10 py-5 rounded-[24px] bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-white/60 hover:text-white hover:bg-white/10 transition-all flex items-center gap-4 active:scale-95"
                   >
-                    <ChevronLeft className="w-4 h-4" /> Back
+                    <ChevronLeft className="w-4 h-4" />
+                    {creationStep === 1 ? 'Cancel' : 'Back'}
                   </button>
                   <button
                     disabled={isSubmitting}
@@ -1385,6 +1388,149 @@ export default function Clubs() {
             </>
           )}
         </AnimatePresence>
+      {/* ── Past-Event Analytics Modal (CLUB_ADMIN) ──────────────────────
+           Previously a dead end: clicking Analytics set showAnalytics:true
+           on the event object but the preview hid itself and nothing else
+           ever rendered for that state.  Fixed: this AnimatePresence block
+           handles that state and shows real data from the event document. */}
+      <AnimatePresence>
+        {selectedEvent?.showAnalytics && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-card w-full max-w-lg rounded-3xl border border-white/10 overflow-hidden shadow-2xl flex flex-col max-h-[85vh]"
+            >
+              {/* Header */}
+              <div className="p-8 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                <div>
+                  <h3 className="text-base font-black text-white uppercase tracking-tight leading-none">
+                    {selectedEvent.title || selectedEvent.venue_name}
+                  </h3>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">
+                    Event Performance
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedEvent(null)}
+                  className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all text-muted-foreground hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                {/* Key stats */}
+                <div className="grid grid-cols-3 gap-4">
+                  {[
+                    {
+                      label: 'Tickets Sold',
+                      value: selectedEvent.tickets_sold ?? '—',
+                    },
+                    {
+                      label: 'Attendance',
+                      value: selectedEvent.attendance ?? selectedEvent.attendees ?? 0,
+                    },
+                    {
+                      label: 'Capacity %',
+                      value: selectedEvent.capacity
+                        ? `${Math.round(
+                            ((selectedEvent.attendance ?? selectedEvent.attendees ?? 0) /
+                              selectedEvent.capacity) *
+                              100,
+                          )}%`
+                        : '—',
+                    },
+                  ].map((s) => (
+                    <div
+                      key={s.label}
+                      className="bg-white/5 rounded-2xl p-4 border border-white/5"
+                    >
+                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-1">
+                        {s.label}
+                      </p>
+                      <p className="text-xl font-bold text-white">{String(s.value)}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Event details */}
+                <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
+                  <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                    Event Details
+                  </h4>
+                  {[
+                    {
+                      label: 'Date',
+                      value: selectedEvent.date
+                        ? new Date(selectedEvent.date).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })
+                        : '—',
+                    },
+                    {
+                      label: 'Time',
+                      value: selectedEvent.start_time
+                        ? `${selectedEvent.start_time}${
+                            selectedEvent.end_time ? ` – ${selectedEvent.end_time}` : ''
+                          }`
+                        : '—',
+                    },
+                    {
+                      label: 'Venue',
+                      value:
+                        selectedEvent.venue ||
+                        selectedEvent.venue_name ||
+                        clubData?.name ||
+                        '—',
+                    },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="flex justify-between text-[11px]">
+                      <span className="text-white/30 uppercase font-black tracking-widest">
+                        {label}
+                      </span>
+                      <span className="text-white/70 font-medium truncate max-w-[200px]">
+                        {value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* No-data notice */}
+                {selectedEvent.attendance == null &&
+                  selectedEvent.tickets_sold == null && (
+                    <div className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-amber-400/80 text-xs font-medium leading-relaxed">
+                      Attendance and ticket data will appear here once the event
+                      is updated with tracking information.
+                    </div>
+                  )}
+              </div>
+
+              {/* Footer */}
+              <div className="p-6 border-t border-white/5 bg-white/[0.02] flex items-center gap-3">
+                <button
+                  onClick={() => { setSelectedEvent(null); handleEditEvent(selectedEvent); }}
+                  className="flex-1 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-[11px] font-black uppercase tracking-widest text-white/60 hover:text-white hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+                >
+                  <Edit2 className="w-4 h-4" /> Edit Event
+                </button>
+                <button
+                  onClick={() => setSelectedEvent(null)}
+                  className="flex-1 py-3.5 rounded-2xl bg-primary/10 border border-primary/20 text-[11px] font-black uppercase tracking-widest text-primary hover:bg-primary/20 transition-all"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       </div>
     );
   }

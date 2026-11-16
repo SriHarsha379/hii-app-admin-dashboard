@@ -10,3 +10,4 @@ database.sqlite
 uploads/
 .DS_Store
 .idea/
+*.sh

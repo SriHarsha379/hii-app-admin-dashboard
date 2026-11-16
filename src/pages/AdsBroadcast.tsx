@@ -384,6 +384,19 @@ export default function AdsBroadcast() {
     }
   });
 
+
+  // FIX: was three hardcoded fake history entries. Real endpoint: /broadcast/get_all_user
+  const { data: broadcastHistory } = useQuery({
+    queryKey: ['broadcast-history'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/broadcast/get_all_user`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      return Array.isArray(json.data) ? json.data : [];
+    },
+  });
+
   const [broadcastStatus, setBroadcastStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const sendBroadcastMutation = useMutation({

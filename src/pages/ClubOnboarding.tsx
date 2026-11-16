@@ -35,6 +35,7 @@ import {
 import { cn, apiErrorMessage } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { FilterDropdown } from '../components/FilterDropdown';
+import { LocationPicker } from '../components/LocationPicker';
 import { useQuery } from '@tanstack/react-query';
 
 import { API_BASE } from '../lib/apiConfig';
@@ -50,6 +51,8 @@ const initialForm = {
   description: '',
   city: '',
   address: '',
+  latitude: '',
+  longitude: '',
   password: '',
   confirmPassword: '',
   // Arrays of server-side URL strings — NOT base64
@@ -416,6 +419,8 @@ export default function ClubOnboarding() {
       }
       vendorBody.append('state', stateId);
       vendorBody.append('address', venueFormData.address || 'Not provided');
+      if (venueFormData.latitude)  vendorBody.append('latitude',  venueFormData.latitude);
+      if (venueFormData.longitude) vendorBody.append('longitude', venueFormData.longitude);
       vendorBody.append('password', venueFormData.password);
       vendorBody.append('vendor_type', 'owner');
       vendorBody.append('contact_person', venueFormData.contactName || '');
@@ -496,7 +501,11 @@ export default function ClubOnboarding() {
   const filteredClaimableClubs = (Array.isArray(claimableClubs) ? claimableClubs : []).filter(
     (club: any) => {
       const q = claimSearch.trim().toLowerCase();
-      return !q || club.name?.toLowerCase().includes(q) || club.city?.toLowerCase().includes(q);
+      // FIX: club.city is a populated {_id, city_name} object — calling
+    // .toLowerCase() on it threw TypeError, crashing the Claim screen on
+    // any search keystroke.
+    const cityStr = typeof club.city === 'object' ? (club.city?.city_name || '') : (club.city || '');
+    return !q || club.name?.toLowerCase().includes(q) || cityStr.toLowerCase().includes(q);
     }
   );
 
@@ -837,18 +846,24 @@ export default function ClubOnboarding() {
                             />
                           </div>
                         </div>
-                        <div className="relative rounded-[40px] overflow-hidden border border-white/5 group min-h-[300px] shadow-inner bg-[#09090B]">
-                          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80')] bg-cover bg-center grayscale opacity-20 group-hover:opacity-40 transition-opacity duration-1000" />
-                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[2px]">
-                            <div className="w-16 h-16 rounded-[24px] bg-primary/10 border border-primary/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-500">
-                              <MapPin className="w-8 h-8 text-primary fill-primary" />
-                            </div>
-                            <span className="text-[10px] font-black text-white/40 uppercase tracking-[0.4em]">Address Verified</span>
-                          </div>
-                          <div className="absolute top-6 right-6 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[8px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Verified Account
-                          </div>
-                        </div>
+                        {/* FIX: replaced dead Unsplash placeholder with real LocationPicker
+                            so lat/lng is captured during club registration */}
+                        <LocationPicker
+                          value={{
+                            address:   venueFormData.address,
+                            latitude:  venueFormData.latitude,
+                            longitude: venueFormData.longitude,
+                          }}
+                          onChange={(loc) =>
+                            setVenueFormData((prev) => ({
+                              ...prev,
+                              address:   loc.address,
+                              latitude:  loc.latitude,
+                              longitude: loc.longitude,
+                            }))
+                          }
+                          placeholder="Search address or place..."
+                        />
                       </div>
                     </div>
                   </FormSection>
