@@ -343,7 +343,7 @@ export default function EventAdminProfile() {
                 <div className="relative">
                   <div className="w-28 h-28 rounded-[32px] overflow-hidden border-2 border-white/10 group-hover:border-primary/50 transition-all duration-500 shadow-2xl">
                     <img
-                      src={(club.business_image ? (club.business_image.startsWith('http') ? club.business_image : `${API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads/')) || null}${club.business_image}`) : `https://api.dicebear.com/7.x/initials/svg?seed=${club.name}`}
+                      src={club.business_image || `https://api.dicebear.com/7.x/initials/svg?seed=${club.name}`}
                       className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"
                       alt=""
                     />

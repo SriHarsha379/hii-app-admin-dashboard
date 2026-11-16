@@ -1026,7 +1026,22 @@ export default function AdsBroadcast() {
 
               <div className="glass-card p-6 rounded-2xl border border-white/10 space-y-4">
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">Recent History</h3>
-                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest py-4 text-center">Broadcast history not yet tracked by the backend.</p>
+                <div className="space-y-3">
+                  {Array.isArray(broadcastHistory) && broadcastHistory.length > 0
+                    ? broadcastHistory.slice(0, 5).map((item: any) => (
+                        <div key={item._id || item.id} className="p-3 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between">
+                          <div>
+                            <p className="text-xs font-bold text-white truncate max-w-[140px]">{item.title || item.subject || 'Broadcast'}</p>
+                            <p className="text-[10px] text-muted-foreground font-medium">
+                              {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '—'}
+                            </p>
+                          </div>
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        </div>
+                      ))
+                    : <p className="text-[10px] text-muted-foreground text-center py-4">No broadcasts sent yet.</p>
+                  }
+                </div>
               </div>
             </div>
           </motion.div>
