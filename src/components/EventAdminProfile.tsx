@@ -40,7 +40,7 @@ export default function EventAdminProfile() {
   const { data: events } = useQuery({
     queryKey: ['events'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/events/list`, {
+      const res = await fetch(`${API_BASE}/event/get_all_event`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const json = await res.json();

@@ -325,16 +325,18 @@ export default function ClaimOrganiserForm() {
 
                 <div className="space-y-4">
                   <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Location Map</label>
-                  <div className="aspect-[16/11] bg-[#09090B] border border-white/5 rounded-[40px] relative overflow-hidden flex items-center justify-center group cursor-pointer shadow-inner">
-                    <img
-                      src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=2000"
-                      className="absolute inset-0 w-full h-full object-cover opacity-10 grayscale group-hover:opacity-20 transition-all duration-700 blur-[2px]"
-                      alt="Map"
-                    />
-                    <div className="relative flex flex-col items-center gap-4 text-center p-8">
-                      <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                  <div className="aspect-[16/11] bg-[#09090B] border border-white/5 rounded-[40px] relative overflow-hidden flex items-center justify-center shadow-inner">
+                    {/* FIX: replaced dead Unsplash placeholder */}
+                    <div className="flex flex-col items-center gap-4 text-center p-8">
+                      <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
                         <MapPin className="w-6 h-6" />
                       </div>
+                      <div>
+                        <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em]">{formData.address || "Address not set"}</p>
+                        <p className="text-[9px] text-white/20 uppercase tracking-widest mt-1">{formData.city || ""}</p>
+                      </div>
+                    </div>
+                  </div>
                       <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] leading-relaxed">Map Preview</p>
                     </div>
                   </div>
