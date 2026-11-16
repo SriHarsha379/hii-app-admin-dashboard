@@ -65,6 +65,7 @@ import EventProfilePreview from '../components/EventProfilePreview';
 import { Layout as LayoutIcon } from 'lucide-react';
 
 import { API_BASE } from '../lib/apiConfig';
+import { useToast } from '../components/Toast';
 const UPLOADS_BASE = API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads');
 const eventImgUrl = (f?: string | null) => !f ? '' : (/^https?:\/\//i.test(f) ? f : `${UPLOADS_BASE}/${f}`);
 const statusColors: any = {
@@ -261,6 +262,7 @@ function RowActionsMenu({ event, onEdit, onDelete, onPreview, onAnalytics, showA
 export default function Events() {
   const { token, user } = useAuth();
   const queryClient = useQueryClient();
+  const { success: toastSuccess, error: toastError } = useToast();
 
   const [viewMode,       setViewMode]       = useState<'grid' | 'table'>('table');
   const [searchTerm,     setSearchTerm]     = useState('');
@@ -558,6 +560,11 @@ export default function Events() {
 
   const filteredEvents = eventList.filter((e: any) => {
     const _name = (e.venue_name || e.title || e.event_name || '').toLowerCase();
+
+  const pg = usePagination(filteredEvents, 20);
+
+  // Reset to page 1 whenever the search/filter changes
+  React.useEffect(() => { pg.setPage(1); }, [searchTerm]);
     const matchesSearch  = _name.includes(searchTerm.toLowerCase()) || (e.city || '').toLowerCase().includes(searchTerm.toLowerCase());
     let   matchesStatus  = true;
     if      (filterStatus === 'ACTIVE')    matchesStatus = e.status === 'LIVE' || e.status === 'UPCOMING';
@@ -610,7 +617,7 @@ export default function Events() {
 
   const exportData = () => {
     const headers = ['Title', 'City', 'Date', 'Status', 'Attendance', 'Genre'];
-    const rows = filteredEvents.map((e: any) => [
+    const rows = pg.pageItems.map((e: any) => [
       csvEsc(e.title),
       csvEsc(e.city),
       csvEsc(e.date),
@@ -753,9 +760,9 @@ export default function Events() {
           { label: 'Live & Upcoming', value: liveCount,                                                                                                                  icon: Zap,       color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
           { label: 'Total Attendance',value: totalAttendance.toLocaleString(),                                                                                           icon: Users,     color: 'text-purple-400',  bg: 'bg-purple-400/10'  },
           { label: 'Tickets Sold',    value: totalTicketsSold.toLocaleString(),                                                                                          icon: Ticket,    color: 'text-amber-400',   bg: 'bg-amber-400/10'   },
-          { label: 'Cities',          value: [...new Set(filteredEvents.map((e: any) => e.city).filter(Boolean))].length,                                               icon: MapPin,    color: 'text-pink-400',    bg: 'bg-pink-400/10'    },
+          { label: 'Cities',          value: [...new Set(pg.pageItems.map((e: any) => e.city).filter(Boolean))].length,                                               icon: MapPin,    color: 'text-pink-400',    bg: 'bg-pink-400/10'    },
           { label: 'Genres',          value: [...new Set(filteredEvents.flatMap((e: any) => Array.isArray(e.genre) ? e.genre : [e.genre]).filter(Boolean))].length,     icon: Activity,  color: 'text-amber-400',   bg: 'bg-amber-400/10'   },
-          { label: 'Venues',          value: [...new Set(filteredEvents.map((e: any) => getVendorId(e)).filter(Boolean))].length,                                       icon: Building2, color: 'text-cyan-400',    bg: 'bg-cyan-400/10'    },
+          { label: 'Venues',          value: [...new Set(pg.pageItems.map((e: any) => getVendorId(e)).filter(Boolean))].length,                                       icon: Building2, color: 'text-cyan-400',    bg: 'bg-cyan-400/10'    },
           { label: 'Cancelled',       value: cancelledCount,                                                                                                             icon: XCircle,   color: 'text-red-400',     bg: 'bg-red-400/10'     },
         ].map((stat) => (
           <div key={stat.label} className="glass-card p-5 rounded-[2rem] border border-white/10 flex flex-col gap-3 hover:border-white/20 transition-all group">
@@ -815,7 +822,7 @@ export default function Events() {
               <div className="col-span-full py-12 text-center text-xs text-muted-foreground">Loading events…</div>
             ) : filteredEvents.length === 0 ? (
               <div className="col-span-full py-12 text-center text-xs text-muted-foreground">No events found.</div>
-            ) : filteredEvents.map((event: any) => (
+            ) : pg.pageItems.map((event: any) => (
               <motion.div
                 key={eventId(event)} whileHover={{ y: -5 }}
                 className="glass-card rounded-2xl border border-white/10 overflow-hidden group cursor-pointer"
@@ -900,7 +907,7 @@ export default function Events() {
                     <tr><td colSpan={5} className="px-6 py-12 text-center text-xs text-muted-foreground">Loading events…</td></tr>
                   ) : filteredEvents.length === 0 ? (
                     <tr><td colSpan={5} className="px-6 py-12 text-center text-xs text-muted-foreground">No events found.</td></tr>
-                  ) : filteredEvents.map((event: any) => (
+                  ) : pg.pageItems.map((event: any) => (
                     <tr
                       key={eventId(event)}
                       className="group hover:bg-white/5 transition-colors cursor-pointer"

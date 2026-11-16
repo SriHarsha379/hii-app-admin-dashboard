@@ -82,6 +82,7 @@ import EventProfilePreview from '../components/EventProfilePreview';
 import { FeatureClubModal } from '../components/FeatureClubModal';
 
 import { API_BASE } from '../lib/apiConfig';
+import { useToast } from '../components/Toast';
 
 // Same fix as AdsBroadcast.tsx: `hii.life/app/server` is the actual mounted
 // app root, so uploaded files (venue images) live under `/app/server/uploads/`,
@@ -104,6 +105,7 @@ export default function Clubs() {
   const navigate = useNavigate();
   // ISSUE 30 FIX — removed orphaned useOutletContext (setIsClubProfileOpen was never called).
   const queryClient = useQueryClient();
+  const { success: toastSuccess, error: toastError } = useToast();
 
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
   const [searchTerm, setSearchTerm] = useState('');

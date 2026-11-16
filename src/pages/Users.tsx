@@ -170,6 +170,11 @@ export default function Users() {
 
   const filteredUsers = (Array.isArray(users) ? users : [])?.filter((u: any) => {
     const matchesSearch = u.name?.toLowerCase().includes(searchTerm.toLowerCase()) || u.email?.toLowerCase().includes(searchTerm.toLowerCase());
+
+  const pg = usePagination(filteredUsers, 20);
+
+  // Reset to page 1 whenever the search/filter changes
+  React.useEffect(() => { pg.setPage(1); }, [searchTerm]);
     const matchesStatus = filterStatus === 'ALL' || u.status === filterStatus;
     const matchesCity = filterCity === 'ALL' || u.city === filterCity;
     return matchesSearch && matchesStatus && matchesCity;
@@ -185,7 +190,7 @@ export default function Users() {
     return 0;
   });
 
-  const { data: rolesByUser = {} } = useUserRoles(filteredUsers.map((u: any) => String(u._id || u.id)));
+  const { data: rolesByUser = {} } = useUserRoles(pg.pageItems.map((u: any) => String(u._id || u.id)));
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -198,7 +203,7 @@ export default function Users() {
 
   const exportUsers = () => {
     const headers = ['Name', 'Email', 'Status', 'City', 'Verified', 'Joined'];
-    const rows = filteredUsers.map((u: any) => [
+    const rows = pg.pageItems.map((u: any) => [
       '"' + (u.name  || '').replace(/"/g, '""') + '"',
       '"' + (u.email || '').replace(/"/g, '""') + '"',
       '"' + (u.status || 'ACTIVE') + '"',
@@ -359,7 +364,7 @@ export default function Users() {
                 <tr>
                   <td colSpan={4} className="px-6 py-12 text-center text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] leading-none">No users found.</td>
                 </tr>
-              ) : filteredUsers.map((user: any) => (
+              ) : pg.pageItems.map((user: any) => (
                 <tr key={user._id || user.id} className="group hover:bg-white/5 transition-colors cursor-pointer" onClick={() => setSelectedUser(user)}>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">

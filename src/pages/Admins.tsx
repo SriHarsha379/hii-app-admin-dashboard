@@ -62,6 +62,8 @@ import {
   Download
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { usePagination } from '../hooks/usePagination';
+import { Pagination } from '../components/Pagination';
 import { FilterDropdown } from '../components/FilterDropdown';
 import { FilterPanel } from '../components/FilterPanel';
 
@@ -175,6 +177,11 @@ export default function Admins() {
 
   const filteredAdmins = (Array.isArray(admins) ? admins : [])?.filter((a: any) => {
     const matchesSearch = a.name?.toLowerCase().includes(searchTerm.toLowerCase()) || a.email?.toLowerCase().includes(searchTerm.toLowerCase());
+
+  const pg = usePagination(filteredAdmins, 20);
+
+  // Reset to page 1 whenever the search/filter changes
+  React.useEffect(() => { pg.setPage(1); }, [searchTerm]);
     const matchesRole = filterRole === 'ALL' || a.role === filterRole;
     const matchesStatus = filterStatus === 'ALL' || a.status === filterStatus;
     return matchesSearch && matchesRole && matchesStatus;
@@ -182,7 +189,7 @@ export default function Admins() {
 
   const exportData = () => {
     const headers = ['Name', 'Email', 'Role', 'Status', 'Created'];
-    const rows = filteredAdmins.map((a: any) => [
+    const rows = pg.pageItems.map((a: any) => [
       `"${a.name || ''}"`, `"${a.email || ''}"`, `"${a.role || 'ADMIN'}"`,
       `"${a.status || 'ACTIVE'}"`, `"${a.createdAt ? new Date(a.createdAt).toLocaleDateString() : ''}"`,
     ]);
@@ -304,7 +311,7 @@ export default function Admins() {
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-xs text-muted-foreground">No admins found.</td>
                 </tr>
-              ) : filteredAdmins.map((admin: any) => (
+              ) : pg.pageItems.map((admin: any) => (
                 <tr
                   key={admin._id || admin.id}
                   onClick={() => setSelectedAdmin(admin)}

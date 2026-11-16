@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 interface User {
   id: string;
@@ -63,6 +63,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
+  }, []);
+
+  // Listen for 401s fired by apiFetch — log out and show a banner
+  // so the user knows why they're suddenly on the login page.
+  useEffect(() => {
+    const handleExpired = () => {
+      setToken(null);
+      setUser(null);
+      localStorage.removeItem('hii_admin_token');
+      localStorage.removeItem('hii_admin_user');
+      // Small delay so any in-flight state settles before navigate
+      setTimeout(() => {
+        window.location.href = '/app/admin/login?reason=expired';
+      }, 100);
+    };
+    window.addEventListener('hii:session-expired', handleExpired);
+    return () => window.removeEventListener('hii:session-expired', handleExpired);
   }, []);
 
   const login = (newToken: string, newUser: User) => {

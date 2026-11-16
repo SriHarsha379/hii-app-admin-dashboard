@@ -30,6 +30,8 @@ import {
 import { cn } from '../lib/utils';
 import { FormSection, RefinedField } from '../components/RefinedForm';
 import { API_BASE } from '../lib/apiConfig';
+import { useToast } from '../components/Toast';
+import { apiFetch } from '../lib/apiFetch';
 import { validatePassword } from '../lib/passwordPolicy';
 
 const UPLOADS_BASE = API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads');
@@ -51,7 +53,7 @@ export default function Settings() {
     mutationFn: async (file: File) => {
       const body = new FormData();
       body.append('profile_image', file);
-      const res = await fetch(`${API_BASE}/auth/update`, {
+      const res = await apiFetch(token, `${API_BASE}/auth/update`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}` },
         body,
@@ -76,6 +78,7 @@ export default function Settings() {
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const queryClient = useQueryClient();
+  const { success: toastSuccess, error: toastError } = useToast();
   const { data: cities = [] } = useQuery({
     queryKey: ['admin-cities'],
     enabled: !!token,
@@ -263,7 +266,7 @@ export default function Settings() {
         if (profile.name)  body.append('name',  profile.name);
         if (profile.email) body.append('email', profile.email);
         if (profile.phone) body.append('phone', profile.phone);
-        const res = await fetch(`${API_BASE}/auth/update`, {
+        const res = await apiFetch(token, `${API_BASE}/auth/update`, {
           method: 'PUT',
           headers: { Authorization: `Bearer ${token}` },
           body,
@@ -279,7 +282,7 @@ export default function Settings() {
         if (security.newPassword !== security.confirmPassword) {
           throw new Error('New passwords do not match');
         }
-        const res = await fetch(`${API_BASE}/auth/change-password`, {
+        const res = await apiFetch(token, `${API_BASE}/auth/change-password`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
@@ -296,7 +299,7 @@ export default function Settings() {
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (err: any) {
-      alert(err.message || 'Save failed');
+      toastError('Error', err.message || 'Save failed');
     } finally {
       setIsSaving(false);
     }

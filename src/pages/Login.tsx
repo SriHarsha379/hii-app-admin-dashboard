@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Lock, Mail, Zap, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -14,6 +14,8 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  const [searchParams] = useSearchParams();
+  const sessionExpired = searchParams.get('reason') === 'expired';
   // NEW: handles the 2FA challenge step — if the account has 2FA enabled,
   // /auth/login returns a pending token instead of a real session, and
   // this second step submits the authenticator code to /auth/verify-2fa.
@@ -113,6 +115,13 @@ navigate('/');
             </h1>
             <p className="text-[10px] text-white/30 uppercase font-black tracking-[0.3em]">Management Portal</p>
           </div>
+
+          {sessionExpired && !error && (
+            <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[11px] font-bold p-4 rounded-2xl mb-8 flex items-center gap-3 uppercase tracking-wider">
+              <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              Your session expired — please sign in again
+            </div>
+          )}
 
           <AnimatePresence mode="wait">
             {error && (

@@ -90,7 +90,7 @@ export default function Analytics() {
   // Admin. There's deliberately no "avg session time" — nothing in this
   // backend tracks real user sessions, so that card is removed below
   // rather than showing a made-up number.
-  const { data: extendedStats } = useQuery({
+  const { data: extendedStats, isFetching: fetchingStats } = useQuery({
     queryKey: ['analytics-extended', timeRange, ownVendorForAnalytics?._id],
     queryFn: async () => {
       const rangeParam = timeRange === '24h' ? '7d' : timeRange; // backend min is 7d; 24h shows last 7d

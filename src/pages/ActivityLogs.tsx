@@ -13,6 +13,8 @@ import {
   ShieldAlert
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { usePagination } from '../hooks/usePagination';
+import { Pagination } from '../components/Pagination';
 import { motion } from 'motion/react';
 
 import { API_BASE } from '../lib/apiConfig';
@@ -66,6 +68,11 @@ export default function ActivityLogs() {
     return item.admin_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
            item.action?.toLowerCase().includes(searchTerm.toLowerCase()) ||
            item.resource?.toLowerCase().includes(searchTerm.toLowerCase());
+
+  const pg = usePagination(filteredData, 20);
+
+  // Reset to page 1 whenever the search/filter changes
+  React.useEffect(() => { pg.setPage(1); }, [searchTerm]);
   });
 
   // ISSUE 40 FIX: RFC 4180 CSV escaping
@@ -73,7 +80,7 @@ export default function ActivityLogs() {
 
   const exportData = () => {
     const headers = ['Admin', 'Action', 'Resource', 'Details', 'Date'];
-    const rows = filteredData.map((item: any) => [
+    const rows = pg.pageItems.map((item: any) => [
       csvEsc(item.admin_name),
       csvEsc(item.action),
       csvEsc(item.resource),
@@ -140,7 +147,7 @@ export default function ActivityLogs() {
                   <tr>
                     <td colSpan={5} className="px-6 py-12 text-center text-xs text-muted-foreground">No logs found.</td>
                   </tr>
-                ) : filteredData.map((log: any) => {
+                ) : pg.pageItems.map((log: any) => {
                   const ActionIcon = actionIcons[log.action] || Activity;
                   return (
                     <tr key={log._id || log.id} className="group hover:bg-white/5 transition-colors">
