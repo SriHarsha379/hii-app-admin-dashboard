@@ -102,8 +102,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+const noop = () => {};
+const noopToast = { toast: noop, success: noop, error: noop, warning: noop, info: noop };
+
 export function useToast() {
   const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error('useToast must be used inside ToastProvider');
-  return ctx;
+  return ctx ?? noopToast;
 }
