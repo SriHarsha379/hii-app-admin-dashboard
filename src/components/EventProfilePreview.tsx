@@ -139,7 +139,7 @@ export default function EventProfilePreview({ onClose, eventData, hideCloseButto
           {/* Immersive Details Bar */}
           <div className="flex items-center justify-between py-4 px-6 rounded-[2rem] bg-gradient-to-r from-[#FF2D9A]/10 to-transparent border border-white/5">
             <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <div className={`w-2 h-2 rounded-full animate-pulse ${eventData?.status === 'CANCELLED' ? 'bg-red-500' : eventData?.status === 'COMPLETED' ? 'bg-zinc-500' : 'bg-green-500'}`} />
               <div>
                 <p className="text-[9px] font-black text-white uppercase tracking-widest">{eventData?.status || "Active"}</p>
                 <p className="text-[7px] font-bold text-white/30 uppercase tracking-[0.15em]">{eventData?.is_verified ? "Verified Event" : "Event"}</p>

@@ -136,9 +136,9 @@ export default function UserProfilePreview({ user, onClose }: UserProfilePreview
           {/* Details Bar */}
           <div className="flex items-center justify-between py-4 px-6 rounded-[2rem] bg-gradient-to-r from-blue-500/10 to-transparent border border-white/5">
             <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+              <div className={`w-2 h-2 rounded-full animate-pulse ${user?.status === 'BANNED' ? 'bg-red-500' : user?.is_verified ? 'bg-blue-500' : 'bg-amber-500'}`} />
               <div>
-                <p className="text-[9px] font-black text-white uppercase tracking-widest">Status: Verified</p>
+                <p className="text-[9px] font-black text-white uppercase tracking-widest">Status: {user?.status === 'BANNED' ? 'Banned' : user?.is_verified ? 'Verified' : 'Unverified'}</p>
                 <p className="text-[7px] font-bold text-white/30 uppercase tracking-[0.15em]">Community Member</p>
               </div>
             </div>

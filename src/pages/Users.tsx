@@ -206,7 +206,7 @@ export default function Users() {
 
   const exportUsers = () => {
     const headers = ['Name', 'Email', 'Status', 'City', 'Verified', 'Joined'];
-    const rows = pg.pageItems.map((u: any) => [
+    const rows = filteredUsers.map((u: any) => [
       '"' + (u.name  || '').replace(/"/g, '""') + '"',
       '"' + (u.email || '').replace(/"/g, '""') + '"',
       '"' + (u.status || 'ACTIVE') + '"',
