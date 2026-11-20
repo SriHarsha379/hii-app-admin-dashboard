@@ -488,7 +488,7 @@ export default function Clubs() {
       body.append('table_reservation_fee', venueFormData.table_reservation_fee || '0');
       body.append('bill_discount_percentage', String(discount || 0));
       body.append('tax_percentage', String(tax || 0));
-      if (!isEditingVenue) body.append('vendor_id', vendorId);
+      if (!isEditingVenue) { if (!vendorId) throw new Error('Select a vendor — organiser is required'); body.append('vendor_id', vendorId); }
       if (venuePortraitFile) body.append('venue_image', venuePortraitFile);
       venueLandscapeFiles.forEach((f) => { if (f) body.append('gallery_images', f); });
 
@@ -506,7 +506,7 @@ export default function Clubs() {
 
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.success === false) {
-        throw new Error(apiErrorMessage(json, 'Failed to save venue'));
+        const msg = apiErrorMessage(json, 'Failed to save venue'); if (msg.toLowerCase().includes('already have a venue')) { throw new Error('This vendor already has a venue. Use the Edit button on their existing club row instead.'); } throw new Error(msg);
       }
 
       queryClient.invalidateQueries({ queryKey: ['clubs'] });
