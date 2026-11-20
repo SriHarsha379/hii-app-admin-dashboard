@@ -453,7 +453,7 @@ export default function PollsContests() {
                           <td colSpan={4} className="px-6 py-12 text-center text-xs text-muted-foreground">Loading polls...</td>
                         </tr>
                       ) : sortedPolls.length > 0 ? sortedPolls.map((poll: any) => (
-                        <tr key={(poll._id || poll._id || poll.id)} className="group hover:bg-white/5 transition-colors">
+                        <tr key={(poll._id || poll._id || poll.id)} className="group hover:bg-white/5 transition-colors cursor-pointer" onClick={() => setSelectedPoll(poll)}>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-primary">
@@ -498,7 +498,7 @@ export default function PollsContests() {
                                 {poll.status === 'ACTIVE' ? 'Active Pop-up' : 'Activate'}
                               </button>
                               <button
-                                onClick={() => setOpenPollMenuId(openPollMenuId === poll._id || poll.id ? null : (poll._id || poll._id || poll.id))}
+                                onClick={(e) => { e.stopPropagation(); setOpenPollMenuId(openPollMenuId === poll._id || poll.id ? null : (poll._id || poll._id || poll.id)); }}
                                 className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition-all"
                               >
                                 <MoreHorizontal className="w-4 h-4" />
