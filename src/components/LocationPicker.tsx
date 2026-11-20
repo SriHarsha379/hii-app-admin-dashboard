@@ -1,16 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { MapPin, Search, Loader2, X } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { MapPin, Loader2, X } from 'lucide-react';
 import { cn } from '../lib/utils';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-
-// Fix default marker icons for Vite/webpack
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
 
 interface LocationValue {
   address: string;
@@ -25,165 +15,163 @@ interface LocationPickerProps {
   className?: string;
 }
 
-async function geocode(query: string) {
-  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5`;
-  const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
-  if (!res.ok) return [];
-  return res.json();
-}
+const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || '';
 
-async function reverseGeocode(lat: number, lon: number): Promise<string> {
-  const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
-  const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
-  if (!res.ok) return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-  const json = await res.json();
-  return json.display_name || `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+function loadGoogleMaps(): Promise<void> {
+  return new Promise((resolve) => {
+    if ((window as any).google?.maps) { resolve(); return; }
+    const existing = document.getElementById('google-maps-script');
+    if (existing) { existing.addEventListener('load', () => resolve()); return; }
+    const script = document.createElement('script');
+    script.id = 'google-maps-script';
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    document.head.appendChild(script);
+  });
 }
 
 export function LocationPicker({ value, onChange, placeholder = 'Search address...', className }: LocationPickerProps) {
   const [query, setQuery] = useState(value.address || '');
-  const [results, setResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [loaded, setLoaded] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
-  const leafletMap = useRef<L.Map | null>(null);
-  const markerRef = useRef<L.Marker | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const leafletMap = useRef<any>(null);
+  const markerRef = useRef<any>(null);
+  const autocompleteRef = useRef<any>(null);
 
-  const defaultLat = value.latitude ? parseFloat(value.latitude) : 20.5937;
-  const defaultLng = value.longitude ? parseFloat(value.longitude) : 78.9629;
+  useEffect(() => {
+    loadGoogleMaps().then(() => setLoaded(true));
+  }, []);
 
   // Init map
   useEffect(() => {
-    if (!mapRef.current || leafletMap.current) return;
-    const map = L.map(mapRef.current, { zoomControl: true }).setView([defaultLat, defaultLng], value.latitude ? 14 : 5);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+    if (!loaded || !mapRef.current || leafletMap.current) return;
+    const google = (window as any).google;
+    const lat = value.latitude ? parseFloat(value.latitude) : 20.5937;
+    const lng = value.longitude ? parseFloat(value.longitude) : 78.9629;
+    const zoom = value.latitude ? 15 : 5;
+
+    const map = new google.maps.Map(mapRef.current, {
+      center: { lat, lng },
+      zoom,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+      styles: [
+        { elementType: 'geometry', stylers: [{ color: '#1a1a2e' }] },
+        { elementType: 'labels.text.stroke', stylers: [{ color: '#1a1a2e' }] },
+        { elementType: 'labels.text.fill', stylers: [{ color: '#8b8b9a' }] },
+        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2a2a3e' }] },
+        { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1a1a2e' }] },
+        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0d0d1a' }] },
+        { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+      ],
+    });
 
     if (value.latitude && value.longitude) {
-      markerRef.current = L.marker([parseFloat(value.latitude), parseFloat(value.longitude)]).addTo(map);
+      markerRef.current = new google.maps.Marker({ map, position: { lat, lng }, draggable: true });
+      markerRef.current.addListener('dragend', async (e: any) => {
+        const newLat = e.latLng.lat();
+        const newLng = e.latLng.lng();
+        const addr = await reverseGeocode(newLat, newLng);
+        setQuery(addr);
+        onChange({ address: addr, latitude: String(newLat), longitude: String(newLng) });
+      });
     }
 
-    map.on('click', async (e) => {
-      const { lat, lng } = e.latlng;
-      if (markerRef.current) markerRef.current.setLatLng([lat, lng]);
-      else markerRef.current = L.marker([lat, lng]).addTo(map);
-      const addr = await reverseGeocode(lat, lng);
+    map.addListener('click', async (e: any) => {
+      const newLat = e.latLng.lat();
+      const newLng = e.latLng.lng();
+      if (markerRef.current) markerRef.current.setPosition({ lat: newLat, lng: newLng });
+      else {
+        markerRef.current = new google.maps.Marker({ map, position: { lat: newLat, lng: newLng }, draggable: true });
+        markerRef.current.addListener('dragend', async (ev: any) => {
+          const a = await reverseGeocode(ev.latLng.lat(), ev.latLng.lng());
+          setQuery(a);
+          onChange({ address: a, latitude: String(ev.latLng.lat()), longitude: String(ev.latLng.lng()) });
+        });
+      }
+      const addr = await reverseGeocode(newLat, newLng);
       setQuery(addr);
-      onChange({ address: addr, latitude: String(lat), longitude: String(lng) });
+      onChange({ address: addr, latitude: String(newLat), longitude: String(newLng) });
     });
 
     leafletMap.current = map;
-    return () => { map.remove(); leafletMap.current = null; };
-  }, []);
+  }, [loaded]);
 
-  // Update marker when value changes externally
+  // Init Places Autocomplete
   useEffect(() => {
-    if (!leafletMap.current || !value.latitude || !value.longitude) return;
-    const lat = parseFloat(value.latitude);
-    const lng = parseFloat(value.longitude);
-    if (markerRef.current) markerRef.current.setLatLng([lat, lng]);
-    else markerRef.current = L.marker([lat, lng]).addTo(leafletMap.current);
-    leafletMap.current.setView([lat, lng], 14);
-    if (value.address && value.address !== query) setQuery(value.address);
-  }, [value.latitude, value.longitude]);
+    if (!loaded || !inputRef.current || autocompleteRef.current) return;
+    const google = (window as any).google;
+    const ac = new google.maps.places.Autocomplete(inputRef.current, {
+      fields: ['formatted_address', 'geometry', 'name'],
+    });
+    ac.addListener('place_changed', () => {
+      const place = ac.getPlace();
+      if (!place.geometry) return;
+      const lat = place.geometry.location.lat();
+      const lng = place.geometry.location.lng();
+      const addr = place.formatted_address || place.name || '';
+      setQuery(addr);
+      onChange({ address: addr, latitude: String(lat), longitude: String(lng) });
+      if (leafletMap.current) {
+        leafletMap.current.setCenter({ lat, lng });
+        leafletMap.current.setZoom(16);
+        if (markerRef.current) markerRef.current.setPosition({ lat, lng });
+        else markerRef.current = new google.maps.Marker({ map: leafletMap.current, position: { lat, lng }, draggable: true });
+      }
+    });
+    autocompleteRef.current = ac;
+  }, [loaded]);
 
-  // Click outside
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setIsOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const handleInput = (val: string) => {
-    setQuery(val);
-    setIsOpen(true);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!val.trim()) { setResults([]); return; }
-    debounceRef.current = setTimeout(async () => {
-      setIsSearching(true);
-      try { setResults(await geocode(val)); }
-      catch { setResults([]); }
-      finally { setIsSearching(false); }
-    }, 400);
-  };
-
-  const handleSelect = (r: any) => {
-    const lat = parseFloat(r.lat);
-    const lng = parseFloat(r.lon);
-    setQuery(r.display_name);
-    setResults([]);
-    setIsOpen(false);
-    onChange({ address: r.display_name, latitude: r.lat, longitude: r.lon });
-    if (leafletMap.current) {
-      leafletMap.current.setView([lat, lng], 15);
-      if (markerRef.current) markerRef.current.setLatLng([lat, lng]);
-      else markerRef.current = L.marker([lat, lng]).addTo(leafletMap.current);
-    }
-  };
+  async function reverseGeocode(lat: number, lng: number): Promise<string> {
+    const google = (window as any).google;
+    return new Promise((resolve) => {
+      const gc = new google.maps.Geocoder();
+      gc.geocode({ location: { lat, lng } }, (results: any, status: any) => {
+        if (status === 'OK' && results[0]) resolve(results[0].formatted_address);
+        else resolve(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+      });
+    });
+  }
 
   const handleClear = () => {
     setQuery('');
-    setResults([]);
     onChange({ address: '', latitude: '', longitude: '' });
-    if (markerRef.current && leafletMap.current) {
-      markerRef.current.remove();
-      markerRef.current = null;
-    }
+    if (markerRef.current) { markerRef.current.setMap(null); markerRef.current = null; }
   };
 
   return (
-    <div ref={containerRef} className={cn('relative w-full space-y-3', className)}>
-      {/* Search input */}
+    <div className={cn('relative w-full space-y-3', className)}>
       <div className="relative group">
         <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 group-focus-within:text-primary transition-colors z-10" />
         <input
+          ref={inputRef}
           type="text"
           value={query}
-          onChange={(e) => handleInput(e.target.value)}
-          onFocus={() => query && setIsOpen(true)}
-          placeholder={placeholder}
-          className="w-full bg-[#09090B] border border-white/5 rounded-[28px] pl-11 pr-10 py-4 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 placeholder:text-white/10 font-medium"
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={loaded ? placeholder : 'Loading maps...'}
+          disabled={!loaded}
+          className="w-full bg-[#09090B] border border-white/5 rounded-[28px] pl-11 pr-10 py-4 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 placeholder:text-white/10 font-medium disabled:opacity-50"
         />
-        {isSearching && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary animate-spin" />}
-        {!isSearching && query && (
+        {!loaded && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary animate-spin" />}
+        {loaded && query && (
           <button type="button" onClick={handleClear} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-white transition-colors">
             <X className="w-4 h-4" />
           </button>
         )}
       </div>
 
-      {/* Search results */}
-      {isOpen && results.length > 0 && (
-        <div className="absolute top-14 left-0 right-0 z-[1000] bg-[#0B0B0F] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
-          {results.map((r, i) => (
-            <button key={i} type="button" onClick={() => handleSelect(r)}
-              className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 group">
-              <MapPin className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
-              <span className="text-xs text-white/70 group-hover:text-white leading-snug">{r.display_name}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Coordinates */}
       {value.latitude && value.longitude && (
         <p className="text-[10px] text-emerald-400/70 font-mono ml-2">
           {parseFloat(value.latitude).toFixed(5)}, {parseFloat(value.longitude).toFixed(5)}
         </p>
       )}
 
-      {/* Map */}
-      <div
-        ref={mapRef}
-        className="w-full rounded-2xl overflow-hidden border border-white/10"
-        style={{ height: '280px', zIndex: 0 }}
-      />
-      <p className="text-[10px] text-white/30 ml-2">Click on the map to pin your exact location</p>
+      <div ref={mapRef} className="w-full rounded-2xl overflow-hidden border border-white/10" style={{ height: '280px' }} />
+      <p className="text-[10px] text-white/30 ml-2">Search or click/drag on the map to set location</p>
     </div>
   );
 }
