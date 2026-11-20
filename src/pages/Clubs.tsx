@@ -126,7 +126,7 @@ export default function Clubs() {
   const [venueStep, setVenueStep] = useState(1);
   const [venueFormData, setVenueFormData] = useState<any>({
     name: '', type: [], email: '', capacity: '', contactName: '',
-    phone: '', description: '', city: '', address: '', vendor_id: '',
+    phone: '', landline: '', description: '', city: '', address: '', vendor_id: '',
     landscape_urls: [''], portrait_url: '',
     // Per-club reservation options (issue: "every club will have
     // different options for members") — table_reservation_fee is the
@@ -241,7 +241,7 @@ export default function Clubs() {
   const resetVenueForm = () => {
     setVenueFormData({
       name: '', type: [], email: '', capacity: '', contactName: '',
-      phone: '', description: '', city: '', address: '', vendor_id: '',
+      phone: '', landline: '', description: '', city: '', address: '', vendor_id: '',
       landscape_urls: [''], portrait_url: '',
       table_reservation_fee: '', bill_discount_percentage: '', tax_percentage: '',
     });
@@ -263,6 +263,7 @@ export default function Clubs() {
       email: club.email || '',
       capacity: club.capacity || '',
       contactName: club.contactName || '',
+      landline: club.landline || '',
       phone: club.phone || club.phone_number || '',
       description: club.about || club.description || '',
       city: typeof club.city_id === 'object' ? club.city_id?._id || '' : club.city_id || '',
@@ -2017,6 +2018,7 @@ export default function Clubs() {
                             <RefinedField label="Contact Email" name="email" type="email" value={venueFormData.email} onChange={(e: any) => setVenueFormData({ ...venueFormData, email: e.target.value })} placeholder="ops@venue.com" icon={<Mail className="w-4 h-4" />} />
                             <RefinedField label="Capacity" name="capacity" type="number" value={venueFormData.capacity} onChange={(e: any) => setVenueFormData({ ...venueFormData, capacity: e.target.value })} placeholder="3500" icon={<Users className="w-4 h-4" />} />
                             <RefinedField label="Contact Number" name="phone" value={venueFormData.phone} onChange={(e: any) => setVenueFormData({ ...venueFormData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} placeholder="10-digit mobile number" icon={<Phone className="w-4 h-4" />} />
+                            <RefinedField label="Landline Number" name="landline" value={venueFormData.landline} onChange={(e: any) => setVenueFormData({ ...venueFormData, landline: e.target.value.replace(/[^0-9+\-() ]/g, '').slice(0, 15) })} placeholder="e.g. +91-80-12345678" icon={<Phone className="w-4 h-4" />} />
                           </div>
                         </FormSection>
                         <FormSection title="Reservation Options" icon={<Ticket className="w-4 h-4" />}>
