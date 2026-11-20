@@ -137,6 +137,7 @@ export default function AdsBroadcast() {
   const [exportDateTo, setExportDateTo] = useState('');
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [selectedAd, setSelectedAd] = useState<any>(null);
   const [filterCity, setFilterCity] = useState('ALL');
 
   const [isFeaturingEvent, setIsFeaturingEvent] = useState(false);
@@ -637,7 +638,7 @@ export default function AdsBroadcast() {
                       const adId = ad._id || ad.id;
                       const isExpired = ad.expiry_date ? new Date(ad.expiry_date).getTime() < Date.now() : false;
                       return (
-                      <tr key={adId} className="group hover:bg-white/5 transition-colors">
+                      <tr key={adId} className="group hover:bg-white/5 transition-colors cursor-pointer" onClick={() => setSelectedAd(ad)}>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-12 h-12 rounded-lg overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center relative">
@@ -692,7 +693,7 @@ export default function AdsBroadcast() {
                         </td>
                         <td className="px-6 py-4 text-right relative">
                           <button
-                            onClick={() => setOpenMenuId(openMenuId === adId ? null : adId)}
+                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === adId ? null : adId); }}
                             className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition-all"
                           >
                             <MoreHorizontal className="w-4 h-4" />
@@ -1413,6 +1414,62 @@ export default function AdsBroadcast() {
           </div>
         )}
       </AnimatePresence>
+      {/* Ad Preview Modal */}
+      <AnimatePresence>
+        {selectedAd && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-card w-full max-w-2xl rounded-[40px] border border-white/10 overflow-hidden shadow-2xl"
+            >
+              <div className="p-8 border-b border-white/5 flex items-center justify-between">
+                <h3 className="text-base font-black text-white uppercase tracking-tight">Ad Preview</h3>
+                <button onClick={() => setSelectedAd(null)} className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all text-muted-foreground hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                {/* Ad image */}
+                <div className="aspect-video rounded-2xl overflow-hidden border border-white/10 bg-white/5">
+                  {selectedAd.ad_image
+                    ? <img src={adAssetUrl(selectedAd.ad_image)} alt="" className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center"><Image className="w-12 h-12 text-white/10" /></div>}
+                </div>
+                {/* Stats row */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[
+                    { label: 'Status', value: selectedAd.expiry_date && new Date(selectedAd.expiry_date).getTime() < Date.now() ? 'Expired' : 'Active', color: selectedAd.expiry_date && new Date(selectedAd.expiry_date).getTime() < Date.now() ? 'text-amber-400' : 'text-emerald-400' },
+                    { label: 'Expires', value: selectedAd.expiry_date ? new Date(selectedAd.expiry_date).toLocaleDateString() : '—', color: 'text-white' },
+                    { label: 'Impressions', value: (selectedAd.impressions_count || 0).toLocaleString(), color: 'text-sky-400' },
+                    { label: 'Clicks', value: (selectedAd.clicks_count || 0).toLocaleString(), color: 'text-pink-400' },
+                  ].map(s => (
+                    <div key={s.label} className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-1">{s.label}</p>
+                      <p className={`text-sm font-black ${s.color}`}>{s.value}</p>
+                    </div>
+                  ))}
+                </div>
+                {/* Link */}
+                {selectedAd.link_url && (
+                  <a href={selectedAd.link_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-primary text-sm font-bold hover:underline truncate">
+                    <LinkIcon className="w-4 h-4 shrink-0" /> {selectedAd.link_url}
+                  </a>
+                )}
+                {/* Actions */}
+                <div className="flex items-center gap-3 pt-2 border-t border-white/5">
+                  <button onClick={() => { openEditAd(selectedAd); setSelectedAd(null); }} className="flex-1 py-3 rounded-2xl bg-primary text-white text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 transition-all flex items-center justify-center gap-2">
+                    <Edit className="w-4 h-4" /> Edit Ad
+                  </button>
+                  <button onClick={() => { deleteAdMutation.mutate(selectedAd._id || selectedAd.id); setSelectedAd(null); }} className="px-6 py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all flex items-center gap-2">
+                    <Trash2 className="w-4 h-4" /> Delete
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <FeatureEventModal
         isOpen={isFeaturingEvent}
         onClose={() => setIsFeaturingEvent(false)}
