@@ -1,5 +1,5 @@
 import React from 'react';
-import { ToastProvider } from './context/ToastContext';
+import { ToastProvider } from './components/Toast';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './context/AuthContext';
