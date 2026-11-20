@@ -193,7 +193,7 @@ export default function Users() {
   // Reset to page 1 whenever the search/filter changes
   React.useEffect(() => { pg.setPage(1); }, [searchTerm]);
 
-  const { data: rolesByUser = {} } = useUserRoles(pg.pageItems.map((u: any) => String(u._id || u.id)));
+  const { data: rolesByUser = {} } = useUserRoles(filteredUsers.map((u: any) => String(u._id || u.id)));
 
   const handleSort = (field: string) => {
     if (sortField === field) {
