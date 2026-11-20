@@ -207,8 +207,9 @@ export default function PollsContests() {
   const voteData: { name: string; votes: number; color: string }[] = (() => {
     const pollList = Array.isArray(polls) ? polls : [];
     if (pollList.length === 0) return [];
-    // Use the first active poll that has options
-    const activePoll = pollList.find((p: any) => p.status === 'ACTIVE' && Array.isArray(p.options) && p.options.length > 0)
+    // Use selectedPoll when available, otherwise first active poll
+    const activePoll = (selectedPoll && Array.isArray((selectedPoll as any).options) && (selectedPoll as any).options.length > 0 ? selectedPoll : null)
+      || pollList.find((p: any) => p.status === 'ACTIVE' && Array.isArray(p.options) && p.options.length > 0)
       || pollList.find((p: any) => Array.isArray(p.options) && p.options.length > 0);
     if (!activePoll) return [{ name: 'Total Votes', votes: pollList.reduce((s: number, p: any) => s + (p.votes || 0), 0), color: CHART_COLORS[0] }];
     return activePoll.options.map((opt: any, i: number) => ({
@@ -553,7 +554,12 @@ export default function PollsContests() {
             {/* Poll Stats */}
             <div className="space-y-6">
               <div className="glass-card p-6 rounded-2xl border border-white/10 space-y-6">
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Vote Distribution</h3>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                  {selectedPoll ? (selectedPoll as any).title : 'Vote Distribution'}
+                </h3>
+                {selectedPoll && (
+                  <button onClick={() => setSelectedPoll(null)} className="text-[10px] text-muted-foreground hover:text-white uppercase tracking-widest font-bold">Clear</button>
+                )}
                 <div className="h-[250px] w-full">
                   {sortedPolls.length === 0 ? (
                     <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No poll data yet</div>
