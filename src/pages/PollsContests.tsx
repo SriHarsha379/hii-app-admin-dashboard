@@ -260,6 +260,34 @@ export default function PollsContests() {
     }
   });
 
+  const updatePollMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch(`${API_BASE}/polls/${data._id || data.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update poll');
+      return res.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['polls'] }); setEditingPoll(null); success('Poll updated!'); },
+    onError: () => toastError('Failed to update poll'),
+  });
+
+  const updateContestMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch(`${API_BASE}/contests/${data._id || data.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update contest');
+      return res.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['contests'] }); setEditingContest(null); success('Contest updated!'); },
+    onError: () => toastError('Failed to update contest'),
+  });
+
   const updatePollStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string, status: string }) => {
       const res = await fetch(`${API_BASE}/polls/${id}/status`, {
