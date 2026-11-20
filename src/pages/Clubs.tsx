@@ -761,7 +761,7 @@ export default function Clubs() {
     // against a filterCity string always evaluated to false, so that
     // filter never actually worked either.
     const cityName = typeof c.city === 'object' ? c.city?.city_name : c.city;
-    const matchesSearch  = c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || cityName?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = [c.name, c.venue_name, cityName, c.email, c.address].some(f => f?.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus  = filterStatus === 'ALL' || c.status === filterStatus;
     const matchesCity    = filterCity   === 'ALL' || cityName === filterCity;
     return matchesSearch && matchesStatus && matchesCity;
