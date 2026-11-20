@@ -94,6 +94,7 @@ export default function PollsContests() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('polls');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [selectedPoll, setSelectedPoll] = useState(null);
   const [newPoll, setNewPoll] = useState({ title: '', city: 'ALL', endDate: '', options: ['', ''] });
   const [sortField, setSortField] = useState('end_date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');

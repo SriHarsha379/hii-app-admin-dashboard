@@ -74,6 +74,8 @@ import { useUserRoles } from '../hooks/useUserRoles';
 import RoleBadges from '../components/RoleBadges';
 import { FilterDropdown } from '../components/FilterDropdown';
 import { FilterPanel } from '../components/FilterPanel';
+import { usePagination } from '../hooks/usePagination';
+import { Pagination } from '../components/Pagination';
 import { motion, AnimatePresence } from 'motion/react';
 
 const statusColors: any = {
@@ -168,27 +170,26 @@ export default function Users() {
     },
   });
 
-  const filteredUsers = (Array.isArray(users) ? users : [])?.filter((u: any) => {
+  const filteredUsers = (Array.isArray(users) ? users : []).filter((u: any) => {
     const matchesSearch = u.name?.toLowerCase().includes(searchTerm.toLowerCase()) || u.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === 'ALL' || u.status === filterStatus;
+    const userCity = typeof u.city === 'object' ? u.city?.city_name : u.city;
+    const matchesCity = filterCity === 'ALL' || userCity === filterCity;
+    return matchesSearch && matchesStatus && matchesCity;
+  }).sort((a: any, b: any) => {
+    let aValue = a[sortField];
+    let bValue = b[sortField];
+    if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+    if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+    if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
+  });
 
   const pg = usePagination(filteredUsers, 20);
 
   // Reset to page 1 whenever the search/filter changes
   React.useEffect(() => { pg.setPage(1); }, [searchTerm]);
-    const matchesStatus = filterStatus === 'ALL' || u.status === filterStatus;
-    const matchesCity = filterCity === 'ALL' || u.city === filterCity;
-    return matchesSearch && matchesStatus && matchesCity;
-  }).sort((a: any, b: any) => {
-    let aValue = a[sortField];
-    let bValue = b[sortField];
-
-    if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-    if (typeof bValue === 'string') bValue = bValue.toLowerCase();
-
-    if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
-    return 0;
-  });
 
   const { data: rolesByUser = {} } = useUserRoles(pg.pageItems.map((u: any) => String(u._id || u.id)));
 
