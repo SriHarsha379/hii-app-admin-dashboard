@@ -290,6 +290,7 @@ export default function PollsContests() {
     const [openPollMenuId, setOpenPollMenuId]         = useState<string | null>(null);
   const [openContestMenuId, setOpenContestMenuId]   = useState<string | null>(null);
   const [deletePollTarget, setDeletePollTarget]     = useState<any>(null);
+  const [editingPoll, setEditingPoll]               = useState<any>(null);
   const [deleteContestTarget, setDeleteContestTarget] = useState<any>(null);
 
   const deletePollMutation = useMutation({
@@ -508,9 +509,24 @@ export default function PollsContests() {
                               {openPollMenuId === (poll._id || poll._id || poll.id) && (
                                 <>
                                   <div className="fixed inset-0 z-10" onClick={() => setOpenPollMenuId(null)} />
-                                  <div className="absolute right-0 top-12 z-20 w-40 rounded-2xl bg-[#0B0B0F] border border-white/10 shadow-2xl overflow-hidden">
+                                  <div className="absolute right-0 top-12 z-20 w-44 rounded-2xl bg-[#0B0B0F] border border-white/10 shadow-2xl overflow-hidden">
                                     <button
-                                      onClick={() => setDeletePollTarget(poll)}
+                                      onClick={(e) => { e.stopPropagation(); setSelectedPoll(poll); setOpenPollMenuId(null); }}
+                                      className="w-full flex items-center gap-3 px-5 py-3 text-xs font-bold text-white/60 hover:text-white hover:bg-white/5 transition-all"
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                      Preview
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setEditingPoll(poll); setOpenPollMenuId(null); }}
+                                      className="w-full flex items-center gap-3 px-5 py-3 text-xs font-bold text-white/60 hover:text-white hover:bg-white/5 transition-all"
+                                    >
+                                      <Settings className="w-4 h-4" />
+                                      Edit
+                                    </button>
+                                    <div className="h-px bg-white/5 mx-3" />
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setDeletePollTarget(poll); setOpenPollMenuId(null); }}
                                       disabled={deletePollMutation.isPending}
                                       className="w-full flex items-center gap-3 px-5 py-3 text-xs font-bold text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50"
                                     >
