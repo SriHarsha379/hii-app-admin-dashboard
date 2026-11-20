@@ -96,5 +96,4 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 export function useToast() {
   const ctx = useContext(ToastContext);
   return ctx ?? { toast: ()=>{}, success: ()=>{}, error: ()=>{}, warning: ()=>{}, info: ()=>{} };
-  return ctx;
 }
