@@ -562,10 +562,6 @@ export default function Events() {
   const filteredEvents = eventList.filter((e: any) => {
     const _name = (e.venue_name || e.title || e.event_name || '').toLowerCase();
 
-  const pg = usePagination(filteredEvents, 20);
-
-  // Reset to page 1 whenever the search/filter changes
-  React.useEffect(() => { pg.setPage(1); }, [searchTerm]);
     const matchesSearch  = _name.includes(searchTerm.toLowerCase()) || (e.city || '').toLowerCase().includes(searchTerm.toLowerCase());
     let   matchesStatus  = true;
     if      (filterStatus === 'ACTIVE')    matchesStatus = e.status === 'LIVE' || e.status === 'UPCOMING';
@@ -589,6 +585,9 @@ export default function Events() {
     if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
     return 0;
   });
+
+  const pg = usePagination(filteredEvents, 20);
+  React.useEffect(() => { pg.setPage(1); }, [searchTerm]);
 
   // Was computed from the full unfiltered `eventList`, so the top stat
   // cards never matched whatever the search/status/city filters below had
