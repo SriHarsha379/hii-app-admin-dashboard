@@ -57,7 +57,8 @@ import {
   ArrowUp,
   ArrowDown,
   Download,
-  Trash2
+  Trash2,
+  Pencil
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { FilterDropdown } from '../components/FilterDropdown';
