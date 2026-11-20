@@ -105,7 +105,7 @@ export default function Users() {
 
   // ISSUE 16 FIX: pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 50;
+  const PAGE_SIZE = 500;
 
   // ISSUE 16 FIX: paginated fetch
   const { data: usersData, isLoading } = useQuery({
