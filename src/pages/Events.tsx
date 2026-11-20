@@ -464,6 +464,7 @@ export default function Events() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
       setIsCreatingEvent(false); setEventFormData(blankForm); setCreationStep(1);
+      success(isEditingEvent ? 'Event updated' : 'Event created', 'Changes saved successfully');
       setPosterFile(null); setLandscapeFile(null); setGalleryFiles([null, null, null, null]);
     },
   });

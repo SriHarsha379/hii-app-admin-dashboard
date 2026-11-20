@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { 
   Plus, 
   Search, 
@@ -92,6 +93,7 @@ export default function PollsContests() {
     ...((Array.isArray(cities) ? cities : []).slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((c: any) => ({ label: c.city_name, value: c.city_name }))),
   ];
   const queryClient = useQueryClient();
+  const { success, error: toastError } = useToast();
   const [activeTab, setActiveTab] = useState('polls');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedPoll, setSelectedPoll] = useState(null);
@@ -304,7 +306,7 @@ export default function PollsContests() {
       queryClient.invalidateQueries({ queryKey: ['polls'] });
       setOpenPollMenuId(null);
     },
-    onError: (err: any) => alert(err.message || 'Failed to remove poll'),
+    onError: (err: any) => toastError('Failed to remove poll', err.message),
   });
 
   const deleteContestMutation = useMutation({
@@ -321,7 +323,7 @@ export default function PollsContests() {
       queryClient.invalidateQueries({ queryKey: ['contests'] });
       setOpenContestMenuId(null);
     },
-    onError: (err: any) => alert(err.message || 'Failed to remove contest'),
+    onError: (err: any) => toastError('Failed to remove contest', err.message),
   });
 
   const exportData = () => {

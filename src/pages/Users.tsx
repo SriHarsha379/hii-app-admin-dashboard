@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { 
   Plus, 
   Search, 
@@ -91,6 +92,7 @@ import { API_BASE } from '../lib/apiConfig';
 export default function Users() {
   const { token } = useAuth();
   const queryClient = useQueryClient();
+  const { success, error: toastError } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [filterCity, setFilterCity] = useState('ALL');

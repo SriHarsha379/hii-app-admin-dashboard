@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import {
   UserPlus,
   Check,
@@ -33,6 +34,7 @@ import { API_BASE } from '../lib/apiConfig';
 export default function OrganiserRequests() {
   const { token } = useAuth();
   const queryClient = useQueryClient();
+  const { success, error: toastError } = useToast();
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'owner' | 'event_organizer'>('ALL');
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');

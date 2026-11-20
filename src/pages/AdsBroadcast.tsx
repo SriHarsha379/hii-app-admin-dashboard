@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { FormSection, RefinedField } from '../components/RefinedForm';
 import { 
   Plus, 
@@ -102,6 +103,7 @@ const channels = [
 export default function AdsBroadcast() {
   const { token } = useAuth();
   const queryClient = useQueryClient();
+  const { success, error: toastError } = useToast();
   const [activeTab, setActiveTab] = useState('ads');
   const [selectedChannels, setSelectedChannels] = useState<string[]>(['push']);
   const [isSending, setIsSending] = useState(false);

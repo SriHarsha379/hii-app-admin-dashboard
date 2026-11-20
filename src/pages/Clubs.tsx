@@ -2169,11 +2169,11 @@ export default function Clubs() {
                   {venueStep < 3 ? (
                     <button onClick={() => {
                       if (venueStep === 1) {
-                        if (!venueFormData.name) { alert('Enter a club name'); return; }
+                        if (!venueFormData.name) { toastError('Enter a club name'); return; }
                         // Vendor is now auto-created in handleSubmitVenue if none selected — no need to block here
-                        if (!venueFormData.type || venueFormData.type.length === 0) { alert('Select a category'); return; }
+                        if (!venueFormData.type || venueFormData.type.length === 0) { toastError('Select a category'); return; }
                       }
-                      if (venueStep === 2 && !venueFormData.city) { alert('Select a city'); return; }
+                      if (venueStep === 2 && !venueFormData.city) { toastError('Select a city'); return; }
                       setVenueStep((v) => v + 1);
                     }} className="px-14 py-5 rounded-[24px] bg-white text-black text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-4 group">
                       Next Step <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
