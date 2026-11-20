@@ -500,7 +500,7 @@ export default function PollsContests() {
                                 {poll.status === 'ACTIVE' ? 'Active Pop-up' : 'Activate'}
                               </button>
                               <button
-                                onClick={(e) => { e.stopPropagation(); setOpenPollMenuId(openPollMenuId === poll._id || poll.id ? null : (poll._id || poll._id || poll.id)); }}
+                                onClick={(e) => { e.stopPropagation(); setOpenPollMenuId(openPollMenuId === (poll._id || poll.id) ? null : (poll._id || poll.id)); }}
                                 className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition-all"
                               >
                                 <MoreHorizontal className="w-4 h-4" />
