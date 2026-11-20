@@ -478,7 +478,7 @@ export default function PollsContests() {
                           <td className="px-6 py-4">
                             <p className="text-xs text-muted-foreground">{new Date(poll.end_date).toLocaleDateString()}</p>
                           </td>
-                          <td className="px-6 py-4 text-right">
+                          <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-3 relative">
                               <button
                                 onClick={() => {
