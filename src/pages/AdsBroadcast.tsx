@@ -138,6 +138,7 @@ export default function AdsBroadcast() {
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [selectedAd, setSelectedAd] = useState<any>(null);
+  const [selectedAdAnalytics, setSelectedAdAnalytics] = useState<any>(null);
   const [filterCity, setFilterCity] = useState('ALL');
 
   const [isFeaturingEvent, setIsFeaturingEvent] = useState(false);
@@ -719,6 +720,12 @@ export default function AdsBroadcast() {
                                     className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-white hover:bg-white/5 rounded-lg transition-colors"
                                   >
                                     <Edit className="w-3.5 h-3.5" /> Edit Ad
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); setSelectedAdAnalytics(ad); }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-white hover:bg-white/5 rounded-lg transition-colors"
+                                  >
+                                    <BarChart2 className="w-3.5 h-3.5" /> Analytics
                                   </button>
                                   <button
                                     onClick={() => deleteAdMutation.mutate(adId)}
@@ -1588,6 +1595,76 @@ export default function AdsBroadcast() {
                   </button>
                   <button onClick={() => { deleteAdMutation.mutate(selectedAd._id || selectedAd.id); setSelectedAd(null); }} disabled={deleteAdMutation.isPending} className="px-6 py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all flex items-center gap-2 disabled:opacity-50">
                     <Trash2 className="w-4 h-4" /> Delete
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedAdAnalytics && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-card w-full max-w-xl rounded-[40px] border border-white/10 overflow-hidden shadow-2xl"
+            >
+              <div className="p-8 border-b border-white/5 flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-black text-white uppercase tracking-tight">{selectedAdAnalytics.ad_name || 'Ad Analytics'}</h3>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">Performance Breakdown</p>
+                </div>
+                <button onClick={() => setSelectedAdAnalytics(null)} className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all text-muted-foreground hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                {/* Main metrics */}
+                <div className="grid grid-cols-3 gap-4">
+                  {(() => {
+                    const impressions = selectedAdAnalytics.impressions_count || 0;
+                    const clicks = selectedAdAnalytics.clicks_count || 0;
+                    const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '0.00';
+                    return [
+                      { label: 'Impressions', value: impressions.toLocaleString(), icon: Eye, color: 'text-sky-400', bg: 'bg-sky-400/10' },
+                      { label: 'Clicks', value: clicks.toLocaleString(), icon: MousePointer2, color: 'text-pink-400', bg: 'bg-pink-400/10' },
+                      { label: 'CTR', value: ctr + '%', icon: TrendingUp, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+                    ];
+                  })().map(s => (
+                    <div key={s.label} className="p-5 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${s.bg}`}>
+                        <s.icon className={`w-5 h-5 ${s.color}`} />
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">{s.label}</p>
+                        <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Campaign info */}
+                <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
+                  <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3">Campaign Info</h4>
+                  {[
+                    { label: 'Status',   value: selectedAdAnalytics.expiry_date && new Date(selectedAdAnalytics.expiry_date).getTime() < Date.now() ? 'Expired' : 'Active' },
+                    { label: 'Start',    value: selectedAdAnalytics.start_date  ? new Date(selectedAdAnalytics.start_date).toLocaleDateString()  : 'Not set' },
+                    { label: 'Expires',  value: selectedAdAnalytics.expiry_date ? new Date(selectedAdAnalytics.expiry_date).toLocaleDateString() : 'Never'   },
+                    { label: 'Has Video',value: selectedAdAnalytics.ad_video    ? 'Yes' : 'No' },
+                    { label: 'Link',     value: selectedAdAnalytics.link_url    || 'No destination link' },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="flex justify-between text-[11px]">
+                      <span className="text-white/30 uppercase font-black tracking-widest">{label}</span>
+                      <span className="text-white/70 font-medium truncate max-w-[200px]">{value}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-3 pt-2 border-t border-white/5">
+                  <button onClick={() => { openEditAd(selectedAdAnalytics); setSelectedAdAnalytics(null); }} className="flex-1 py-3 rounded-2xl bg-primary text-white text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 transition-all flex items-center justify-center gap-2">
+                    <Edit className="w-4 h-4" /> Edit Ad
+                  </button>
+                  <button onClick={() => setSelectedAdAnalytics(null)} className="px-6 py-3 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-all">
+                    Close
                   </button>
                 </div>
               </div>
