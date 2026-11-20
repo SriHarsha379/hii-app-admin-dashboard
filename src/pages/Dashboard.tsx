@@ -103,9 +103,9 @@ export default function Dashboard() {
   const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/user/get_all_user`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/user/get_all_user?limit=500`, { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json();
-      return json.data?.users ?? [];
+      return { users: json.data?.users ?? [], total: json.data?.total ?? 0 };
     },
     enabled: user?.role === 'SUPER_ADMIN',
   });
@@ -135,11 +135,11 @@ export default function Dashboard() {
 
   const eventList = Array.isArray(events) ? events : [];
   const clubList  = Array.isArray(clubs)  ? clubs  : [];
-  const userList  = Array.isArray(users)  ? users  : [];
+  const userList = Array.isArray(users) ? users : ((users as any)?.users ?? []);
+  const totalUsers = (users as any)?.total ?? userList.length;
 
   const activeEvents = eventList.filter((e: any) => e.status === 'LIVE' || e.status === 'UPCOMING').length;
   const pastEvents   = eventList.filter((e: any) => e.status === 'COMPLETED').length;
-  const totalUsers   = userList.length;
   // "active" = the real `is_active` field on the User model. The previous
   // check (`last_active` / `isActive`) didn't match any real field name —
   // neither exists on the schema — so this always evaluated to 0.
