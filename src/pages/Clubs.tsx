@@ -749,7 +749,9 @@ export default function Clubs() {
     return true;
   });
 
-  const filteredClubs = (Array.isArray(clubs) ? clubs : []).filter((c: any) => {
+  const filteredClubs = (Array.isArray(clubs) ? clubs : [])
+  .map((c: any) => withVenueData(c))
+  .filter((c: any) => {
     // FIXED: c.city is a populated {_id, city_name} object for most
     // vendors, not a plain string — `c.city?.toLowerCase()` only guards
     // against null/undefined, not against city being an object, so this
