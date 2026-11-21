@@ -517,6 +517,8 @@ export default function Clubs() {
 
       queryClient.invalidateQueries({ queryKey: ['clubs'] });
       queryClient.invalidateQueries({ queryKey: ['mongo-vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['venues-for-clubs'] });
+      toastSuccess('Club saved successfully!');
       setIsCreatingClub(false);
       resetVenueForm();
     } catch (err: any) {
