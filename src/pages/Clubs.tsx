@@ -250,7 +250,7 @@ export default function Clubs() {
     setVenueFormData({
       name: club.name || '', type: Array.isArray(club.category_ids) ? club.category_ids.map((c: any) => c?._id || c) : [],
       email: club.email || '', capacity: club.capacity || '', contactName: club.contactName || '',
-      phone: club.phone || club.phone_number || '',
+      phone: club.phone || club.phone_number || club.contact_number || '',
       landline: club.landline || club.landline_number || '', description: club.about || club.description || '',
       city: typeof club.city_id === 'object' ? club.city_id?._id || '' : club.city_id || '',
       address: club.address || '',
@@ -353,6 +353,7 @@ export default function Clubs() {
       body.append('latitude', venueFormData.latitude || '');
       body.append('longitude', venueFormData.longitude || '');
       body.append('about', venueFormData.description || '');
+      if (venueFormData.phone) body.append('contact_number', venueFormData.phone);
       if (venueFormData.landline) body.append('landline', venueFormData.landline);
       body.append('table_reservation_fee', venueFormData.table_reservation_fee || '0');
       body.append('bill_discount_percentage', String(Math.max(0, Math.min(100, Number(venueFormData.bill_discount_percentage) || 0))));

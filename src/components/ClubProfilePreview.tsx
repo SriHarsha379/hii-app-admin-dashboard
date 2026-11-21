@@ -40,7 +40,7 @@ export default function ClubProfilePreview({ club, onClose, onEdit, hideCloseBut
       capacity:    b.capacity  || 'Not set',
       about:       b.about || b.description || 'No description available.',
       gallery:     (Array.isArray(b.gallery_images) ? b.gallery_images : (Array.isArray(b.landscape_urls) ? b.landscape_urls : [])).filter(Boolean).map(imgUrl),
-      phone:       b.phone || b.phone_number || '',
+      phone:       b.phone || b.phone_number || b.contact_number || '',
       landline:    b.landline || b.landline_number || '',
       email:       b.email || '',
       website:     b.website || '',
