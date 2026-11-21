@@ -41,57 +41,103 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 // ── Reject-reason modal ───────────────────────────────────────────────────────
-function RejectModal({
-  open, clubName, onConfirm, onCancel, isPending,
-}: {
+
+// ── Reject modal ─────────────────────────────────────────────────────────────
+function RejectModal({ open, clubName, onConfirm, onCancel, isPending }: {
   open: boolean; clubName: string;
   onConfirm: (reason: string) => void;
   onCancel: () => void;
   isPending: boolean;
 }) {
   const [reason, setReason] = React.useState('');
+  const presets = ['Incomplete information', 'Duplicate listing', 'Policy violation', 'Invalid documents'];
   React.useEffect(() => { if (!open) setReason(''); }, [open]);
   if (!open) return null;
+
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
       <motion.div
-        initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-        className="w-full max-w-md bg-[#0d0d12] rounded-3xl border border-white/10 shadow-2xl p-8 space-y-6"
+        initial={{ scale: 0.9, opacity: 0, y: 12 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        transition={{ type: 'spring', damping: 24, stiffness: 280 }}
+        className="w-full max-w-md bg-[#0d0d12] rounded-3xl border border-white/10 shadow-[0_0_80px_rgba(0,0,0,0.6)] overflow-hidden"
       >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
-            <AlertTriangle className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-base font-black text-white uppercase tracking-tight">Reject Vendor</h3>
-            <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-0.5">{clubName}</p>
+        {/* Header */}
+        <div className="relative px-7 pt-7 pb-5 border-b border-white/[0.05]">
+          <div className="absolute top-0 left-8 right-8 h-px bg-gradient-to-r from-transparent via-red-500/40 to-transparent" />
+          <div className="flex items-start gap-4">
+            <div className="w-11 h-11 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 shrink-0 mt-0.5">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-white uppercase tracking-tight">Reject Vendor</h3>
+              <p className="text-[11px] text-white/40 font-medium mt-1 leading-snug">
+                This will mark <span className="text-white/70 font-bold">{clubName}</span> as rejected and notify them by email.
+              </p>
+            </div>
           </div>
         </div>
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-white/40 uppercase tracking-widest">Reason (optional)</label>
-          <textarea
-            rows={3} value={reason} onChange={(e) => setReason(e.target.value)}
-            placeholder="Enter reason for rejection..."
-            className="w-full bg-[#09090B] border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-red-500/40 resize-none font-medium placeholder:text-white/10 transition-all"
-          />
+
+        {/* Body */}
+        <div className="px-7 py-6 space-y-5">
+          {/* Quick presets */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-white/30 uppercase tracking-widest">Quick Reason</label>
+            <div className="flex flex-wrap gap-2">
+              {presets.map(p => (
+                <button
+                  key={p}
+                  onClick={() => setReason(p)}
+                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                    reason === p
+                      ? 'bg-red-500/15 border-red-500/30 text-red-400'
+                      : 'bg-white/[0.03] border-white/[0.07] text-white/40 hover:text-white/70 hover:border-white/20'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom reason */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-white/30 uppercase tracking-widest">Custom Reason <span className="normal-case font-medium text-white/20">(optional)</span></label>
+            <textarea
+              rows={3}
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              placeholder="Describe why this vendor is being rejected..."
+              className="w-full bg-[#0c0c10] border border-white/[0.07] rounded-2xl px-4 py-3.5 text-sm text-white focus:outline-none focus:border-red-500/30 resize-none font-medium placeholder:text-white/15 transition-all hover:border-white/15"
+            />
+          </div>
         </div>
-        <div className="flex gap-3">
-          <button onClick={onCancel} className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-xs font-black uppercase tracking-widest text-white/60 hover:text-white hover:bg-white/10 transition-all">
+
+        {/* Footer */}
+        <div className="px-7 pb-7 flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.07] text-xs font-black uppercase tracking-widest text-white/50 hover:text-white hover:bg-white/[0.08] transition-all"
+          >
             Cancel
           </button>
           <button
             disabled={isPending}
             onClick={() => onConfirm(reason)}
-            className="flex-1 py-3 rounded-xl bg-red-500 text-white text-xs font-black uppercase tracking-widest hover:bg-red-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 py-3.5 rounded-2xl bg-red-500 text-white text-xs font-black uppercase tracking-widest hover:bg-red-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-red-500/20"
           >
-            {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
-            Reject
+            {isPending
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <Ban className="w-4 h-4" />}
+            Reject Vendor
           </button>
         </div>
       </motion.div>
     </div>
   );
 }
+
 
 export default function Clubs() {
   const { token, user } = useAuth();
@@ -1099,31 +1145,57 @@ export default function Clubs() {
         {isCreatingClub && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-              className="glass-card w-full max-w-3xl rounded-[40px] border border-white/10 overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-              <div className="p-8 lg:p-10 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+              className="glass-card w-full max-w-2xl rounded-3xl border border-white/[0.08] overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.7)] flex flex-col max-h-[90vh]">
+              <div className="px-6 py-5 border-b border-white/[0.05] flex items-center justify-between bg-[#0a0a0f]">
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-[0_0_20px_rgba(255,45,154,0.1)]"><Building2 className="w-5 h-5" /></div>
-                  <div className="space-y-1">
-                    <h3 className="text-xl font-black text-white uppercase tracking-tight">{selectedClub ? 'Edit' : 'Add New'} <span className="text-primary neon-text">Club</span></h3>
-                    <p className="text-[10px] text-white/30 font-black uppercase tracking-[0.2em]">Step {venueStep}/3</p>
+                  <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
+                    <Building2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-white uppercase tracking-widest">
+                      {selectedClub ? 'Edit Club' : 'Add New Club'}
+                    </h3>
+                    <p className="text-[10px] text-white/30 font-medium mt-0.5">Step {venueStep} of 3</p>
                   </div>
                 </div>
                 <button onClick={() => { setIsCreatingClub(false); resetVenueForm(); }} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all border border-white/5"><X className="w-5 h-5" /></button>
               </div>
-              <div className="flex-1 overflow-y-auto p-10 lg:p-12 scrollbar-hide">
-                <div className="flex items-center justify-between mb-16 relative px-4">
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-white/5 rounded-full z-0" />
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary rounded-full z-0 transition-all duration-700 shadow-[0_0_15px_rgba(255,45,154,0.5)]" style={{ width: `${((venueStep - 1) / 2) * 100}%` }} />
-                  {[1, 2, 3].map(step => (
-                    <div key={step} className="relative z-10 flex flex-col items-center gap-4">
-                      <div className={cn('w-14 h-14 rounded-2xl flex items-center justify-center text-sm font-black border-2 transition-all duration-500', venueStep >= step ? 'bg-primary border-primary text-white shadow-[0_0_30px_rgba(255,45,154,0.3)] scale-110' : 'bg-[#09090B] border-white/5 text-white/20')}>
-                        {venueStep > step ? <Check className="w-6 h-6 stroke-[3px]" /> : step}
+              <div className="flex-1 overflow-y-auto p-6 lg:p-8 scrollbar-hide">
+                <div className="mb-10">
+                  {/* Step labels */}
+                  <div className="flex items-center justify-between mb-3 px-1">
+                    {['Details', 'Visuals', 'Logistics'].map((label, i) => {
+                      const step = i + 1;
+                      return (
+                        <span key={label} className={`text-[10px] font-black uppercase tracking-widest transition-colors ${venueStep >= step ? 'text-primary' : 'text-white/20'}`}>
+                          {label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  {/* Progress track */}
+                  <div className="relative h-1.5 bg-white/[0.05] rounded-full overflow-hidden">
+                    <div
+                      className="absolute left-0 top-0 h-full bg-gradient-to-r from-primary to-purple-500 rounded-full transition-all duration-500 shadow-[0_0_12px_rgba(255,45,154,0.4)]"
+                      style={{ width: `${((venueStep - 1) / 2) * 100}%` }}
+                    />
+                  </div>
+                  {/* Step dots */}
+                  <div className="flex items-center justify-between mt-3 px-0">
+                    {[1, 2, 3].map(step => (
+                      <div key={step} className="flex flex-col items-center gap-1.5">
+                        <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-[10px] font-black border transition-all duration-300 ${
+                          venueStep > step
+                            ? 'bg-primary border-primary text-white shadow-[0_0_12px_rgba(255,45,154,0.3)]'
+                            : venueStep === step
+                              ? 'bg-primary/10 border-primary text-primary scale-110'
+                              : 'bg-white/[0.03] border-white/10 text-white/20'
+                        }`}>
+                          {venueStep > step ? <Check className="w-3.5 h-3.5 stroke-[3px]" /> : step}
+                        </div>
                       </div>
-                      <span className={cn('text-[10px] uppercase font-black tracking-[0.2em] absolute -bottom-10 w-32 text-center transition-colors duration-500', venueStep >= step ? 'text-primary' : 'text-white/20')}>
-                        {step === 1 ? 'Details' : step === 2 ? 'Visuals' : 'Logistics'}
-                      </span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
                 <div className="mt-8">
                   <AnimatePresence mode="wait">
