@@ -894,6 +894,9 @@ export default function Events() {
                     <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest cursor-pointer select-none hover:text-white transition-colors" onClick={() => handleSort('city')}>
                       <div className="flex items-center gap-1.5">Venue / City <SortIcon field="city" /></div>
                     </th>
+                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                      Host / Organiser
+                    </th>
                     <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest cursor-pointer select-none hover:text-white transition-colors" onClick={() => handleSort('date')}>
                       <div className="flex items-center gap-1.5">Date & Time <SortIcon field="date" /></div>
                     </th>
@@ -905,9 +908,9 @@ export default function Events() {
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {isLoading ? (
-                    <tr><td colSpan={5} className="px-6 py-12 text-center text-xs text-muted-foreground">Loading events…</td></tr>
+                    <tr><td colSpan={6} className="px-6 py-12 text-center text-xs text-muted-foreground">Loading events…</td></tr>
                   ) : filteredEvents.length === 0 ? (
-                    <tr><td colSpan={5} className="px-6 py-12 text-center text-xs text-muted-foreground">No events found.</td></tr>
+                    <tr><td colSpan={6} className="px-6 py-12 text-center text-xs text-muted-foreground">No events found.</td></tr>
                   ) : pg.pageItems.map((event: any) => (
                     <tr
                       key={eventId(event)}
@@ -932,6 +935,10 @@ export default function Events() {
                       <td className="px-6 py-4">
                         <p className="text-xs font-bold text-white">{event.vendor_id?.name || getVendorName(getVendorId(event)) || '—'}</p>
                         <p className="text-[10px] text-muted-foreground">{event.city || '—'}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-xs font-bold text-white">{event.vendor_id?.name || getVendorName(getVendorId(event)) || '—'}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Organiser</p>
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-xs font-bold text-white">{new Date(event.date || Date.now()).toLocaleDateString()}</p>
@@ -1426,7 +1433,7 @@ export default function Events() {
                           ) : (
                             <div className="relative">
                               
-                              <SingleSelectDropdown value={eventFormData.vendor_id || eventFormData.venue_id} onChange={(vendorId) => setEventFormData({ ...eventFormData, vendor_id: vendorId, venue_id: vendorId })} options={vendorList.map((v: any) => ({ label: v.name, value: v._id || v.id }))} placeholder="Select venue" />
+                              <SingleSelectDropdown value={eventFormData.vendor_id || eventFormData.venue_id} onChange={(vendorId) => setEventFormData({ ...eventFormData, vendor_id: vendorId, venue_id: vendorId })} options={vendorList.map((v: any) => ({ label: v.name, value: v._id || v.id }))} placeholder="Select organiser / venue..." />
                             </div>
                           )}
                         </div>
