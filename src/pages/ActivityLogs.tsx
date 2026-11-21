@@ -69,11 +69,12 @@ export default function ActivityLogs() {
            item.action?.toLowerCase().includes(searchTerm.toLowerCase()) ||
            item.resource?.toLowerCase().includes(searchTerm.toLowerCase());
 
-  const pg = usePagination(filteredData, 20);
 
   // Reset to page 1 whenever the search/filter changes
-  React.useEffect(() => { pg.setPage(1); }, [searchTerm]);
   });
+
+  const pg = usePagination(filteredData, 20);
+  React.useEffect(() => { pg.setPage(1); }, [searchTerm]);
 
   // ISSUE 40 FIX: RFC 4180 CSV escaping
   const csvEsc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;

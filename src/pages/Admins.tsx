@@ -178,14 +178,15 @@ export default function Admins() {
   const filteredAdmins = (Array.isArray(admins) ? admins : [])?.filter((a: any) => {
     const matchesSearch = a.name?.toLowerCase().includes(searchTerm.toLowerCase()) || a.email?.toLowerCase().includes(searchTerm.toLowerCase());
 
-  const pg = usePagination(filteredAdmins, 20);
 
   // Reset to page 1 whenever the search/filter changes
-  React.useEffect(() => { pg.setPage(1); }, [searchTerm]);
     const matchesRole = filterRole === 'ALL' || a.role === filterRole;
     const matchesStatus = filterStatus === 'ALL' || a.status === filterStatus;
     return matchesSearch && matchesRole && matchesStatus;
   });
+
+  const pg = usePagination(filteredAdmins, 20);
+  React.useEffect(() => { pg.setPage(1); }, [searchTerm]);
 
   const exportData = () => {
     const headers = ['Name', 'Email', 'Role', 'Status', 'Created'];
