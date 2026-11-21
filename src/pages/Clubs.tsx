@@ -1212,17 +1212,6 @@ export default function Clubs() {
                               <RefinedField label="Club Name" name="name" value={venueFormData.name} onChange={(e: any) => setVenueFormData({ ...venueFormData, name: e.target.value })} placeholder="e.g. The Quantum Vault" icon={<Building2 className="w-4 h-4" />} />
                             </div>
                             <div className="space-y-4 group/field">
-                              <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Vendor / Organiser</label>
-                              {isClubAdmin ? (
-                                <div className="flex items-center gap-3 w-full bg-[#09090B] border border-white/5 rounded-[24px] px-8 py-5 text-sm text-white/60">
-                                  <span className="truncate">{ownVendorForVenue?.name || user?.organisation || 'Your organisation'}</span>
-                                  <span className="ml-auto text-[9px] font-black uppercase tracking-widest text-white/20 shrink-0">Locked to your account</span>
-                                </div>
-                              ) : (
-                                <SingleSelectDropdown options={(vendorListForVenue || []).map((v: any) => ({ label: v.name, value: v._id || v.id }))} value={venueFormData.vendor_id} onChange={(val: string) => setVenueFormData({ ...venueFormData, vendor_id: val })} placeholder="Select vendor..." />
-                              )}
-                            </div>
-                            <div className="space-y-4 group/field">
                               <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Category</label>
                               <MultiSelectDropdown options={venueTypes?.slice().sort((a: any, b: any) => (a.category_name || '').localeCompare(b.category_name || '')).map((t: any) => ({ label: t.category_name, value: t._id })) || []} value={Array.isArray(venueFormData.type) ? venueFormData.type : (venueFormData.type ? [venueFormData.type] : [])} onChange={(v: any) => setVenueFormData({ ...venueFormData, type: v })} placeholder="Select categories" />
                             </div>
