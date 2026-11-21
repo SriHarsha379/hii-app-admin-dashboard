@@ -159,6 +159,7 @@ export default function Clubs() {
   const [isViewingVenue, setIsViewingVenue] = useState(false);
   const [rejectModal, setRejectModal] = useState<{ open: boolean; clubId: string; clubName: string }>({ open: false, clubId: '', clubName: '' });
   const [venueStep, setVenueStep] = useState(1);
+  const [venueError, setVenueError] = useState('');
   const [venueFormData, setVenueFormData] = useState<any>({
     name: '', type: [], email: '', capacity: '', contactName: '',
     phone: '', description: '', city: '', address: '', vendor_id: '',
@@ -241,7 +242,7 @@ export default function Clubs() {
     setVenueLandscapeFiles([null]); setVenueLandscapePreviews(['']);
     setVenuePortraitFile(null); setVenuePortraitPreview('');
     setWorkingHours(prev => prev.map(h => ({ ...h, active: false })));
-    setVenueStep(1); setIsEditingVenue(false);
+    setVenueStep(1); setIsEditingVenue(false); setVenueError('');
   };
 
   const openEditVenue = (club: any) => {
@@ -1367,27 +1368,139 @@ export default function Clubs() {
                       </motion.div>
                     )}
                     {venueStep === 3 && (
-                      <motion.div key="vs3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-10">
-                        <FormSection title="Opening Hours" icon={<Clock className="w-4 h-4" />}>
-                          <div className="space-y-6">
+                      <motion.div key="vs3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+
+                        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] overflow-hidden">
+                          <div className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.04]">
+                            <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
+                              <Clock className="w-3.5 h-3.5" />
+                            </div>
+                            <div>
+                              <h4 className="text-[11px] font-black text-white/70 uppercase tracking-[0.25em]">Opening Hours</h4>
+                              <p className="text-[9px] text-white/30 mt-0.5">Toggle days on/off and set opening & closing time per day</p>
+                            </div>
+                          </div>
+
+                          <div className="p-4 space-y-2">
                             {workingHours.map((item, index) => (
-                              <div key={item.day} className="flex flex-col sm:flex-row items-start sm:items-center gap-6 group p-4 rounded-[28px] hover:bg-white/[0.02] transition-all">
-                                <button type="button" onClick={() => toggleDay(index)} className={cn('min-w-[140px] px-8 py-4 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all border', item.active ? 'bg-primary text-white border-primary shadow-[0_0_20px_rgba(255,45,154,0.3)] scale-105' : 'bg-[#09090B] border-white/5 text-white/20 hover:text-white/60')}>{item.day}</button>
+                              <div key={item.day} className={cn(
+                                'rounded-xl border transition-all overflow-hidden',
+                                item.active ? 'border-primary/20 bg-primary/[0.03]' : 'border-white/[0.05] bg-white/[0.01]'
+                              )}>
+                                {/* Day toggle row */}
+                                <div className="flex items-center gap-3 px-4 py-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleDay(index)}
+                                    className={cn(
+                                      'relative w-9 h-5 rounded-full transition-all shrink-0',
+                                      item.active ? 'bg-primary' : 'bg-white/10'
+                                    )}
+                                  >
+                                    <span className={cn(
+                                      'absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200',
+                                      item.active ? 'left-[18px]' : 'left-0.5'
+                                    )} />
+                                  </button>
+                                  <span className={cn(
+                                    'text-xs font-black uppercase tracking-widest flex-1 transition-colors',
+                                    item.active ? 'text-white' : 'text-white/30'
+                                  )}>
+                                    {item.day}
+                                  </span>
+                                  {item.active && (
+                                    <span className="text-[10px] text-primary/70 font-bold">
+                                      {item.openTime || '22:00'} – {item.closeTime || '04:00'}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Time pickers — only when active */}
                                 <AnimatePresence>
                                   {item.active && (
-                                    <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1 w-full">
-                                      <RefinedField label="Open Hours" name={`hours-${index}`} value={item.time} onChange={(e: any) => updateDayTime(index, e.target.value)} placeholder="22:00 - 04:00" icon={<Clock className="w-4 h-4" />} />
+                                    <motion.div
+                                      initial={{ height: 0, opacity: 0 }}
+                                      animate={{ height: 'auto', opacity: 1 }}
+                                      exit={{ height: 0, opacity: 0 }}
+                                      transition={{ duration: 0.2 }}
+                                      className="overflow-hidden"
+                                    >
+                                      <div className="grid grid-cols-2 gap-3 px-4 pb-4">
+                                        <div className="space-y-1.5">
+                                          <label className="text-[9px] font-black text-white/30 uppercase tracking-widest">Opens at</label>
+                                          <input
+                                            type="time"
+                                            value={item.openTime || '22:00'}
+                                            onChange={e => {
+                                              const nh = [...workingHours];
+                                              nh[index] = { ...nh[index], openTime: e.target.value, time: `${e.target.value} - ${nh[index].closeTime || '04:00'}` };
+                                              setWorkingHours(nh);
+                                            }}
+                                            className="w-full bg-[#0c0c10] border border-white/[0.07] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-primary/40 transition-all [color-scheme:dark]"
+                                          />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                          <label className="text-[9px] font-black text-white/30 uppercase tracking-widest">Closes at</label>
+                                          <input
+                                            type="time"
+                                            value={item.closeTime || '04:00'}
+                                            onChange={e => {
+                                              const nh = [...workingHours];
+                                              nh[index] = { ...nh[index], closeTime: e.target.value, time: `${nh[index].openTime || '22:00'} - ${e.target.value}` };
+                                              setWorkingHours(nh);
+                                            }}
+                                            className="w-full bg-[#0c0c10] border border-white/[0.07] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-primary/40 transition-all [color-scheme:dark]"
+                                          />
+                                        </div>
+                                      </div>
                                     </motion.div>
                                   )}
                                 </AnimatePresence>
                               </div>
                             ))}
                           </div>
-                          <div className="mt-8 p-10 rounded-[40px] bg-blue-500/5 border border-blue-500/10 flex items-start gap-6">
-                            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0 border border-blue-500/20"><Info className="w-6 h-6" /></div>
-                            <div className="space-y-2"><h4 className="text-xs font-black text-white uppercase tracking-widest">Note</h4><p className="text-[13px] text-white/40 leading-relaxed font-medium">Activating a day will automatically use the same hours as the previously selected day.</p></div>
+                        </div>
+
+                        {/* Quick presets */}
+                        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] p-4 space-y-3">
+                          <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Quick Presets</p>
+                          <div className="flex flex-wrap gap-2">
+                            {[
+                              { label: 'Mon–Fri', days: ['Monday','Tuesday','Wednesday','Thursday','Friday'] },
+                              { label: 'Weekends', days: ['Saturday','Sunday'] },
+                              { label: 'All Week', days: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'] },
+                              { label: 'Thu–Sun', days: ['Thursday','Friday','Saturday','Sunday'] },
+                            ].map(preset => (
+                              <button key={preset.label} type="button"
+                                onClick={() => setWorkingHours(prev => prev.map(h => ({
+                                  ...h,
+                                  active: preset.days.includes(h.day),
+                                  openTime: preset.days.includes(h.day) ? (h.openTime || '22:00') : h.openTime,
+                                  closeTime: preset.days.includes(h.day) ? (h.closeTime || '04:00') : h.closeTime,
+                                  time: preset.days.includes(h.day) ? `${h.openTime || '22:00'} - ${h.closeTime || '04:00'}` : h.time,
+                                })))}
+                                className="px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.07] text-[10px] font-black text-white/50 uppercase tracking-widest hover:text-white hover:border-primary/30 hover:bg-primary/5 transition-all">
+                                {preset.label}
+                              </button>
+                            ))}
                           </div>
-                        </FormSection>
+                        </div>
+
+                        {/* Summary */}
+                        {workingHours.some(h => h.active) && (
+                          <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/[0.03] p-4">
+                            <p className="text-[10px] font-black text-emerald-400/70 uppercase tracking-widest mb-2">Schedule Summary</p>
+                            <div className="space-y-1">
+                              {workingHours.filter(h => h.active).map(h => (
+                                <div key={h.day} className="flex items-center justify-between text-xs">
+                                  <span className="text-white/60 font-bold">{h.day}</span>
+                                  <span className="text-emerald-400 font-mono text-[11px]">{h.openTime || '22:00'} – {h.closeTime || '04:00'}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                       </motion.div>
                     )}
                   </AnimatePresence>
