@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -5,61 +6,45 @@ import EventProfilePreview from './EventProfilePreview';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE } from '../lib/apiConfig';
-import { 
-  Heart, 
-  MapPin, 
-  Calendar as CalendarIcon, 
-  Clock, 
-  X,
-  ChevronLeft as ChevronLeftIcon,
-  Users,
-  Activity,
-  CalendarDays,
-  ChevronRight as ChevronRightIcon
+import {
+  Heart, MapPin, Calendar as CalendarIcon, Clock, X,
+  ChevronLeft as ChevronLeftIcon, Users, Activity,
+  CalendarDays, ChevronRight as ChevronRightIcon,
+  Building2, Star, Phone, Globe, Shield,
 } from 'lucide-react';
 
 interface ClubProfilePreviewProps {
-  club: any;
-  onClose?: () => void;
-  onEdit?: () => void;
-  hideCloseButton?: boolean;
+  club: any; onClose?: () => void; onEdit?: () => void; hideCloseButton?: boolean;
 }
 
 export default function ClubProfilePreview({ club, onClose, onEdit, hideCloseButton }: ClubProfilePreviewProps) {
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [activeTab, setActiveTab]         = useState<'info' | 'events' | 'gallery'>('info');
+
+  const UPLOADS_BASE = API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads');
+  const imgUrl = (f: any) => !f ? '' : (/^https?:\/\//i.test(f) ? f : UPLOADS_BASE + '/' + f);
 
   const data = React.useMemo(() => {
-    const base = club || {};
-    const UPLOADS = API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads');
-    const toUrl = (f: any) => !f ? '' : (/^https?:\/\//i.test(f) ? f : UPLOADS + '/' + f);
-    // `city` (and `state`) come back from the vendor list API as populated
-    // objects — { _id, city_name } — not plain strings. Rendering that
-    // object directly as a React child throws "Objects are not valid as a
-    // React child" and crashes the whole preview, which is why clicking a
-    // venue turned the screen black (the dark backdrop renders, then the
-    // crash wipes out everything behind it). Unwrap it the same way the
-    // Clubs grid card already does defensively.
-    const cityName = typeof base.city === 'object' && base.city !== null
-      ? (base.city.city_name || '')
-      : (base.city || '');
-
+    const b = club || {};
+    const cityName = typeof b.city === 'object' && b.city ? (b.city.city_name || '') : (b.city || '');
     return {
-      name: base.name || 'Unnamed club',
-      portrait_url: toUrl(base.venue_image || base.portrait_url || base.poster_url || base.business_image || ''),
-      tags: Array.isArray(base.tags) ? base.tags : [],
-      date: Array.isArray(base.open_days) && base.open_days.length
-        ? base.open_days.join(', ')
-        : (base.date || 'Schedule not set'),
-      time: (base.start_time && base.end_time)
-        ? `${base.start_time} – ${base.end_time}`
-        : (base.start_time || base.time || 'Hours not set'),
-      location: cityName || base.location || 'Location not set',
-      venue: base.venue || base.name || 'Venue not set',
-      followers: String(base.likes || 0),
-      capacity: (base.capacity != null && base.capacity > 0) ? base.capacity : 'Not set',
-      about: base.about || base.description || 'No description available.',
-      gallery: (Array.isArray(base.gallery) ? base.gallery : (Array.isArray(base.gallery_images) ? base.gallery_images : (Array.isArray(base.landscape_urls) ? base.landscape_urls : []))).filter(Boolean).map(toUrl),
-      pastEvents: Array.isArray(base.pastEvents) ? base.pastEvents : (Array.isArray(base.lineup) ? base.lineup : [])
+      name:        b.venue_name || b.name || 'Unnamed Club',
+      coverImg:    imgUrl(b.venue_image || b.business_image || b.portrait_url || b.poster_url || ''),
+      tags:        Array.isArray(b.category_ids) ? b.category_ids.map((c: any) => c?.category_name || c).filter(Boolean) : [],
+      openDays:    Array.isArray(b.open_days) ? b.open_days : [],
+      startTime:   b.start_time || '',
+      endTime:     b.end_time   || '',
+      city:        cityName,
+      address:     b.address || '',
+      followers:   String(b.likes || 0),
+      capacity:    b.capacity  || 'Not set',
+      about:       b.about || b.description || 'No description available.',
+      gallery:     (Array.isArray(b.gallery_images) ? b.gallery_images : (Array.isArray(b.landscape_urls) ? b.landscape_urls : [])).filter(Boolean).map(imgUrl),
+      phone:       b.phone || b.phone_number || '',
+      email:       b.email || '',
+      website:     b.website || '',
+      isVerified:  !!b.is_verified,
+      isActive:    b.is_active !== false,
     };
   }, [club]);
 
@@ -67,8 +52,7 @@ export default function ClubProfilePreview({ club, onClose, onEdit, hideCloseBut
   const vendorId = (club && typeof club.vendor_id === 'object' && club.vendor_id)
     ? (club.vendor_id._id || club.vendor_id.id)
     : (club && (club.vendor_id || club._id || club.id)) || '';
-  const UPLOADS_BASE = API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads');
-  const eventImg = (f: any) => !f ? '' : (/^https?:\/\//i.test(f) ? f : (UPLOADS_BASE + '/' + f));
+
   const { data: upcomingEvents = [] } = useQuery({
     queryKey: ['club-upcoming-events', vendorId],
     enabled: Boolean(token && vendorId),
@@ -77,7 +61,7 @@ export default function ClubProfilePreview({ club, onClose, onEdit, hideCloseBut
       if (!res.ok) return [];
       const json = await res.json();
       const list = Array.isArray(json.data) ? json.data : [];
-      const vid = (e: any) => (e && typeof e.vendor_id === 'object' && e.vendor_id) ? (e.vendor_id._id || e.vendor_id.id) : (e && e.vendor_id);
+      const vid  = (e: any) => (e && typeof e.vendor_id === 'object' && e.vendor_id) ? (e.vendor_id._id || e.vendor_id.id) : (e && e.vendor_id);
       const today = new Date(); today.setHours(0, 0, 0, 0);
       return list
         .filter((e: any) => !e.is_deleted && String(vid(e)) === String(vendorId))
@@ -86,213 +70,201 @@ export default function ClubProfilePreview({ club, onClose, onEdit, hideCloseBut
     },
   });
 
+  const hours = data.startTime && data.endTime ? `${data.startTime} – ${data.endTime}` : (data.startTime || 'Hours not set');
+  const daysLabel = data.openDays.length ? data.openDays.join(', ') : 'Days not set';
+
   return (
-    <div className="flex flex-col h-full bg-black text-white relative select-none font-sans overflow-hidden">
-      {/* Top Header Bar — hidden when shown as the secondary "app view"
-          sidebar alongside the main centered card (Clubs.tsx), since that
-          card already has its own close (X) and Edit Venue controls;
-          showing a second set here would just be redundant/confusing. */}
+    <div className="flex flex-col h-full bg-[#08080c] text-white relative select-none font-sans overflow-hidden">
+
+      {/* Top bar */}
       {!hideCloseButton && (
-      <div className="absolute top-0 inset-x-0 h-20 z-50 flex items-center justify-between px-6 pointer-events-none">
-        <button
-          onClick={onClose}
-          className="w-12 h-12 bg-black/40 backdrop-blur-xl rounded-2xl flex items-center justify-center pointer-events-auto border border-white/5 hover:bg-black/60 transition-all active:scale-95 group"
-        >
-          <ChevronLeftIcon className="w-6 h-6 text-white group-hover:-translate-x-0.5 transition-transform" />
-        </button>
-        <div className="flex items-center gap-3 pointer-events-auto">
-          {onEdit && (
-            <button
-              onClick={onEdit}
-              className="h-12 px-5 bg-primary/90 backdrop-blur-xl rounded-2xl flex items-center gap-2 border border-primary/20 hover:bg-primary transition-all active:scale-95 text-white text-xs font-black uppercase tracking-widest"
-            >
-              Edit
-            </button>
-          )}
-          <button
-            onClick={onClose}
-            className="w-12 h-12 bg-black/40 backdrop-blur-xl rounded-2xl flex items-center justify-center pointer-events-auto border border-white/5 hover:bg-black/60 transition-all active:scale-95"
-          >
-            <X className="w-5 h-5 text-white" />
+        <div className="absolute top-0 inset-x-0 h-20 z-50 flex items-center justify-between px-5 pointer-events-none">
+          <button onClick={onClose} className="w-11 h-11 bg-black/50 backdrop-blur-xl rounded-2xl flex items-center justify-center pointer-events-auto border border-white/10 hover:bg-black/70 transition-all active:scale-95">
+            <ChevronLeftIcon className="w-5 h-5 text-white" />
           </button>
+          <div className="flex items-center gap-2 pointer-events-auto">
+            {onEdit && (
+              <button onClick={onEdit} className="h-11 px-5 bg-primary rounded-2xl flex items-center gap-2 hover:bg-primary/90 transition-all active:scale-95 text-white text-[10px] font-black uppercase tracking-widest">
+                Edit
+              </button>
+            )}
+            <button onClick={onClose} className="w-11 h-11 bg-black/50 backdrop-blur-xl rounded-2xl flex items-center justify-center border border-white/10 hover:bg-black/70 transition-all active:scale-95">
+              <X className="w-5 h-5 text-white" />
+            </button>
+          </div>
         </div>
-      </div>
       )}
 
       <div className="flex-1 overflow-y-auto scrollbar-hide">
-        {/* Cover Image Section */}
-        <div className="relative h-[480px] shrink-0 overflow-hidden">
-          {data.portrait_url ? (
-            <img src={(data.portrait_url) || null} alt={data.name} className="w-full h-full object-cover scale-105" referrerPolicy="no-referrer" />
+
+        {/* Hero */}
+        <div className="relative h-[380px] shrink-0 overflow-hidden">
+          {data.coverImg ? (
+            <img src={data.coverImg} alt={data.name} className="w-full h-full object-cover" />
           ) : (
-            <div className="w-full h-full bg-white/5 flex items-center justify-center">
-              <MapPin className="w-16 h-16 text-white/15" />
+            <div className="w-full h-full bg-gradient-to-br from-[#1a0a2e] via-[#0d0d1a] to-[#1a0a10] flex items-center justify-center">
+              <Building2 className="w-20 h-20 text-white/10" />
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#08080c] via-[#08080c]/60 to-transparent" />
 
-          {/* Featured Badge */}
-          <div className="absolute bottom-12 left-6 right-6 flex items-end justify-between">
-            <div className="space-y-4">
-              <div className="flex gap-2">
+          {/* Status badges */}
+          <div className="absolute top-6 right-5 flex flex-col gap-2 items-end">
+            {data.isVerified && (
+              <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-[9px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-1">
+                <Shield className="w-3 h-3" /> Verified
+              </span>
+            )}
+            <span className={cn('px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border', data.isActive ? 'bg-green-500/20 border-green-500/30 text-green-400' : 'bg-red-500/20 border-red-500/30 text-red-400')}>
+              {data.isActive ? 'Active' : 'Inactive'}
+            </span>
+          </div>
+
+          <div className="absolute bottom-0 left-0 right-0 p-6">
+            {data.tags.length > 0 && (
+              <div className="flex gap-2 mb-3 flex-wrap">
                 {data.tags.map((tag: string) => (
-                  <span key={tag} className="px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[8px] font-black text-white uppercase tracking-[0.2em] border border-white/10">
-                    {tag}
-                  </span>
+                  <span key={tag} className="px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[8px] font-black text-white uppercase tracking-[0.2em] border border-white/10">{tag}</span>
                 ))}
               </div>
-              <h1 className="text-4xl font-black tracking-tight text-white leading-[1.1] max-w-[280px]">
-                {data.name}
-              </h1>
-            </div>
-
-            <div className="flex flex-col items-center gap-2 mb-2">
-              <div className="w-14 h-14 rounded-full bg-[#FF2D9A]/20 backdrop-blur-xl border border-[#FF2D9A]/30 flex items-center justify-center shadow-xl group cursor-pointer active:scale-90 transition-transform">
-                <Heart className="w-6 h-6 text-[#FF2D9A] fill-[#FF2D9A]" />
-              </div>
-              <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{data.followers}</span>
-            </div>
+            )}
+            <h1 className="text-3xl font-black tracking-tight text-white leading-tight">{data.name}</h1>
+            {data.city && (
+              <p className="flex items-center gap-1.5 text-[11px] font-bold text-white/50 mt-2 uppercase tracking-widest">
+                <MapPin className="w-3.5 h-3.5 text-primary" />{data.city}
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Info Section */}
-        <div className="px-6 py-8 space-y-10">
+        {/* Quick stats row */}
+        <div className="grid grid-cols-3 border-b border-white/5">
+          {[
+            { label: 'Followers', value: data.followers, icon: Heart },
+            { label: 'Capacity',  value: data.capacity,  icon: Users },
+            { label: 'Events',    value: String(upcomingEvents.length || 0), icon: CalendarIcon },
+          ].map(s => (
+            <div key={s.label} className="flex flex-col items-center py-5 gap-1 border-r border-white/5 last:border-r-0">
+              <s.icon className="w-4 h-4 text-primary" />
+              <p className="text-base font-black text-white">{s.value}</p>
+              <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest">{s.label}</p>
+            </div>
+          ))}
+        </div>
 
-          {/* Vital Stats Cards */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-white/[0.03] border border-white/5 rounded-3xl p-5 flex flex-col gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
-                <CalendarIcon className="w-5 h-5 text-blue-400" />
-              </div>
-              <div>
-                <p className="text-[8px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Timing</p>
-                <p className="text-[11px] font-black text-white truncate">{data.date}</p>
-                <p className="text-[9px] font-bold text-white/50">{data.time}</p>
-              </div>
-            </div>
-            <div className="bg-white/[0.03] border border-white/5 rounded-3xl p-5 flex flex-col gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-purple-500/10 flex items-center justify-center border border-purple-500/20">
-                <MapPin className="w-5 h-5 text-purple-400" />
-              </div>
-              <div>
-                <p className="text-[8px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Location</p>
-                <p className="text-[11px] font-black text-white truncate">{data.venue}</p>
-                <p className="text-[9px] font-bold text-white/50 truncate">{data.location}</p>
-              </div>
-            </div>
-          </div>
+        {/* Tabs */}
+        <div className="flex border-b border-white/5 px-4 pt-2">
+          {(['info', 'events', 'gallery'] as const).map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              className={cn('flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 -mb-px',
+                activeTab === tab ? 'border-primary text-primary' : 'border-transparent text-white/30 hover:text-white/60')}>
+              {tab}
+            </button>
+          ))}
+        </div>
 
-          {/* Immersive Details Bar */}
-          <div className="flex items-center justify-between py-4 px-6 rounded-[2rem] bg-gradient-to-r from-[#FF2D9A]/10 to-transparent border border-white/5">
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <div>
-                <p className="text-[9px] font-black text-white uppercase tracking-widest">{club?.is_active ? "Open" : "Closed"}</p>
-                <p className="text-[7px] font-bold text-white/30 uppercase tracking-[0.15em]">{club?.is_verified ? "Verified Club" : "Pending Review"}</p>
-              </div>
-            </div>
-            <div className="h-8 w-px bg-white/10" />
-            <div className="flex items-center gap-3">
-              <Activity className="w-4 h-4 text-white/20" />
-              <div>
-                <p className="text-[9px] font-black text-white uppercase tracking-widest">{data.capacity}</p>
-                <p className="text-[7px] font-bold text-white/30 uppercase tracking-[0.15em]">Capacity</p>
-              </div>
-            </div>
-          </div>
+        {/* Tab: Info */}
+        <AnimatePresence mode="wait">
+          {activeTab === 'info' && (
+            <motion.div key="info" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-5 space-y-5">
 
-          {/* Gallery Section */}
-          <div className="space-y-5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[10px] font-black text-[#FF2D9A] uppercase tracking-[0.3em]">Gallery</h3>
-              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/5">
-                <Activity className="w-3 h-3 text-white/40" />
-                <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">Experience</span>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {data.gallery.map((img: string, i: number) => (
-                <div key={i} className={cn(
-                  "rounded-3xl overflow-hidden bg-white/5 border border-white/10 shadow-lg",
-                  (i === 0 || i === 3) ? "aspect-square" : "aspect-[4/5]"
-                )}>
-                  <img src={(img) || null} alt="" className="w-full h-full object-cover hover:scale-110 transition-transform duration-700" referrerPolicy="no-referrer" />
+              {/* Hours & Days */}
+              <div className="grid grid-cols-1 gap-3">
+                <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0"><Clock className="w-5 h-5 text-blue-400" /></div>
+                  <div>
+                    <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-0.5">Open Hours</p>
+                    <p className="text-sm font-black text-white">{hours}</p>
+                    <p className="text-[10px] text-white/40 mt-0.5">{daysLabel}</p>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* About Section */}
-          <div className="space-y-4">
-            <h3 className="text-[10px] font-black text-[#FF2D9A] uppercase tracking-[0.3em]">About</h3>
-            <p className="text-[13px] text-white/50 leading-relaxed font-medium">
-              "{data.about}"
-            </p>
-          </div>
-
-          {/* Past Events Section */}
-          <div className="space-y-5 pb-12">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[10px] font-black text-[#FF2D9A] uppercase tracking-[0.3em]">Upcoming Events</h3>
-              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/5">
-                <CalendarDays className="w-3 h-3 text-white/40" />
-                <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">History</span>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 gap-3">
-              {upcomingEvents.length === 0 && (
-                <p className="text-xs text-white/20 font-medium">No upcoming events scheduled.</p>
-              )}
-              {upcomingEvents.map((event: any, i: number) => (
-                <div
-                  key={i}
-                  onClick={() => setSelectedEvent(event)}
-                  className="flex items-center justify-between p-3 rounded-3xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors group cursor-pointer"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl overflow-hidden border border-white/10 bg-black/40">
-                      {event.poster_url ? (
-                        <img src={(eventImg(event.poster_url)) || null} alt={event.title} className="w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
-                      ) : (
-                        <CalendarDays className="w-5 h-5 text-white/20 m-auto mt-4" />
-                      )}
-                    </div>
+                {data.address && (
+                  <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0"><MapPin className="w-5 h-5 text-purple-400" /></div>
                     <div>
-                      <p className="text-[11px] font-black text-white uppercase tracking-tight">{event.title || event.venue_name}</p>
-                      <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest mt-1">{event.start_date || event.date || ''}</p>
+                      <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-0.5">Address</p>
+                      <p className="text-sm font-black text-white leading-snug">{data.address}</p>
                     </div>
                   </div>
-                  <ChevronRightIcon className="w-4 h-4 text-white/10 group-hover:text-primary transition-colors mr-2" />
+                )}
+              </div>
+
+              {/* Contact */}
+              {(data.phone || data.email || data.website) && (
+                <div className="space-y-3">
+                  <p className="text-[10px] font-black text-primary uppercase tracking-widest">Contact</p>
+                  {data.phone   && <div className="flex items-center gap-3 text-sm text-white/70"><Phone  className="w-4 h-4 text-white/30 shrink-0" />{data.phone}</div>}
+                  {data.email   && <div className="flex items-center gap-3 text-sm text-white/70"><Activity className="w-4 h-4 text-white/30 shrink-0" />{data.email}</div>}
+                  {data.website && <div className="flex items-center gap-3 text-sm text-white/70"><Globe  className="w-4 h-4 text-white/30 shrink-0" />{data.website}</div>}
+                </div>
+              )}
+
+              {/* About */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-black text-primary uppercase tracking-widest">About</p>
+                <p className="text-[13px] text-white/50 leading-relaxed font-medium">{data.about}</p>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Tab: Events */}
+          {activeTab === 'events' && (
+            <motion.div key="events" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-5 space-y-3">
+              {upcomingEvents.length === 0 ? (
+                <div className="py-12 text-center space-y-3">
+                  <CalendarIcon className="w-10 h-10 text-white/10 mx-auto" />
+                  <p className="text-[10px] font-black text-white/30 uppercase tracking-widest">No upcoming events</p>
+                </div>
+              ) : upcomingEvents.map((event: any, i: number) => (
+                <div key={event._id || i} onClick={() => setSelectedEvent(event)}
+                  className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] transition-all cursor-pointer group">
+                  <div className="w-14 h-14 rounded-xl overflow-hidden border border-white/10 bg-white/5 shrink-0">
+                    {event.venue_image || event.poster_url ? (
+                      <img src={event.venue_image || event.poster_url} alt="" className="w-full h-full object-cover" />
+                    ) : <CalendarDays className="w-5 h-5 text-white/20 m-auto mt-4" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-black text-white truncate group-hover:text-primary transition-colors">{event.venue_name || event.title}</p>
+                    <p className="text-[10px] text-white/30 font-bold uppercase mt-0.5">
+                      {event.start_date ? new Date(event.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}
+                    </p>
+                  </div>
+                  <ChevronRightIcon className="w-4 h-4 text-white/20 group-hover:text-primary transition-colors shrink-0" />
                 </div>
               ))}
-            </div>
-          </div>
+            </motion.div>
+          )}
 
-        </div>
+          {/* Tab: Gallery */}
+          {activeTab === 'gallery' && (
+            <motion.div key="gallery" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-5 pb-12">
+              {data.gallery.length === 0 ? (
+                <div className="py-12 text-center space-y-3">
+                  <Building2 className="w-10 h-10 text-white/10 mx-auto" />
+                  <p className="text-[10px] font-black text-white/30 uppercase tracking-widest">No gallery images</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {data.gallery.map((img: string, i: number) => (
+                    <div key={i} className={cn('rounded-2xl overflow-hidden bg-white/5 border border-white/10', i === 0 ? 'col-span-2 aspect-video' : 'aspect-square')}>
+                      <img src={img} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Event Details Drawer Overlay */}
+      {/* Event drawer */}
       <AnimatePresence>
         {selectedEvent && (
           <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedEvent(null)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110]"
-            />
-            <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="fixed inset-y-0 right-0 w-full max-w-[420px] bg-black z-[111] shadow-[0_0_100px_rgba(0,0,0,0.8)] overflow-hidden border-l border-white/5"
-            >
-              <EventProfilePreview
-                eventData={selectedEvent}
-                onClose={() => setSelectedEvent(null)}
-              />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedEvent(null)} className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110]" />
+            <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="fixed inset-y-0 right-0 w-full max-w-[420px] bg-black z-[111] shadow-2xl overflow-hidden border-l border-white/5">
+              <EventProfilePreview eventData={selectedEvent} onClose={() => setSelectedEvent(null)} />
             </motion.div>
           </>
         )}
