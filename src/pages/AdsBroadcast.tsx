@@ -115,6 +115,7 @@ export default function AdsBroadcast() {
   });
   const [isCreatingAd, setIsCreatingAd] = useState(false);
   const [editingAdId, setEditingAdId] = useState<string | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
   const [adStep, setAdStep] = useState(1);
   const [adFormData, setAdFormData] = useState({
     name: '',
@@ -717,6 +718,14 @@ export default function AdsBroadcast() {
                                   >
                                     <Eye className="w-3.5 h-3.5" /> Preview
                                   </button>
+                                  {ad.ad_video && (
+                                    <button
+                                      onClick={() => { setVideoPreviewUrl(adAssetUrl(ad.ad_video)); setOpenMenuId(null); }}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-purple-400 hover:bg-purple-400/10 rounded-lg transition-colors"
+                                    >
+                                      <Video className="w-3.5 h-3.5" /> Preview Video
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => openEditAd(ad)}
                                     className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-white hover:bg-white/5 rounded-lg transition-colors"
@@ -1585,6 +1594,48 @@ export default function AdsBroadcast() {
           await featureEventMutation.mutateAsync(data);
         }}
       />
+
+      {/* Video Preview Modal */}
+      <AnimatePresence>
+        {videoPreviewUrl && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md" onClick={() => setVideoPreviewUrl(null)}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="relative w-full max-w-3xl rounded-3xl overflow-hidden border border-white/10 shadow-2xl bg-black"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+                    <Video className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-widest">Video Preview</h3>
+                </div>
+                <button onClick={() => setVideoPreviewUrl(null)} className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-4 bg-black">
+                <video
+                  src={videoPreviewUrl}
+                  controls
+                  autoPlay
+                  className="w-full rounded-2xl max-h-[70vh] object-contain bg-black"
+                />
+              </div>
+              <div className="px-6 py-4 border-t border-white/10 flex items-center justify-between">
+                <a href={videoPreviewUrl} target="_blank" rel="noreferrer"
+                  className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline flex items-center gap-2">
+                  <Download className="w-3.5 h-3.5" /> Download Video
+                </a>
+                <button onClick={() => setVideoPreviewUrl(null)}
+                  className="px-5 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black text-white/60 uppercase tracking-widest hover:text-white hover:bg-white/10 transition-all">
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isExportingAds && (

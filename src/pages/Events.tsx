@@ -895,6 +895,9 @@ export default function Events() {
                       <div className="flex items-center gap-1.5">Venue / City <SortIcon field="city" /></div>
                     </th>
                     <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                      Host / Organizer
+                    </th>
+                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
                       Host / Organiser
                     </th>
                     <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest cursor-pointer select-none hover:text-white transition-colors" onClick={() => handleSort('date')}>
