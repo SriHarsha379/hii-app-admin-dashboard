@@ -1438,7 +1438,10 @@ export default function AdsBroadcast() {
               className="glass-card w-full max-w-2xl rounded-[40px] border border-white/10 overflow-hidden shadow-2xl max-h-[90vh] flex flex-col"
             >
               <div className="p-8 border-b border-white/5 flex items-center justify-between">
-                <h3 className="text-base font-black text-white uppercase tracking-tight">Ad Preview</h3>
+                <div>
+                  <h3 className="text-base font-black text-white uppercase tracking-tight">{selectedAd.ad_name || 'Ad Preview'}</h3>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">Campaign Details & Performance</p>
+                </div>
                 <button onClick={() => setSelectedAd(null)} className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all text-muted-foreground hover:text-white">
                   <X className="w-5 h-5" />
                 </button>
@@ -1452,12 +1455,7 @@ export default function AdsBroadcast() {
                       ? <img src={adAssetUrl(selectedAd.ad_image)} alt="" className="w-full h-full object-cover" />
                       : <div className="w-full h-full flex items-center justify-center"><Image className="w-12 h-12 text-white/10" /></div>}
                 </div>
-                {/* Show both image and video if both exist */}
-                {selectedAd.ad_video && selectedAd.ad_image && (
-                  <div className="rounded-2xl overflow-hidden border border-white/10 bg-white/5 h-24">
-                    <img src={adAssetUrl(selectedAd.ad_image)} alt="Ad thumbnail" className="w-full h-full object-cover opacity-60" />
-                  </div>
-                )}
+
                 {/* Stats row */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
