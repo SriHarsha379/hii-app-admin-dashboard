@@ -369,7 +369,7 @@ export default function Clubs() {
       resetEventForm();
     } catch (err: any) {
       console.error(err);
-      setSubmitError(err.message || 'Failed to save event. Please try again.');
+      toastError(err.message || 'Failed to save event. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -521,7 +521,7 @@ export default function Clubs() {
       resetVenueForm();
     } catch (err: any) {
       console.error(err);
-      setSubmitError(err.message || 'Failed to save venue. Please try again.');
+      toastError(err.message || 'Failed to save venue. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
