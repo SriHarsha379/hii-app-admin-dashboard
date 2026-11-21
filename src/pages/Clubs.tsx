@@ -480,6 +480,10 @@ export default function Clubs() {
       body.append('latitude', venueFormData.latitude || '');
       body.append('longitude', venueFormData.longitude || '');
       body.append('about', venueFormData.description || '');
+      body.append('capacity', venueFormData.capacity || '');
+      body.append('contact_name', venueFormData.contactName || '');
+      body.append('contact_number', venueFormData.phone || '');
+      body.append('landline', venueFormData.landline || '');
       // ISSUE 29 FIX — validate before submitting, not silently clamp after.
       const discount = Number(venueFormData.bill_discount_percentage);
       const tax      = Number(venueFormData.tax_percentage);
@@ -2170,7 +2174,8 @@ export default function Clubs() {
                         // Vendor is now auto-created in handleSubmitVenue if none selected — no need to block here
                         if (!venueFormData.type || venueFormData.type.length === 0) { toastError('Select a category'); return; }
                       }
-                      if (venueStep === 2 && !venueFormData.city) { toastError('Select a city'); return; }
+                      if (venueStep === 2 && !venueFormData.city) { toastError('Please select a city from the dropdown'); return; }
+                      if (venueStep === 2 && !venueFormData.address) { toastError('Please pick a location on the map'); return; }
                       setVenueStep((v) => v + 1);
                     }} className="px-14 py-5 rounded-[24px] bg-white text-black text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-4 group">
                       Next Step <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
