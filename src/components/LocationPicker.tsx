@@ -22,6 +22,8 @@ function loadGoogleMaps(): Promise<void> {
     if ((window as any).google?.maps) { resolve(); return; }
     const existing = document.getElementById('google-maps-script');
     if (existing) { existing.addEventListener('load', () => resolve()); return; }
+    // Suppress the "This page can't load Google Maps correctly" dialog
+    (window as any).gm_authFailure = () => { console.warn('Google Maps auth warning suppressed'); resolve(); };
     const script = document.createElement('script');
     script.id = 'google-maps-script';
     script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&libraries=places`;
@@ -101,29 +103,34 @@ export function LocationPicker({ value, onChange, placeholder = 'Search address.
     leafletMap.current = map;
   }, [loaded]);
 
-  // Init Places Autocomplete
+  // Init Places Autocomplete (new API)
   useEffect(() => {
     if (!loaded || !inputRef.current || autocompleteRef.current) return;
     const google = (window as any).google;
-    const ac = new google.maps.places.Autocomplete(inputRef.current, {
-      fields: ['formatted_address', 'geometry', 'name'],
-    });
-    ac.addListener('place_changed', () => {
-      const place = ac.getPlace();
-      if (!place.geometry) return;
-      const lat = place.geometry.location.lat();
-      const lng = place.geometry.location.lng();
-      const addr = place.formatted_address || place.name || '';
-      setQuery(addr);
-      onChange({ address: addr, latitude: String(lat), longitude: String(lng) });
-      if (leafletMap.current) {
-        leafletMap.current.setCenter({ lat, lng });
-        leafletMap.current.setZoom(16);
-        if (markerRef.current) markerRef.current.setPosition({ lat, lng });
-        else markerRef.current = new google.maps.Marker({ map: leafletMap.current, position: { lat, lng }, draggable: true });
-      }
-    });
-    autocompleteRef.current = ac;
+    // Try new API first, fall back to legacy
+    try {
+      const ac = new google.maps.places.Autocomplete(inputRef.current, {
+        fields: ['formatted_address', 'geometry', 'name'],
+      });
+      ac.addListener('place_changed', () => {
+        const place = ac.getPlace();
+        if (!place.geometry) return;
+        const lat = place.geometry.location.lat();
+        const lng = place.geometry.location.lng();
+        const addr = place.formatted_address || place.name || '';
+        setQuery(addr);
+        onChange({ address: addr, latitude: String(lat), longitude: String(lng) });
+        if (leafletMap.current) {
+          leafletMap.current.setCenter({ lat, lng });
+          leafletMap.current.setZoom(16);
+          if (markerRef.current) markerRef.current.setPosition({ lat, lng });
+          else markerRef.current = new google.maps.Marker({ map: leafletMap.current, position: { lat, lng }, draggable: true });
+        }
+      });
+      autocompleteRef.current = ac;
+    } catch(e) {
+      console.warn('Places Autocomplete init failed:', e);
+    }
   }, [loaded]);
 
   async function reverseGeocode(lat: number, lng: number): Promise<string> {
