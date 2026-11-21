@@ -1781,6 +1781,9 @@ export default function Clubs() {
                         <button onClick={(e) => { e.stopPropagation(); openEditVenue(withVenueData(club)); }} className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition-colors" title="Edit venue">
                           <Edit2 className="w-4 h-4" />
                         </button>
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteVenueTarget(club); }} className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors" title="Delete venue">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -1989,23 +1992,7 @@ export default function Clubs() {
                             <div className="col-span-1 md:col-span-2">
                               <RefinedField label="Club Name" name="name" value={venueFormData.name} onChange={(e: any) => setVenueFormData({ ...venueFormData, name: e.target.value })} placeholder="e.g. The Quantum Vault" icon={<Building2 className="w-4 h-4" />} />
                             </div>
-                            <div className="space-y-4 group/field">
-                              <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Vendor / Organiser</label>
-                              {isClubAdmin ? (
-                                <div className="flex items-center gap-3 w-full bg-[#09090B] border border-white/5 rounded-[24px] px-8 py-5 text-sm text-white/60">
-                                  <span className="truncate">{ownVendorForVenue?.name || user?.organisation || 'Your organisation'}</span>
-                                  <span className="ml-auto text-[9px] font-black uppercase tracking-widest text-white/20 shrink-0">Locked to your account</span>
-                                </div>
-                              ) : (
-                                <SingleSelectDropdown
-                                  options={(vendorListForVenue || []).map((v: any) => ({ label: v.name, value: v._id || v.id }))}
-                                  value={venueFormData.vendor_id}
-                                  onChange={(val: string) => setVenueFormData({ ...venueFormData, vendor_id: val })}
-                                  placeholder="Select vendor..."
-                                />
-                              )}
-                              <p className="text-[9px] text-white/20 ml-1">Note: each vendor can only have one venue on the backend.</p>
-                            </div>
+{/* Vendor/Organiser field moved to Create New Events */}
                             <div className="space-y-4 group/field">
                               <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Category</label>
                               <MultiSelectDropdown

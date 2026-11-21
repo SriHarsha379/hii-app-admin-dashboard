@@ -13,6 +13,7 @@ interface LocationPickerProps {
   onChange: (val: LocationValue) => void;
   placeholder?: string;
   className?: string;
+  cityBias?: string;
 }
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || '';
@@ -42,7 +43,7 @@ function loadGoogleMaps(): Promise<void> {
   });
 }
 
-export function LocationPicker({ value, onChange, placeholder = 'Search address...', className }: LocationPickerProps) {
+export function LocationPicker({ value, onChange, placeholder = 'Search address...', className, cityBias }: LocationPickerProps) {
   const [query, setQuery] = useState(value.address || '');
   const [loaded, setLoaded] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
@@ -118,9 +119,21 @@ export function LocationPicker({ value, onChange, placeholder = 'Search address.
     const google = (window as any).google;
     if (!google?.maps?.places?.PlaceAutocompleteElement) return;
     try {
-      const el = new google.maps.places.PlaceAutocompleteElement({
-        types: ['establishment', 'geocode'],
-      });
+      const elOptions: any = { types: ['establishment', 'geocode'] };
+      // Bias results toward selected city using geocoding
+      if (cityBias) {
+        const gc = new google.maps.Geocoder();
+        gc.geocode({ address: cityBias + ', India' }, (results: any, status: any) => {
+          if (status === 'OK' && results[0]) {
+            const loc = results[0].geometry.location;
+            const circle = new google.maps.Circle({ center: loc, radius: 50000 });
+            if (el.componentRestrictions === undefined) {
+              try { (el as any).locationBias = circle.getBounds(); } catch(e) {}
+            }
+          }
+        });
+      }
+      const el = new google.maps.places.PlaceAutocompleteElement(elOptions);
       // Style to match our input
       el.style.cssText = 'width:100%;--gmp-mat-color-surface:transparent;';
       if (acContainerRef.current) {
