@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
@@ -212,30 +213,44 @@ function RowActionsMenu({ event, onEdit, onDelete, onPreview, onAnalytics, showA
   onPreview: () => void; onAnalytics: () => void; showAnalyticsBtn: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   React.useEffect(() => {
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    if (!open) return;
+    const handler = (e: MouseEvent) => { setOpen(false); };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  }, [open]);
+
+  const handleOpen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    }
+    setOpen(v => !v);
+  };
 
   return (
-    <div className="relative" ref={ref}>
+    <div>
       <button
-        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        ref={btnRef}
+        onClick={handleOpen}
         className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
       >
         <MoreHorizontal className="w-4 h-4" />
       </button>
       <AnimatePresence>
-        {open && (
+        {open && typeof document !== "undefined" && ReactDOM.createPortal(
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: -4 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -4 }}
             transition={{ duration: 0.1 }}
-            className="absolute right-0 top-full mt-1 w-44 bg-[#09090B] border border-white/10 rounded-2xl shadow-2xl z-[200] overflow-hidden py-1"
+            style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 9999 }}
+            className="w-44 bg-[#09090B] border border-white/10 rounded-2xl shadow-2xl overflow-hidden py-1"
+            onMouseDown={e => e.stopPropagation()}
           >
             <button onClick={(e) => { e.stopPropagation(); setOpen(false); onPreview(); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-bold text-white/60 hover:text-white hover:bg-white/5 transition-all text-left">
               <Eye className="w-3.5 h-3.5" /> Preview
@@ -252,7 +267,8 @@ function RowActionsMenu({ event, onEdit, onDelete, onPreview, onAnalytics, showA
             <button onClick={(e) => { e.stopPropagation(); setOpen(false); onDelete(); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-bold text-red-400 hover:bg-red-500/10 transition-all text-left">
               <Trash2 className="w-3.5 h-3.5" /> Delete
             </button>
-          </motion.div>
+          </motion.div>,
+          document.body
         )}
       </AnimatePresence>
     </div>
