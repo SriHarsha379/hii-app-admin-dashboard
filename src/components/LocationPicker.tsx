@@ -17,7 +17,19 @@ interface LocationPickerProps {
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || '';
 // Suppress Google Maps auth dialog globally
-if (typeof window !== 'undefined') (window as any).gm_authFailure = () => {};
+if (typeof window !== 'undefined') {
+  (window as any).gm_authFailure = () => {};
+  // Auto-dismiss the "can't load Google Maps" dialog if it appears
+  const observer = new MutationObserver(() => {
+    const dialogs = document.querySelectorAll('.dismissButton, [class*="dismissButton"]');
+    dialogs.forEach((el: any) => el.click());
+    // Also find by text content
+    document.querySelectorAll('button').forEach((btn: any) => {
+      if (btn.textContent?.trim() === 'OK' && btn.closest('[class*="gm-"]')) btn.click();
+    });
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+}
 
 function loadGoogleMaps(): Promise<void> {
   return new Promise((resolve) => {
