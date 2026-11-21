@@ -2059,7 +2059,7 @@ export default function Clubs() {
                               <div className="relative">
                                 <select
                                   value={venueFormData.city}
-                                  onChange={(e) => setVenueFormData({ ...venueFormData, city: e.target.value })}
+                                  onChange={(e) => { const v = e.target.value; setVenueFormData((prev: any) => ({ ...prev, city: v })); }}
                                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary/50 appearance-none cursor-pointer"
                                 >
                                   <option value="" disabled>Select City...</option>
@@ -2071,7 +2071,7 @@ export default function Clubs() {
                               </div>
                             </div>
                             <div className="col-span-1 md:col-span-2">
-                              <LocationPicker value={{ address: venueFormData.address, latitude: venueFormData.latitude, longitude: venueFormData.longitude }} onChange={(loc) => setVenueFormData({ ...venueFormData, address: loc.address, latitude: loc.latitude, longitude: loc.longitude })} placeholder="Search address or place..." />
+                              <LocationPicker value={{ address: venueFormData.address, latitude: venueFormData.latitude, longitude: venueFormData.longitude }} onChange={(loc) => setVenueFormData((prev: any) => ({ ...prev, address: loc.address, latitude: loc.latitude, longitude: loc.longitude }))} cityBias={venueFormData.city} placeholder="Search address or place..." />
                             </div>
                           </div>
                         </FormSection>
