@@ -626,7 +626,11 @@ export default function Clubs() {
         success('Club deleted successfully');
         setDeleteVenueTarget(null);
       }
-    } catch { } finally { setIsDeletingVenue(false); }
+    } catch (err: any) { 
+      toastError(err?.message || 'Failed to delete club');
+    } finally { 
+      setIsDeletingVenue(false); 
+    }
   };
 
   const unfeatureVenueMutation = useMutation({
