@@ -163,7 +163,7 @@ export default function Clubs() {
   const [venueSubmitError, setVenueSubmitError] = useState('');
   const [venueFormData, setVenueFormData] = useState<any>({
     name: '', type: [], email: '', capacity: '', contactName: '',
-    phone: '', description: '', city: '', address: '', vendor_id: '',
+    phone: '', landline: '', description: '', city: '', address: '', vendor_id: '',
     landscape_urls: [''], portrait_url: '',
     table_reservation_fee: '', bill_discount_percentage: '', tax_percentage: '',
   });
@@ -239,7 +239,7 @@ export default function Clubs() {
     setCreationStep(1); setIsEditingEvent(false);
   };
   const resetVenueForm = () => {
-    setVenueFormData({ name: '', type: [], email: '', capacity: '', contactName: '', phone: '', description: '', city: '', address: '', vendor_id: '', landscape_urls: [''], portrait_url: '', table_reservation_fee: '', bill_discount_percentage: '', tax_percentage: '' });
+    setVenueFormData({ name: '', type: [], email: '', capacity: '', contactName: '', phone: '', landline: '', description: '', city: '', address: '', vendor_id: '', landscape_urls: [''], portrait_url: '', table_reservation_fee: '', bill_discount_percentage: '', tax_percentage: '' });
     setVenueLandscapeFiles([null]); setVenueLandscapePreviews(['']);
     setVenuePortraitFile(null); setVenuePortraitPreview('');
     setWorkingHours(prev => prev.map(h => ({ ...h, active: false })));
@@ -250,7 +250,8 @@ export default function Clubs() {
     setVenueFormData({
       name: club.name || '', type: Array.isArray(club.category_ids) ? club.category_ids.map((c: any) => c?._id || c) : [],
       email: club.email || '', capacity: club.capacity || '', contactName: club.contactName || '',
-      phone: club.phone || club.phone_number || '', description: club.about || club.description || '',
+      phone: club.phone || club.phone_number || '',
+      landline: club.landline || club.landline_number || '', description: club.about || club.description || '',
       city: typeof club.city_id === 'object' ? club.city_id?._id || '' : club.city_id || '',
       address: club.address || '',
       vendor_id: typeof club.vendor_id === 'object' ? club.vendor_id?._id || '' : club.vendor_id || '',
@@ -352,6 +353,7 @@ export default function Clubs() {
       body.append('latitude', venueFormData.latitude || '');
       body.append('longitude', venueFormData.longitude || '');
       body.append('about', venueFormData.description || '');
+      if (venueFormData.landline) body.append('landline', venueFormData.landline);
       body.append('table_reservation_fee', venueFormData.table_reservation_fee || '0');
       body.append('bill_discount_percentage', String(Math.max(0, Math.min(100, Number(venueFormData.bill_discount_percentage) || 0))));
       body.append('tax_percentage', venueFormData.tax_percentage || '0');
@@ -1226,6 +1228,7 @@ export default function Clubs() {
                             <RefinedField label="Contact Email" name="email" type="email" value={venueFormData.email} onChange={(e: any) => setVenueFormData({ ...venueFormData, email: e.target.value })} placeholder="ops@venue.com" icon={<Mail className="w-4 h-4" />} />
                             <RefinedField label="Capacity" name="capacity" type="number" value={venueFormData.capacity} onChange={(e: any) => setVenueFormData({ ...venueFormData, capacity: e.target.value })} placeholder="3500" icon={<Users className="w-4 h-4" />} />
                             <RefinedField label="Contact Number" name="phone" value={venueFormData.phone} onChange={(e: any) => setVenueFormData({ ...venueFormData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} placeholder="10-digit mobile number" icon={<Phone className="w-4 h-4" />} />
+                            <RefinedField label="Landline Number" name="landline" value={venueFormData.landline} onChange={(e: any) => setVenueFormData({ ...venueFormData, landline: e.target.value.replace(/\D/g, '').slice(0, 11) })} placeholder="e.g. 02212345678" icon={<Phone className="w-4 h-4" />} hint="Optional" />
                           </div>
                         </FormSection>
                         <FormSection title="Reservation Options" icon={<Ticket className="w-4 h-4" />}>

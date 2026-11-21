@@ -41,6 +41,7 @@ export default function ClubProfilePreview({ club, onClose, onEdit, hideCloseBut
       about:       b.about || b.description || 'No description available.',
       gallery:     (Array.isArray(b.gallery_images) ? b.gallery_images : (Array.isArray(b.landscape_urls) ? b.landscape_urls : [])).filter(Boolean).map(imgUrl),
       phone:       b.phone || b.phone_number || '',
+      landline:    b.landline || b.landline_number || '',
       email:       b.email || '',
       website:     b.website || '',
       isVerified:  !!b.is_verified,
@@ -193,7 +194,8 @@ export default function ClubProfilePreview({ club, onClose, onEdit, hideCloseBut
               {(data.phone || data.email || data.website) && (
                 <div className="space-y-3">
                   <p className="text-[10px] font-black text-primary uppercase tracking-widest">Contact</p>
-                  {data.phone   && <div className="flex items-center gap-3 text-sm text-white/70"><Phone  className="w-4 h-4 text-white/30 shrink-0" />{data.phone}</div>}
+                  {data.phone   && <div className="flex items-center gap-3 text-sm text-white/70"><Phone  className="w-4 h-4 text-white/30 shrink-0" />{data.phone} <span className="text-[10px] text-white/30 uppercase tracking-widest">Mobile</span></div>}
+      {data.landline && <div className="flex items-center gap-3 text-sm text-white/70"><Phone  className="w-4 h-4 text-white/30 shrink-0" />{data.landline} <span className="text-[10px] text-white/30 uppercase tracking-widest">Landline</span></div>}
                   {data.email   && <div className="flex items-center gap-3 text-sm text-white/70"><Activity className="w-4 h-4 text-white/30 shrink-0" />{data.email}</div>}
                   {data.website && <div className="flex items-center gap-3 text-sm text-white/70"><Globe  className="w-4 h-4 text-white/30 shrink-0" />{data.website}</div>}
                 </div>
