@@ -609,8 +609,8 @@ export default function Clubs() {
     if (!deleteVenueTarget) return;
     setIsDeletingVenue(true);
     try {
-      const venue = getVenueForVendor(deleteVenueTarget._id || deleteVenueTarget.id);
-      const idToDelete = venue?._id || deleteVenueTarget._id || deleteVenueTarget.id;
+      // deleteVenueTarget is already merged withVenueData — use venue_id first
+      const idToDelete = deleteVenueTarget.venue_id || deleteVenueTarget._id || deleteVenueTarget.id;
       await deleteVenueMutation.mutateAsync(idToDelete);
     } catch { } finally { setIsDeletingVenue(false); }
   };
