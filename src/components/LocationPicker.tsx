@@ -170,7 +170,7 @@ export function LocationPicker({ value, onChange, placeholder = 'Search address.
       </div>
 
       {isOpen && results.length > 0 && (
-        <div className="absolute top-14 left-0 right-0 z-[1000] bg-[#0B0B0F] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="absolute top-14 left-0 right-0 z-[9999] bg-[#0B0B0F] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
           {results.map((r, i) => (
             <button key={i} type="button" onClick={() => handleSelect(r)}
               className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 group">
