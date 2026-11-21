@@ -601,6 +601,7 @@ export default function Clubs() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clubs'] });
       queryClient.invalidateQueries({ queryKey: ['venues-for-clubs'] });
+      success('Club deleted successfully');
       setDeleteVenueTarget(null);
     },
   });
