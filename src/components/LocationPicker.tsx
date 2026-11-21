@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { MapPin, Loader2, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -60,6 +61,8 @@ export function LocationPicker({ value, onChange, placeholder = 'Search address.
   const [isSearching, setIsSearching] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState<{top:number,left:number,width:number}|null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<HTMLDivElement>(null);
@@ -119,6 +122,10 @@ export function LocationPicker({ value, onChange, placeholder = 'Search address.
   const handleInput = (val: string) => {
     setQuery(val);
     setIsOpen(true);
+    if (inputRef.current) {
+      const rect = inputRef.current.getBoundingClientRect();
+      setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!val.trim()) { setResults([]); return; }
     debounceRef.current = setTimeout(async () => {
@@ -154,10 +161,11 @@ export function LocationPicker({ value, onChange, placeholder = 'Search address.
       <div className="relative group">
         <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 group-focus-within:text-primary transition-colors z-10" />
         <input
+          ref={inputRef}
           type="text"
           value={query}
           onChange={(e) => handleInput(e.target.value)}
-          onFocus={() => query && setIsOpen(true)}
+          onFocus={() => { if (query) { setIsOpen(true); if (inputRef.current) { const r = inputRef.current.getBoundingClientRect(); setDropdownPos({top: r.bottom+4, left: r.left, width: r.width}); }}}}
           placeholder={placeholder}
           className="w-full bg-[#09090B] border border-white/5 rounded-[28px] pl-11 pr-10 py-4 text-sm text-white focus:outline-none focus:border-primary/50 transition-all hover:border-white/10 placeholder:text-white/10 font-medium"
         />
@@ -169,8 +177,9 @@ export function LocationPicker({ value, onChange, placeholder = 'Search address.
         )}
       </div>
 
-      {isOpen && results.length > 0 && (
-        <div className="absolute top-full left-0 right-0 z-[9999] mt-1 bg-[#0B0B0F] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-48 overflow-y-auto">
+      {isOpen && results.length > 0 && dropdownPos && typeof document !== 'undefined' && ReactDOM.createPortal(
+        <div style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, zIndex: 99999 }}
+          className="bg-[#0B0B0F] border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-48 overflow-y-auto">
           {results.map((r, i) => (
             <button key={i} type="button" onClick={() => handleSelect(r)}
               className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 group">
@@ -178,7 +187,8 @@ export function LocationPicker({ value, onChange, placeholder = 'Search address.
               <span className="text-xs text-white/70 group-hover:text-white leading-snug">{r.display_name}</span>
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
 
       {value.latitude && value.longitude && (
