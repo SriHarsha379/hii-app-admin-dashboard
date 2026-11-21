@@ -160,6 +160,7 @@ export default function Clubs() {
   const [rejectModal, setRejectModal] = useState<{ open: boolean; clubId: string; clubName: string }>({ open: false, clubId: '', clubName: '' });
   const [venueStep, setVenueStep] = useState(1);
   const [venueError, setVenueError] = useState('');
+  const [venueSubmitError, setVenueSubmitError] = useState('');
   const [venueFormData, setVenueFormData] = useState<any>({
     name: '', type: [], email: '', capacity: '', contactName: '',
     phone: '', description: '', city: '', address: '', vendor_id: '',
@@ -242,7 +243,7 @@ export default function Clubs() {
     setVenueLandscapeFiles([null]); setVenueLandscapePreviews(['']);
     setVenuePortraitFile(null); setVenuePortraitPreview('');
     setWorkingHours(prev => prev.map(h => ({ ...h, active: false })));
-    setVenueStep(1); setIsEditingVenue(false); setVenueError('');
+    setVenueStep(1); setIsEditingVenue(false); setVenueError(''); setVenueSubmitError(''); setVenueSubmitError('');
   };
 
   const openEditVenue = (club: any) => {
@@ -365,7 +366,7 @@ export default function Clubs() {
       queryClient.invalidateQueries({ queryKey: ['clubs'] });
       setIsCreatingClub(false); resetVenueForm();
     } catch (err: any) {
-      alert(err.message || 'Failed to save venue.');
+      setVenueSubmitError(err.message || 'Failed to save venue.');
     } finally { setIsSubmitting(false); }
   };
 
