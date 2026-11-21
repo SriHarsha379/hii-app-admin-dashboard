@@ -235,7 +235,7 @@ function RowActionsMenu({ event, onEdit, onDelete, onPreview, onAnalytics, showA
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -4 }}
             transition={{ duration: 0.1 }}
-            className="absolute right-0 top-full mt-1 w-44 bg-[#09090B] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden py-1"
+            className="absolute right-0 top-full mt-1 w-44 bg-[#09090B] border border-white/10 rounded-2xl shadow-2xl z-[200] overflow-hidden py-1"
           >
             <button onClick={(e) => { e.stopPropagation(); setOpen(false); onPreview(); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-bold text-white/60 hover:text-white hover:bg-white/5 transition-all text-left">
               <Eye className="w-3.5 h-3.5" /> Preview
@@ -883,7 +883,7 @@ export default function Events() {
           </div>
         ) : (
           /* Table view */
-          <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
+          <div className="glass-card rounded-2xl border border-white/10">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
