@@ -26,6 +26,7 @@ import {
   FileText,
   User,
   ChevronRight,
+  ChevronDown,
   Shield,
   Activity,
   ShieldCheck,
