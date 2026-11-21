@@ -1440,7 +1440,7 @@ export default function Events() {
                           <SingleSelectDropdown value={eventFormData.city} onChange={(val) => setEventFormData({ ...eventFormData, city: val })} options={cities?.slice().sort((a: any, b: any) => (a.city_name || '').localeCompare(b.city_name || '')).map((c: any) => ({ label: c.city_name, value: c._id })) || []} placeholder="Select city" />
                         </div>
                         <div className="space-y-3">
-                          <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Venue</label>
+                          <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] ml-1">Vendor / Organizer</label>
                           {isEventAdmin ? (
                             <div className="flex items-center gap-3 py-4 pl-6 pr-8 rounded-2xl text-sm bg-[#09090B] border border-white/5 text-white/60">
                               <Building2 className="text-white/20 w-4 h-4 shrink-0" />
