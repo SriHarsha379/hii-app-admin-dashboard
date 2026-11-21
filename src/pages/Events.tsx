@@ -908,11 +908,9 @@ export default function Events() {
                       <div className="flex items-center gap-1.5">Event Name <SortIcon field="title" /></div>
                     </th>
                     <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest cursor-pointer select-none hover:text-white transition-colors" onClick={() => handleSort('city')}>
-                      <div className="flex items-center gap-1.5">Venue / City <SortIcon field="city" /></div>
+                      <div className="flex items-center gap-1.5">Host / Organizer <SortIcon field="city" /></div>
                     </th>
-                    <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
-                      Host / Organizer
-                    </th>
+
                     <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
                       Host / Organiser
                     </th>
@@ -927,9 +925,9 @@ export default function Events() {
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {isLoading ? (
-                    <tr><td colSpan={6} className="px-6 py-12 text-center text-xs text-muted-foreground">Loading events…</td></tr>
+                    <tr><td colSpan={5} className="px-6 py-12 text-center text-xs text-muted-foreground">Loading events…</td></tr>
                   ) : filteredEvents.length === 0 ? (
-                    <tr><td colSpan={6} className="px-6 py-12 text-center text-xs text-muted-foreground">No events found.</td></tr>
+                    <tr><td colSpan={5} className="px-6 py-12 text-center text-xs text-muted-foreground">No events found.</td></tr>
                   ) : pg.pageItems.map((event: any) => (
                     <tr
                       key={eventId(event)}
