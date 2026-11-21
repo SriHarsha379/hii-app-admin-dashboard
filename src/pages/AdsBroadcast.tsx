@@ -1435,7 +1435,7 @@ export default function AdsBroadcast() {
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              className="glass-card w-full max-w-2xl rounded-[40px] border border-white/10 overflow-hidden shadow-2xl"
+              className="glass-card w-full max-w-2xl rounded-[40px] border border-white/10 overflow-hidden shadow-2xl max-h-[90vh] flex flex-col"
             >
               <div className="p-8 border-b border-white/5 flex items-center justify-between">
                 <h3 className="text-base font-black text-white uppercase tracking-tight">Ad Preview</h3>
@@ -1443,7 +1443,7 @@ export default function AdsBroadcast() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="p-8 space-y-6">
+              <div className="p-8 space-y-6 overflow-y-auto flex-1">
                 {/* Ad media — video takes priority over image */}
                 <div className="aspect-video rounded-2xl overflow-hidden border border-white/10 bg-white/5">
                   {selectedAd.ad_video
