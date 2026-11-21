@@ -611,6 +611,7 @@ export default function Clubs() {
     try {
       // deleteVenueTarget is already merged withVenueData — use venue_id first
       const idToDelete = deleteVenueTarget.venue_id || deleteVenueTarget._id || deleteVenueTarget.id;
+      console.log('Delete target:', { venue_id: deleteVenueTarget.venue_id, _id: deleteVenueTarget._id, idToDelete });
       await deleteVenueMutation.mutateAsync(idToDelete);
     } catch { } finally { setIsDeletingVenue(false); }
   };
