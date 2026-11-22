@@ -532,6 +532,53 @@ export default function Users() {
       </AnimatePresence>
 
 
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-2 mt-4">
+          <p className="text-[10px] font-black text-white/30 uppercase tracking-widest">
+            Page {currentPage} of {totalPages} · {totalUsers} total users
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              ← Prev
+            </button>
+            <div className="flex items-center gap-1">
+              {currentPage > 2 && (
+                <>
+                  <button onClick={() => setCurrentPage(1)} className="w-8 h-8 rounded-lg text-[11px] font-black bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition-all">1</button>
+                  {currentPage > 3 && <span className="px-1 text-white/20 text-xs">…</span>}
+                </>
+              )}
+              {currentPage > 1 && (
+                <button onClick={() => setCurrentPage(currentPage - 1)} className="w-8 h-8 rounded-lg text-[11px] font-black bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition-all">{currentPage - 1}</button>
+              )}
+              <button className="w-8 h-8 rounded-lg text-[11px] font-black bg-primary text-white shadow-lg shadow-primary/20">{currentPage}</button>
+              {currentPage < totalPages && (
+                <button onClick={() => setCurrentPage(currentPage + 1)} className="w-8 h-8 rounded-lg text-[11px] font-black bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition-all">{currentPage + 1}</button>
+              )}
+              {currentPage < totalPages - 1 && (
+                <>
+                  {currentPage < totalPages - 2 && <span className="px-1 text-white/20 text-xs">…</span>}
+                  <button onClick={() => setCurrentPage(totalPages)} className="w-8 h-8 rounded-lg text-[11px] font-black bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition-all">{totalPages}</button>
+                </>
+              )}
+            </div>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
