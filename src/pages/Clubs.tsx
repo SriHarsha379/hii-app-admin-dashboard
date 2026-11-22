@@ -376,6 +376,7 @@ export default function Clubs() {
   // ── All queries ────────────────────────────────────────────────────────
   const { data: clubs, isLoading } = useQuery({
     queryKey: ['clubs'],
+    staleTime: 60 * 1000,
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json(); return json.data ?? [];

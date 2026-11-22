@@ -330,6 +330,7 @@ export default function Events() {
   // ── Queries (FIXED: correct paths + response unwrapping) ─────────────────────
   const { data: events, isLoading } = useQuery({
     queryKey: ['events'],
+    staleTime: 60 * 1000, // 1 min cache — reduces refetch lag
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/events/list`, { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json();
