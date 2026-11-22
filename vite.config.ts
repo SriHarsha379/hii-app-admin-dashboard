@@ -12,6 +12,18 @@ export default defineConfig({
   base: '/app/admin/',
   build: {
     outDir: 'build',
+    chunkSizeWarningLimit: 2000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react':  ['react', 'react-dom', 'react-router-dom'],
+          'vendor-query':  ['@tanstack/react-query'],
+          'vendor-motion': ['motion/react'],
+          'vendor-charts': ['recharts'],
+          'vendor-icons':  ['lucide-react'],
+        },
+      },
+    },
   },
   resolve: {
     alias: {
