@@ -175,8 +175,6 @@ export default function Users() {
   const filteredUsers = (Array.isArray(users) ? users : []).filter((u: any) => {
     const matchesSearch = u.name?.toLowerCase().includes(searchTerm.toLowerCase()) || u.email?.toLowerCase().includes(searchTerm.toLowerCase());
 
-  const totalPagesUsers = Math.ceil(filteredUsers.length / PAGE_SIZE);
-  const paginatedUsers = filteredUsers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
     const matchesStatus = filterStatus === 'ALL' || u.status === filterStatus;
     const userCity = typeof u.city === 'object' ? u.city?.city_name : u.city;
     const matchesCity = filterCity === 'ALL' || userCity === filterCity;
