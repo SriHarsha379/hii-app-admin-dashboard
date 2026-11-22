@@ -37,6 +37,8 @@ const actionIcons: any = {
 export default function ActivityLogs() {
   const { token } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo,   setDateTo]   = useState('');
   const [logPage,  setLogPage]  = useState(1);
@@ -96,6 +98,9 @@ export default function ActivityLogs() {
     URL.revokeObjectURL(url);
   };
 
+  const totalPagesLogs = Math.ceil(filteredData.length / PAGE_SIZE);
+  const paginatedLogs = filteredData.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -116,7 +121,7 @@ export default function ActivityLogs() {
                 <input
                   type="text"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                   placeholder="Search logs..."
                   className="w-full sm:w-64 bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary/50"
                 />
@@ -150,7 +155,10 @@ export default function ActivityLogs() {
                   </tr>
                 ) : pg.pageItems.map((log: any) => {
                   const ActionIcon = actionIcons[log.action] || Activity;
-                  return (
+                  const totalPagesLogs = Math.ceil(filteredData.length / PAGE_SIZE);
+  const paginatedLogs = filteredData.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  return (
                     <tr key={log._id || log.id} className="group hover:bg-white/5 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
@@ -189,6 +197,41 @@ export default function ActivityLogs() {
                 })}
               </tbody>
             </table>
+
+        {/* Pagination */}
+        {totalPagesLogs > 1 && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-white/5">
+            <p className="text-[10px] font-black text-white/30 uppercase tracking-widest">
+              Showing {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, filteredData.length)} of {filteredData.length} logs
+            </p>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+                ← Prev
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPagesLogs }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === totalPagesLogs || Math.abs(p - currentPage) <= 1)
+                  .reduce((acc: (number|string)[], p, i, arr) => {
+                    if (i > 0 && (p as number) - (arr[i-1] as number) > 1) acc.push('...');
+                    acc.push(p); return acc;
+                  }, [])
+                  .map((p, i) => p === '...' ? (
+                    <span key={i} className="px-2 text-white/20 text-xs">…</span>
+                  ) : (
+                    <button key={i} onClick={() => setCurrentPage(p as number)}
+                      className={cn('w-8 h-8 rounded-lg text-[11px] font-black transition-all', currentPage === p ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10')}>
+                      {p}
+                    </button>
+                  ))}
+              </div>
+              <button onClick={() => setCurrentPage(p => Math.min(totalPagesLogs, p + 1))} disabled={currentPage === totalPagesLogs}
+                className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
           </div>
         </div>
       </motion.div>

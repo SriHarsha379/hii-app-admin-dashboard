@@ -154,6 +154,8 @@ export default function Clubs() {
   const [selectedClub, setSelectedClub] = useState<any>(null);
   const [isCreatingClub, setIsCreatingClub] = useState(false);
   const [isFeaturingClub, setIsFeaturingClub] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 15;
   const [isViewingFeaturedClubs, setIsViewingFeaturedClubs] = useState(false);
   const [isEditingVenue, setIsEditingVenue] = useState(false);
   const [isViewingVenue, setIsViewingVenue] = useState(false);
@@ -634,6 +636,9 @@ export default function Clubs() {
     a.click(); URL.revokeObjectURL(url);
   };
 
+  const totalPagesClubs = Math.ceil(filteredClubs.length / PAGE_SIZE);
+  const paginatedClubs = filteredClubs.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   const featurableClubs = filteredClubs.map((c: any) => {
     const venue = getVenueForVendor(c._id || c.id); if (!venue) return null;
     return { _id: venue._id, venue_name: venue.venue_name || c.name, city: c.city, venue_image: venue.venue_image };
@@ -824,7 +829,7 @@ export default function Clubs() {
           <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
             <div className="relative flex-1 sm:flex-none">
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search clubs..."
+              <input type="text" value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }} placeholder="Search clubs..."
                 className="w-full sm:w-64 bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary/50" />
             </div>
             <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10">
@@ -870,7 +875,7 @@ export default function Clubs() {
                     <tr><td colSpan={6} className="px-6 py-12 text-center text-xs text-muted-foreground">Loading clubs...</td></tr>
                   ) : filteredClubs.length === 0 ? (
                     <tr><td colSpan={6} className="px-6 py-12 text-center text-xs text-muted-foreground">No clubs found.</td></tr>
-                  ) : filteredClubs.map((club: any) => {
+                  ) : paginatedClubs.map((club: any) => {
                     const venue = getVenueForVendor(club._id || club.id);
                     const venueId = venue?._id;
                     const isActive = club.is_active;
@@ -1000,7 +1005,7 @@ export default function Clubs() {
               <div className="col-span-full py-12 text-center text-xs text-muted-foreground">Loading clubs...</div>
             ) : filteredClubs.length === 0 ? (
               <div className="col-span-full py-12 text-center text-xs text-muted-foreground">No clubs found.</div>
-            ) : filteredClubs.map((club: any) => {
+            ) : paginatedClubs.map((club: any) => {
               const venue = getVenueForVendor(club._id || club.id);
               const venueId = venue?._id;
               return (
@@ -1056,6 +1061,42 @@ export default function Clubs() {
           </div>
         )}
       </div>
+
+
+      {/* Pagination */}
+      {totalPagesClubs > 1 && (
+        <div className="flex items-center justify-between px-2 mt-4">
+          <p className="text-[10px] font-black text-white/30 uppercase tracking-widest">
+            Showing {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, filteredClubs.length)} of {filteredClubs.length} clubs
+          </p>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+              className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+              ← Prev
+            </button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPagesClubs }, (_, i) => i + 1)
+                .filter(p => p === 1 || p === totalPagesClubs || Math.abs(p - currentPage) <= 1)
+                .reduce((acc: (number|string)[], p, i, arr) => {
+                  if (i > 0 && (p as number) - (arr[i-1] as number) > 1) acc.push('...');
+                  acc.push(p); return acc;
+                }, [])
+                .map((p, i) => p === '...' ? (
+                  <span key={i} className="px-2 text-white/20 text-xs">…</span>
+                ) : (
+                  <button key={i} onClick={() => setCurrentPage(p as number)}
+                    className={cn('w-8 h-8 rounded-lg text-[11px] font-black transition-all', currentPage === p ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10')}>
+                    {p}
+                  </button>
+                ))}
+            </div>
+            <button onClick={() => setCurrentPage(p => Math.min(totalPagesClubs, p + 1))} disabled={currentPage === totalPagesClubs}
+              className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Venue detail panel ── */}
       <AnimatePresence>
