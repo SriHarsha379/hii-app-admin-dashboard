@@ -283,6 +283,7 @@ export default function Events() {
 
   const [viewMode,       setViewMode]       = useState<'grid' | 'table'>('table');
   const [searchTerm,     setSearchTerm]     = useState('');
+  const resetPage = () => setCurrentPage(1);
   const [filterStatus,   setFilterStatus]   = useState('ALL');
   const [filterCity,     setFilterCity]     = useState('ALL');
   const [sortField,      setSortField]      = useState('date');
@@ -303,6 +304,8 @@ export default function Events() {
   const [listPage, setListPage] = useState(1);
   const [creationStep,   setCreationStep]   = useState(1);
   const [modalKey,       setModalKey]       = useState(0); // increment to force modal remount
+  const [currentPage,    setCurrentPage]    = useState(1);
+  const PAGE_SIZE = 15;
 
   // Scroll modal body to top whenever step changes
   React.useEffect(() => {
@@ -610,6 +613,9 @@ export default function Events() {
   // Was computed from the full unfiltered `eventList`, so the top stat
   // cards never matched whatever the search/status/city filters below had
   // narrowed the table down to. Now derived from `filteredEvents` instead.
+  const totalPages = Math.ceil(filteredEvents.length / PAGE_SIZE);
+  const paginatedEvents = filteredEvents.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   const liveCount        = filteredEvents.filter((e: any) => e.status === 'LIVE' || e.status === 'UPCOMING').length;
   const cancelledCount   = filteredEvents.filter((e: any) => e.status === 'CANCELLED').length;
   const totalAttendance  = filteredEvents.reduce((s: number, e: any) => s + (Number(e.attendance)   || 0), 0);
@@ -802,7 +808,7 @@ export default function Events() {
           <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
             <div className="relative flex-1 sm:flex-none">
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search events…" className="w-full sm:w-64 bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-white/20" />
+              <input type="text" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); resetPage(); }} placeholder="Search events…" className="w-full sm:w-64 bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-white/20" />
             </div>
             <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10">
               <button onClick={() => setViewMode('grid')}  className={cn('p-2 rounded-lg transition-all', viewMode === 'grid'  ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-muted-foreground hover:text-white')}><LayoutIcon className="w-4 h-4" /></button>
@@ -980,7 +986,49 @@ export default function Events() {
         )}
       </div>
 
-      {/* back button removed — close X is built into the preview card */}
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-2">
+          <p className="text-[10px] font-black text-white/30 uppercase tracking-widest">
+            Showing {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, filteredEvents.length)} of {filteredEvents.length} events
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              ← Prev
+            </button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                .reduce((acc: (number|string)[], p, i, arr) => {
+                  if (i > 0 && (p as number) - (arr[i-1] as number) > 1) acc.push('...');
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) => p === '...' ? (
+                  <span key={i} className="px-2 text-white/20 text-xs">…</span>
+                ) : (
+                  <button key={i} onClick={() => setCurrentPage(p as number)}
+                      className={cn('w-8 h-8 rounded-lg text-[11px] font-black transition-all', currentPage === p ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10')}>
+                    {p}
+                  </button>
+                ))}
+            </div>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Spacer */}
 
       {/* ── Event Preview ─────────────────────────────────────────────────────── */}
       <AnimatePresence>
