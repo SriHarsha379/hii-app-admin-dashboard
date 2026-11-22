@@ -533,40 +533,6 @@ export default function Users() {
         )}
       </AnimatePresence>
 
-      {/* Pagination */}
-      {totalPagesUsers > 1 && (
-        <div className="flex items-center justify-between px-2 mt-4">
-          <p className="text-[10px] font-black text-white/30 uppercase tracking-widest">
-            Showing {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, filteredUsers.length)} of {filteredUsers.length} users
-          </p>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-              className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed">
-              ← Prev
-            </button>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: totalPagesUsers }, (_, i) => i + 1)
-                .filter(p => p === 1 || p === totalPagesUsers || Math.abs(p - currentPage) <= 1)
-                .reduce((acc: (number|string)[], p, i, arr) => {
-                  if (i > 0 && (p as number) - (arr[i-1] as number) > 1) acc.push('...');
-                  acc.push(p); return acc;
-                }, [])
-                .map((p, i) => p === '...' ? (
-                  <span key={i} className="px-2 text-white/20 text-xs">…</span>
-                ) : (
-                  <button key={i} onClick={() => setCurrentPage(p as number)}
-                    className={cn('w-8 h-8 rounded-lg text-[11px] font-black transition-all', currentPage === p ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10')}>
-                    {p}
-                  </button>
-                ))}
-            </div>
-            <button onClick={() => setCurrentPage(p => Math.min(totalPagesUsers, p + 1))} disabled={currentPage === totalPagesUsers}
-              className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/50 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed">
-              Next →
-            </button>
-          </div>
-        </div>
-      )}
 
     </div>
   );
