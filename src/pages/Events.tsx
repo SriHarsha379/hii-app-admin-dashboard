@@ -951,10 +951,6 @@ export default function Events() {
                         <p className="text-[10px] text-muted-foreground">{event.city || '—'}</p>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-xs font-bold text-white">{event.vendor_id?.name || getVendorName(getVendorId(event)) || '—'}</p>
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Organiser</p>
-                      </td>
-                      <td className="px-6 py-4">
                         <p className="text-xs font-bold text-white">{new Date(event.date || Date.now()).toLocaleDateString()}</p>
                         <p className="text-[10px] text-muted-foreground">{event.start_time || '—'}</p>
                       </td>
