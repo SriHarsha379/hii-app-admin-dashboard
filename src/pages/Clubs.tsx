@@ -338,7 +338,7 @@ export default function Clubs() {
       if (activeDays.length === 0) throw new Error('Select at least one open day');
       const [start_time, end_time] = activeDays[0].time.split(' - ').map((s: string) => s.trim());
       const vendorId = selectedClub ? (selectedClub.vendor_id || selectedClub._id) : venueFormData.vendor_id;
-      if (!vendorId) throw new Error('Select a vendor/organiser for this venue');
+      // vendor_id removed from Add Club per Point 3 — moved to Events
       if (!venueFormData.city) throw new Error('Select a city');
       if (!venueFormData.address) throw new Error('Pick a location on the map');
       if (venueFormData.phone && !/^\d{10}$/.test(venueFormData.phone)) throw new Error('Enter a valid 10-digit phone number');
@@ -1547,7 +1547,7 @@ export default function Clubs() {
                 <div className="flex items-center gap-4">
                   <button onClick={() => { setIsCreatingClub(false); resetVenueForm(); }} className="px-8 py-5 rounded-[24px] text-[10px] font-black uppercase tracking-[0.2em] text-white/40 hover:text-white transition-all">Cancel</button>
                   {venueStep < 3 ? (
-                    <button onClick={() => { if (venueStep === 1) { if (!venueFormData.name) { alert('Enter a club name'); return; } if (!selectedClub && !venueFormData.vendor_id) { alert('Select a vendor'); return; } if (!venueFormData.type?.length) { alert('Select a category'); return; } } if (venueStep === 2 && !venueFormData.city) { alert('Select a city'); return; } setVenueStep(v => v + 1); }} className="px-14 py-5 rounded-[24px] bg-white text-black text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-4 group">Next Step <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></button>
+                    <button onClick={() => { if (venueStep === 1) { if (!venueFormData.name) { alert('Enter a club name'); return; } if (!venueFormData.type?.length) { alert('Select a category'); return; } } if (venueStep === 2 && !venueFormData.city) { alert('Select a city'); return; } setVenueStep(v => v + 1); }} className="px-14 py-5 rounded-[24px] bg-white text-black text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-4 group">Next Step <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></button>
                   ) : (
                     <button disabled={isSubmitting} onClick={handleSubmitVenue} className="px-16 py-5 rounded-[24px] bg-gradient-to-br from-primary to-purple-600 text-white text-[11px] font-black uppercase tracking-[0.2em] shadow-[0_10px_40px_rgba(255,45,154,0.3)] hover:scale-105 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-3">
                       {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : selectedClub ? 'Save Changes' : 'Add Club'}
