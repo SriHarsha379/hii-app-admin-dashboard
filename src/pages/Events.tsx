@@ -218,7 +218,10 @@ function RowActionsMenu({ event, onEdit, onDelete, onPreview, onAnalytics, showA
 
   React.useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => { setOpen(false); };
+    const handler = (e: MouseEvent) => {
+      if (btnRef.current && btnRef.current.contains(e.target as Node)) return;
+      setOpen(false);
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
@@ -233,7 +236,7 @@ function RowActionsMenu({ event, onEdit, onDelete, onPreview, onAnalytics, showA
   };
 
   return (
-    <div>
+    <div className="relative" onClick={e => e.stopPropagation()}>
       <button
         ref={btnRef}
         onClick={handleOpen}
@@ -242,13 +245,13 @@ function RowActionsMenu({ event, onEdit, onDelete, onPreview, onAnalytics, showA
         <MoreHorizontal className="w-4 h-4" />
       </button>
       <AnimatePresence>
-        {open && typeof document !== "undefined" && ReactDOM.createPortal(
+        {open && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: -4 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -4 }}
             transition={{ duration: 0.1 }}
-            style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 9999 }}
+            style={{ position: "absolute", top: "100%", right: 0, zIndex: 9999 }}
             className="w-44 bg-[#09090B] border border-white/10 rounded-2xl shadow-2xl overflow-hidden py-1"
             onMouseDown={e => e.stopPropagation()}
           >
@@ -267,8 +270,7 @@ function RowActionsMenu({ event, onEdit, onDelete, onPreview, onAnalytics, showA
             <button onClick={(e) => { e.stopPropagation(); setOpen(false); onDelete(); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-bold text-red-400 hover:bg-red-500/10 transition-all text-left">
               <Trash2 className="w-3.5 h-3.5" /> Delete
             </button>
-          </motion.div>,
-          document.body
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
@@ -974,7 +976,7 @@ export default function Events() {
                           onEdit={() => openEdit(event)}
                           onDelete={() => setDeleteTarget(event)}
                           onAnalytics={() => setShowAnalytics(event)}
-                          showAnalyticsBtn={user?.role === 'EVENT_ADMIN' || user?.role === 'SUPER_ADMIN'}
+                          showAnalyticsBtn={true}
                         />
                       </td>
                     </tr>

@@ -10,11 +10,26 @@ interface LocationPickerProps {
   placeholder?: string; className?: string;
 }
 
-async function geocode(q: string) {
-  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6&countrycodes=in`;
-  const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
-  if (!res.ok) return [];
-  return res.json() as Promise<{ display_name: string; lat: string; lon: string }[]>;
+async function geocode(q: string): Promise<{ display_name: string; lat: string; lon: string }[]> {
+  if (q.trim().length < 3) return [];
+  try {
+    const { AutocompleteSuggestion } = await (window as any).google.maps.importLibrary("places");
+    const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+      input: q,
+      includedRegionCodes: ['in'],
+    });
+    const results: { display_name: string; lat: string; lon: string }[] = [];
+    for (const s of suggestions.slice(0, 6)) {
+      const place = s.placePrediction.toPlace();
+      await place.fetchFields({ fields: ['location', 'formattedAddress'] });
+      results.push({
+        display_name: s.placePrediction.text.toString(),
+        lat: String(place.location.lat()),
+        lon: String(place.location.lng()),
+      });
+    }
+    return results;
+  } catch (e) { console.error('Places API error:', e); return []; }
 }
 
 export function LocationPicker({ value, onChange, placeholder = 'Search address...', className }: LocationPickerProps) {
@@ -55,7 +70,7 @@ export function LocationPicker({ value, onChange, placeholder = 'Search address.
       try { setResults(await geocode(val)); }
       catch { setResults([]); }
       finally { setIsSearching(false); }
-    }, 450);
+    }, 800);
   };
 
   const handleSelect = (r: { display_name: string; lat: string; lon: string }) => {
@@ -120,11 +135,11 @@ export function LocationPicker({ value, onChange, placeholder = 'Search address.
         </div>
       )}
 
-      {/* Portal results */}
+      {/* Portal results - outside overflow:hidden container */}
       {typeof document !== 'undefined' && createPortal(
         isOpen && results.length > 0 ? (
-          <div id="lp-portal"
-            style={{ position: 'fixed', top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 99999 }}
+          <div
+            style={{ position: 'fixed', top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 999999 }}
             className="bg-[#0d0d12] border border-white/10 rounded-2xl shadow-[0_16px_48px_rgba(0,0,0,0.8)] overflow-hidden"
           >
             <div className="overflow-y-auto" style={{ maxHeight: '240px' }}>

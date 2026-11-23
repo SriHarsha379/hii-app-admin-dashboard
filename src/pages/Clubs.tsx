@@ -360,7 +360,7 @@ export default function Clubs() {
       body.append('table_reservation_fee', venueFormData.table_reservation_fee || '0');
       body.append('bill_discount_percentage', String(Math.max(0, Math.min(100, Number(venueFormData.bill_discount_percentage) || 0))));
       body.append('tax_percentage', venueFormData.tax_percentage || '0');
-      if (!isEditingVenue) body.append('vendor_id', vendorId);
+      if (!isEditingVenue && vendorId) body.append('vendor_id', vendorId);
       if (venuePortraitFile) body.append('venue_image', venuePortraitFile);
       venueLandscapeFiles.forEach(f => { if (f) body.append('gallery_images', f); });
       const url    = isEditingVenue && selectedClub ? `${API_BASE}/venue/update_venue/${selectedClub._id}` : `${API_BASE}/venue/create_venue`;
@@ -371,6 +371,8 @@ export default function Clubs() {
       queryClient.invalidateQueries({ queryKey: ['clubs'] });
       setIsCreatingClub(false); resetVenueForm();
     } catch (err: any) {
+      console.error('Venue submit error:', err.message);
+      alert(err.message || 'Failed to save venue.');
       setVenueSubmitError(err.message || 'Failed to save venue.');
     } finally { setIsSubmitting(false); }
   };
