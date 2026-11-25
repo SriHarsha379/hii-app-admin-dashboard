@@ -380,10 +380,21 @@ export default function Clubs() {
   // ── All queries ────────────────────────────────────────────────────────
   const { data: clubs, isLoading } = useQuery({
     queryKey: ['clubs'],
-    staleTime: 60 * 1000,
+    staleTime: 0,
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, { headers: { Authorization: `Bearer ${token}` } });
-      const json = await res.json(); return json.data ?? [];
+      const [vendorRes, venueRes] = await Promise.all([
+        fetch(`${API_BASE}/vendor/get_all_vendors`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE}/venue/get_all_venues`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      const vendors = (await vendorRes.json()).data ?? [];
+      const allVenues = (await venueRes.json()).data ?? [];
+      // Add orphan venues (no vendor) as standalone entries
+      const vendorIds = new Set(vendors.map((v: any) => String(v._id || v.id)));
+      const orphanVenues = allVenues.filter((v: any) => {
+        const vid = typeof v.vendor_id === 'object' ? v.vendor_id?._id : v.vendor_id;
+        return !vid || !vendorIds.has(String(vid));
+      }).map((v: any) => ({ ...v, name: v.venue_name, _id: v._id, isOrphanVenue: true }));
+      return [...vendors, ...orphanVenues];
     },
   });
 

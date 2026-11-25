@@ -38,7 +38,7 @@ export default function EventProfilePreview({ onClose, eventData, hideCloseButto
       tags: Array.isArray(base.genre) ? base.genre : (base.genre ? [base.genre] : []),
       date: base.date ? (isNaN(new Date(base.date).getTime()) ? base.date : new Date(base.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })) : 'Date not set',
       time: base.start_time ? `${base.start_time}${base.end_time ? ` – ${base.end_time}` : ''}` : 'Time not set',
-      location: base.city || 'Location not set',
+      location: base.address || base.city || 'Location not set',
       venue: base.venue_name || base.venue || 'Venue not set',
       followers: String(base.likes || 0),
       capacity: base.capacity || 'Not set',
@@ -79,8 +79,20 @@ export default function EventProfilePreview({ onClose, eventData, hideCloseButto
           {data.portrait_url ? (
             <img src={(data.portrait_url) || null} alt={data.name} className="w-full h-full object-cover scale-105" referrerPolicy="no-referrer" />
           ) : (
-            <div className="w-full h-full bg-white/5 flex items-center justify-center">
-              <CalendarIcon className="w-16 h-16 text-white/15" />
+            <div className="w-full h-full flex items-center justify-center relative overflow-hidden"
+              style={{ background: 'linear-gradient(135deg, #1a0a2e 0%, #0d0d1a 40%, #2a0a1a 70%, #1a0a2e 100%)' }}>
+              {/* Animated gradient orbs */}
+              <div className="absolute w-64 h-64 rounded-full opacity-20 blur-3xl"
+                style={{ background: 'radial-gradient(circle, #FF2D9A, transparent)', top: '10%', left: '20%' }} />
+              <div className="absolute w-48 h-48 rounded-full opacity-15 blur-3xl"
+                style={{ background: 'radial-gradient(circle, #7C3AED, transparent)', bottom: '20%', right: '10%' }} />
+              <div className="relative z-10 text-center space-y-4">
+                <div className="w-24 h-24 rounded-3xl mx-auto flex items-center justify-center border border-white/10"
+                  style={{ background: 'rgba(255,45,154,0.1)', backdropFilter: 'blur(20px)' }}>
+                  <CalendarIcon className="w-10 h-10 text-[#FF2D9A]/60" />
+                </div>
+                <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">No poster uploaded</p>
+              </div>
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
