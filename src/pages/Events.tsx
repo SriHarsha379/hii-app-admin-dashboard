@@ -318,7 +318,7 @@ export default function Events() {
   const blankForm = {
     title: '', city: '', venue_id: '', vendor_id: '',
     genre: [] as string[], event_type: [] as string[],
-    date: '', start_time: '', end_time: '', description: '',
+    date: '', end_date: '', is_multi_day: false, start_time: '', end_time: '', description: '', is_recurring: false, recurrence_frequency: 'weekly', recurrence_days: [] as string[],
     address: '', latitude: '', longitude: '',
     poster_url: '', landscape_url: '',
     gallery_urls: ['', '', '', ''] as string[],
@@ -448,7 +448,13 @@ export default function Events() {
     body.append('end_time', eventFormData.end_time);
     body.append('address', eventFormData.address);
     body.append('start_date', eventFormData.date);
-    body.append('is_multi_day', 'false');
+    body.append('is_multi_day', String(eventFormData.is_multi_day || false));
+    if (eventFormData.is_multi_day && eventFormData.end_date) body.append('end_date', eventFormData.end_date);
+    body.append('is_recurring', String(eventFormData.is_recurring || false));
+    if (eventFormData.is_recurring) {
+      body.append('recurrence_frequency', eventFormData.recurrence_frequency || 'weekly');
+      body.append('recurrence_days', JSON.stringify(eventFormData.recurrence_days || []));
+    }
     body.append('about', eventFormData.description || '');
     body.append('latitude', eventFormData.latitude || '0');
     body.append('longitude', eventFormData.longitude || '0');
@@ -719,7 +725,12 @@ export default function Events() {
       event_type:    Array.isArray(event.category_ids) ? event.category_ids.map((c: any) => c?._id || c)
                        : Array.isArray(event.event_type) ? event.event_type
                        : (event.event_type ? [event.event_type] : []),
-      date:          event.date         ? event.date.slice(0, 10) : '',
+      date:          event.date         ? event.date.slice(0, 10) : (event.start_date ? event.start_date.slice(0, 10) : ''),
+      end_date:      event.end_date      ? event.end_date.slice(0, 10) : '',
+      is_multi_day:  event.is_multi_day  || false,
+      is_recurring:  event.is_recurring  || false,
+      recurrence_frequency: event.recurrence_frequency || 'weekly',
+      recurrence_days: Array.isArray(event.recurrence_days) ? event.recurrence_days : [],
       start_time:    event.start_time   || '',
       end_time:      event.end_time     || '',
       description:   event.description  || event.about || '',
@@ -1548,8 +1559,70 @@ export default function Events() {
                     <FormSection title="Schedule" icon={<Clock className="w-4 h-4" />}>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
                         <RefinedField label="Event Date"  name="date"       type="date" value={eventFormData.date}       onChange={(e: any) => setEventFormData({ ...eventFormData, date:       e.target.value })} icon={<Calendar className="w-4 h-4" />} />
+                        {/* ✅ Point 10 — Multi-day toggle + End Date */}
+                        <div className="flex items-center gap-3 px-1">
+                          <button type="button"
+                            onClick={() => setEventFormData({ ...eventFormData, is_multi_day: !eventFormData.is_multi_day, end_date: '' })}
+                            className={cn('relative w-10 h-5 rounded-full transition-colors', eventFormData.is_multi_day ? 'bg-primary' : 'bg-white/10')}
+                          >
+                            <span className={cn('absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform', eventFormData.is_multi_day ? 'translate-x-5' : 'translate-x-0.5')} />
+                          </button>
+                          <span className="text-[11px] font-bold text-white/40 uppercase tracking-widest">Multi-day Event</span>
+                        </div>
+                        {eventFormData.is_multi_day && (
+                          <RefinedField label="End Date" name="end_date" type="date" value={eventFormData.end_date} onChange={(e: any) => setEventFormData({ ...eventFormData, end_date: e.target.value })} icon={<Calendar className="w-4 h-4" />} />
+                        )}
                         <RefinedField label="Start Time"  name="start_time" type="time" value={eventFormData.start_time} onChange={(e: any) => setEventFormData({ ...eventFormData, start_time: e.target.value })} icon={<Clock className="w-4 h-4" />} />
                         <RefinedField label="End Time"    name="end_time"   type="time" value={eventFormData.end_time}   onChange={(e: any) => setEventFormData({ ...eventFormData, end_time:   e.target.value })} icon={<Clock className="w-4 h-4" />} />
+                        {/* ✅ Point 11 — Recurring Event */}
+                        <div className="flex items-center gap-3 px-1 pt-2">
+                          <button type="button"
+                            onClick={() => setEventFormData({ ...eventFormData, is_recurring: !eventFormData.is_recurring })}
+                            className={cn('relative w-10 h-5 rounded-full transition-colors', eventFormData.is_recurring ? 'bg-primary' : 'bg-white/10')}
+                          >
+                            <span className={cn('absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform', eventFormData.is_recurring ? 'translate-x-5' : 'translate-x-0.5')} />
+                          </button>
+                          <span className="text-[11px] font-bold text-white/40 uppercase tracking-widest">Recurring Event</span>
+                        </div>
+                        {eventFormData.is_recurring && (
+                          <div className="space-y-3 p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black text-white/30 uppercase tracking-widest">Frequency</label>
+                              <div className="flex gap-2">
+                                {['daily', 'weekly', 'monthly'].map(f => (
+                                  <button key={f} type="button"
+                                    onClick={() => setEventFormData({ ...eventFormData, recurrence_frequency: f })}
+                                    className={cn('px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all border',
+                                      eventFormData.recurrence_frequency === f
+                                        ? 'bg-primary/20 border-primary/40 text-primary'
+                                        : 'bg-white/5 border-white/10 text-white/40 hover:border-white/20'
+                                    )}
+                                  >{f}</button>
+                                ))}
+                              </div>
+                            </div>
+                            {eventFormData.recurrence_frequency === 'weekly' && (
+                              <div className="space-y-2">
+                                <label className="text-[10px] font-black text-white/30 uppercase tracking-widest">Repeat on</label>
+                                <div className="flex gap-2 flex-wrap">
+                                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+                                    <button key={day} type="button"
+                                      onClick={() => {
+                                        const days = eventFormData.recurrence_days || [];
+                                        setEventFormData({ ...eventFormData, recurrence_days: days.includes(day) ? days.filter((d: string) => d !== day) : [...days, day] });
+                                      }}
+                                      className={cn('w-10 h-10 rounded-xl text-[11px] font-black transition-all border',
+                                        (eventFormData.recurrence_days || []).includes(day)
+                                          ? 'bg-primary/20 border-primary/40 text-primary'
+                                          : 'bg-white/5 border-white/10 text-white/40 hover:border-white/20'
+                                      )}
+                                    >{day}</button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </FormSection>
                     <FormSection title="Location" icon={<MapPin className="w-4 h-4" />}>
