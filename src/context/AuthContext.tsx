@@ -35,7 +35,7 @@ function isTokenExpired(token: string): boolean {
 
 const TOKEN_KEY = 'hii_admin_token';
 const USER_KEY  = 'hii_admin_user';
-const storage   = sessionStorage;
+const storage   = localStorage; // ✅ Point 17 — persist session across tabs
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 

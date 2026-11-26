@@ -117,7 +117,7 @@ function ImageUploadZone({
       >
         {value && (
           <>
-            <img src={(value) || null} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            <img src={(/^https?:\/\//i.test(value) || value.startsWith('blob:')) ? value : `${UPLOADS_BASE}/${value}`} alt="" className="absolute inset-0 w-full h-full object-cover" />
             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
               <span className="text-[11px] font-black uppercase text-white tracking-[0.2em]">Change Image</span>
             </div>
@@ -159,7 +159,7 @@ function GalleryUploadZone({ urls, onChange, onFilesChange }: { urls: string[]; 
             <div key={i} className="aspect-square rounded-3xl bg-[#09090B] border border-white/5 flex items-center justify-center hover:bg-white/5 transition-colors cursor-pointer group relative overflow-hidden" onClick={() => ref.current?.click()}>
               {urls[i] ? (
                 <>
-                  <img src={(urls[i]) || null} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                  <img src={(/^https?:\/\//i.test(urls[i]) || urls[i].startsWith('blob:')) ? urls[i] : `${UPLOADS_BASE}/${urls[i]}`} alt="" className="absolute inset-0 w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <Upload className="w-5 h-5 text-white" />
                   </div>
@@ -401,9 +401,20 @@ export default function Events() {
   const { data: vendors } = useQuery({
     queryKey: ['mongo-vendors'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/vendor/get_all_vendors`, { headers: { Authorization: `Bearer ${token}` } });
-      const json = await res.json();
-      return json.data ?? [];
+      const [vendorRes, venueRes] = await Promise.all([
+        fetch(`${API_BASE}/vendor/get_all_vendors`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE}/venue/get_all_venues`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      const vendorData = (await vendorRes.json()).data ?? [];
+      const allVenues = (await venueRes.json()).data ?? [];
+      const vendorIds = new Set(vendorData.map((v: any) => String(v._id || v.id)));
+      const orphanVenues = allVenues
+        .filter((v: any) => {
+          const vid = typeof v.vendor_id === 'object' ? v.vendor_id?._id : v.vendor_id;
+          return !vid || !vendorIds.has(String(vid));
+        })
+        .map((v: any) => ({ ...v, name: v.venue_name, _id: v._id }));
+      return [...vendorData, ...orphanVenues];
     },
   });
 
@@ -508,10 +519,13 @@ export default function Events() {
       }
       return json;
     },
-    onSuccess: () => {
+    onSuccess: (json: any) => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
       setIsCreatingEvent(false); setIsEditingEvent(false);
-      setSelectedEvent(null); setEventFormData(blankForm); setCreationStep(1);
+      // ✅ Point 7 fix — update selectedEvent with fresh data so preview shows new images
+      if (json?.data) setSelectedEvent(json.data);
+      else setSelectedEvent(null);
+      setEventFormData(blankForm); setCreationStep(1);
       setPosterFile(null); setLandscapeFile(null); setGalleryFiles([null, null, null, null]);
     },
   });
@@ -694,13 +708,17 @@ export default function Events() {
     const filled = {
       id:            eventId(event),
       title:         event.title        || '',
-      city:          (typeof event.city === 'object' && event.city)
+      city:          (typeof event.city_id === 'object' && event.city_id)
+                       ? (event.city_id._id || event.city_id.id || '')
+                       : (typeof event.city === 'object' && event.city)
                        ? (event.city._id || event.city.id || '')
-                       : (event.city || ''),
+                       : (event.city_id || event.city || ''),
       venue_id:      getVendorId(event),
       vendor_id:     getVendorId(event),
       genre:         Array.isArray(event.genre)      ? event.genre      : (event.genre      ? [event.genre]      : []),
-      event_type:    Array.isArray(event.event_type) ? event.event_type : (event.event_type ? [event.event_type] : []),
+      event_type:    Array.isArray(event.category_ids) ? event.category_ids.map((c: any) => c?._id || c)
+                       : Array.isArray(event.event_type) ? event.event_type
+                       : (event.event_type ? [event.event_type] : []),
       date:          event.date         ? event.date.slice(0, 10) : '',
       start_time:    event.start_time   || '',
       end_time:      event.end_time     || '',
@@ -948,7 +966,13 @@ export default function Events() {
                               : <Calendar className="w-4 h-4 text-white/20" />}
                           </div>
                           <div>
-                            <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{event.title}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{event.title}</p>
+                              {/* ✅ Point 4 — star mark for featured events */}
+                              {Array.isArray(featuredEvents) && featuredEvents.some((fe: any) => eventId(fe) === eventId(event)) && (
+                                <Star className="w-3 h-3 text-yellow-400 fill-yellow-400 shrink-0" title="Featured" />
+                              )}
+                            </div>
                             <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
                               {Array.isArray(event.genre) ? event.genre.join(', ') : (event.genre || '—')}
                             </p>
@@ -1053,27 +1077,40 @@ export default function Events() {
             >
               <div className="w-full max-w-2xl pointer-events-auto flex flex-col gap-0 rounded-[2.5rem] overflow-hidden border border-white/10 shadow-[0_0_120px_rgba(0,0,0,0.8)]">
 
-                {/* ── Hero image ── */}
-                <div className="relative" style={{ aspectRatio: '16/8' }}>
-                  {selectedEvent.landscape_urls?.[0] || selectedEvent.poster_url ? (
-                    <img
-                      src={eventImgUrl(selectedEvent.landscape_urls?.[0] || selectedEvent.poster_url)}
-                      alt={selectedEvent.title}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div
-                      className="w-full h-full flex items-center justify-center"
-                      style={{ background: 'linear-gradient(135deg, #1a0a2e 0%, #0d0d1a 50%, #1a0a10 100%)' }}
-                    >
-                      <div className="text-center space-y-3 opacity-30">
-                        <Calendar className="w-16 h-16 mx-auto text-primary" />
-                        <p className="text-xs font-black uppercase tracking-widest text-white">No Image</p>
+                {/* ── Hero image — Point 8 fix: Cover left, Poster right ── */}
+                <div className="relative flex" style={{ aspectRatio: '16/8' }}>
+                  {/* Left: Cover/Landscape image */}
+                  <div className="flex-1 relative overflow-hidden">
+                    {selectedEvent.landscape_urls?.[0] ? (
+                      <img src={eventImgUrl(selectedEvent.landscape_urls[0])} alt={selectedEvent.title} className="w-full h-full object-cover" />
+                    ) : selectedEvent.poster_url ? (
+                      <img src={eventImgUrl(selectedEvent.poster_url)} alt={selectedEvent.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #1a0a2e 0%, #0d0d1a 50%, #1a0a10 100%)' }}>
+                        <div className="text-center space-y-3 opacity-30">
+                          <Calendar className="w-12 h-12 mx-auto text-primary" />
+                          <p className="text-[9px] font-black uppercase tracking-widest text-white">No Cover</p>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                    <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/60 text-[8px] font-black text-white/50 uppercase tracking-widest">Cover</div>
+                  </div>
+                  {/* Right: Main Poster */}
+                  <div className="w-1/3 relative overflow-hidden border-l border-white/10">
+                    {selectedEvent.poster_url ? (
+                      <img src={eventImgUrl(selectedEvent.poster_url)} alt={selectedEvent.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #0d0d1a 0%, #1a0a2e 100%)' }}>
+                        <div className="text-center space-y-2 opacity-30">
+                          <Calendar className="w-8 h-8 mx-auto text-primary" />
+                          <p className="text-[8px] font-black uppercase tracking-widest text-white">No Poster</p>
+                        </div>
+                      </div>
+                    )}
+                    <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/60 text-[8px] font-black text-white/50 uppercase tracking-widest">Poster</div>
+                  </div>
                   {/* Gradient overlay */}
-                  <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.3) 40%, rgba(9,9,11,0.98) 100%)' }} />
+                  <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.3) 40%, rgba(9,9,11,0.98) 100%)' }} />
 
                   {/* Top bar: status + close */}
                   <div className="absolute top-5 left-6 right-6 flex items-center justify-between">

@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Star, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -341,7 +341,8 @@ export default function Clubs() {
       // vendor_id removed from Add Club per Point 3 — moved to Events
       if (!venueFormData.city) throw new Error('Select a city');
       if (!venueFormData.address) throw new Error('Pick a location on the map');
-      if (venueFormData.phone && !/^\d{10}$/.test(venueFormData.phone)) throw new Error('Enter a valid 10-digit phone number');
+      if (!venueFormData.phone) throw new Error('Contact number is required');
+      if (!/^\d{10}$/.test(venueFormData.phone)) throw new Error('Enter a valid 10-digit phone number');
       if (!venueFormData.type || venueFormData.type.length === 0) throw new Error('Select a category');
       if (!venuePortraitFile && !venueFormData.portrait_url) throw new Error('Upload a venue image');
       const body = new FormData();
@@ -355,6 +356,7 @@ export default function Clubs() {
       body.append('latitude', venueFormData.latitude || '');
       body.append('longitude', venueFormData.longitude || '');
       body.append('about', venueFormData.description || '');
+      if (venueFormData.capacity) body.append('capacity', venueFormData.capacity);
       if (venueFormData.phone) body.append('contact_number', venueFormData.phone);
       if (venueFormData.landline) body.append('landline', venueFormData.landline);
       body.append('table_reservation_fee', venueFormData.table_reservation_fee || '0');
@@ -393,7 +395,7 @@ export default function Clubs() {
       const orphanVenues = allVenues.filter((v: any) => {
         const vid = typeof v.vendor_id === 'object' ? v.vendor_id?._id : v.vendor_id;
         return !vid || !vendorIds.has(String(vid));
-      }).map((v: any) => ({ ...v, name: v.venue_name, _id: v._id, isOrphanVenue: true }));
+      }).map((v: any) => ({ ...v, name: v.venue_name, _id: v._id, isOrphanVenue: true, is_verified: true, is_active: true }));
       return [...vendors, ...orphanVenues];
     },
   });
@@ -904,7 +906,13 @@ export default function Clubs() {
                                 : <Building2 className="w-4 h-4 text-white/20" />}
                             </div>
                             <div>
-                              <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{club.name}</p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{club.name}</p>
+                                {/* ✅ Point 4 — star mark for featured clubs */}
+                                {Array.isArray(featuredVenues) && featuredVenues.some((fv: any) => String(fv._id || fv.id) === String(club._id || club.id)) && (
+                                  <Star className="w-3 h-3 text-yellow-400 fill-yellow-400 shrink-0" title="Featured" />
+                                )}
+                              </div>
                               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{club.vendor_type === 'event_organizer' ? 'Event Organiser' : 'Club Owner'}</p>
                             </div>
                           </div>
@@ -1272,7 +1280,7 @@ export default function Clubs() {
                             </div>
                             <RefinedField label="Contact Email" name="email" type="email" value={venueFormData.email} onChange={(e: any) => setVenueFormData({ ...venueFormData, email: e.target.value })} placeholder="ops@venue.com" icon={<Mail className="w-4 h-4" />} />
                             <RefinedField label="Capacity" name="capacity" type="number" value={venueFormData.capacity} onChange={(e: any) => setVenueFormData({ ...venueFormData, capacity: e.target.value })} placeholder="3500" icon={<Users className="w-4 h-4" />} />
-                            <RefinedField label="Contact Number" name="phone" value={venueFormData.phone} onChange={(e: any) => setVenueFormData({ ...venueFormData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} placeholder="10-digit mobile number" icon={<Phone className="w-4 h-4" />} />
+                            <RefinedField label="Contact Number *" name="phone" value={venueFormData.phone} onChange={(e: any) => setVenueFormData({ ...venueFormData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} placeholder="10-digit mobile number" icon={<Phone className="w-4 h-4" />} />
                             <RefinedField label="Landline Number" name="landline" value={venueFormData.landline} onChange={(e: any) => setVenueFormData({ ...venueFormData, landline: e.target.value.replace(/\D/g, '').slice(0, 11) })} placeholder="e.g. 02212345678" icon={<Phone className="w-4 h-4" />} hint="Optional" />
                           </div>
                         </FormSection>
