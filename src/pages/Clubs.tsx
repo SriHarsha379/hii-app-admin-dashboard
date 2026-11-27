@@ -547,7 +547,9 @@ export default function Clubs() {
   // NEW: Activate vendor
   const activateMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`${API_BASE}/vendor/activate_vendor/${id}`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
+      const club = Array.isArray(clubs) ? clubs.find((c: any) => String(c._id || c.id) === String(id)) : null;
+      const url = club?.isOrphanVenue ? `${API_BASE}/venue/activate_venue/${id}` : `${API_BASE}/vendor/activate_vendor/${id}`;
+      const res = await fetch(url, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.success === false) throw new Error(json?.message || 'Failed to activate');
       return json;
@@ -558,7 +560,9 @@ export default function Clubs() {
   // NEW: Deactivate vendor
   const deactivateMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`${API_BASE}/vendor/deactivate_vendor/${id}`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
+      const club = Array.isArray(clubs) ? clubs.find((c: any) => String(c._id || c.id) === String(id)) : null;
+      const url = club?.isOrphanVenue ? `${API_BASE}/venue/deactivate_venue/${id}` : `${API_BASE}/vendor/deactivate_vendor/${id}`;
+      const res = await fetch(url, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.success === false) throw new Error(json?.message || 'Failed to deactivate');
       return json;
@@ -582,10 +586,13 @@ export default function Clubs() {
 
   // ── Helpers ────────────────────────────────────────────────────────────
   const getVenueForVendor = (vendorId: string) => {
+    // ✅ Point 3 fix — for orphan venues the club itself is the venue
+    const club = Array.isArray(clubs) ? clubs.find((c: any) => String(c._id || c.id) === String(vendorId)) : null;
+    if (club?.isOrphanVenue) return club;
     if (!Array.isArray(venues)) return null;
     return venues.find((v: any) => {
       const vid = typeof v.vendor_id === 'object' ? v.vendor_id?._id : v.vendor_id;
-      return vid === vendorId;
+      return String(vid) === String(vendorId);
     }) || null;
   };
   const withVenueData = (club: any) => {
@@ -614,7 +621,11 @@ export default function Clubs() {
     return true;
   });
 
-  const cityName = (c: any) => typeof c.city === 'object' ? c.city?.city_name : c.city;
+  const cityName = (c: any) => {
+    if (typeof c.city === 'object' && c.city) return c.city.city_name || '';
+    if (typeof c.city_id === 'object' && c.city_id) return c.city_id.city_name || '';
+    return c.city || c.city_name || '';
+  };
 
   const filteredClubs = (Array.isArray(clubs) ? clubs : []).filter((c: any) => {
     const cn = cityName(c);
@@ -870,6 +881,14 @@ export default function Clubs() {
               <input type="text" value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }} placeholder="Search clubs..."
                 className="w-full sm:w-64 bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary/50" />
             </div>
+            {/* ✅ Point 8 — Sort dropdown for grid mode */}
+            <select value={`${sortField}-${sortOrder}`} onChange={(e) => { const [f, o] = e.target.value.split('-'); setSortField(f); setSortOrder(o as 'asc' | 'desc'); }}
+              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary/50">
+              <option value="name-asc">Name A→Z</option>
+              <option value="name-desc">Name Z→A</option>
+              <option value="status-asc">Status</option>
+              <option value="createdAt-desc">Newest First</option>
+            </select>
             <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10">
               <button onClick={() => setViewMode('grid')} className={cn('p-2 rounded-lg transition-all', viewMode === 'grid' ? 'bg-primary text-white' : 'text-muted-foreground hover:text-white')}><LayoutIcon className="w-4 h-4" /></button>
               <button onClick={() => setViewMode('table')} className={cn('p-2 rounded-lg transition-all', viewMode === 'table' ? 'bg-primary text-white' : 'text-muted-foreground hover:text-white')}><Database className="w-4 h-4" /></button>
@@ -1462,6 +1481,17 @@ export default function Clubs() {
                           </div>
 
                           <div className="p-4 space-y-2">
+                            {/* ✅ Point 4 — Apply Monday timings to all days */}
+                            {workingHours[0]?.active && (
+                              <button type="button"
+                                onClick={() => {
+                                  const mondayTime = workingHours[0].time;
+                                  setWorkingHours(prev => prev.map((h, i) => i === 0 ? h : { ...h, time: mondayTime, active: true }));
+                                }}
+                                className="w-full py-2 rounded-xl bg-primary/10 border border-primary/20 text-[10px] font-black text-primary uppercase tracking-widest hover:bg-primary/20 transition-all">
+                                Apply Monday timings to all days
+                              </button>
+                            )}
                             {workingHours.map((item, index) => (
                               <div key={item.day} className={cn(
                                 'rounded-xl border transition-all overflow-hidden',

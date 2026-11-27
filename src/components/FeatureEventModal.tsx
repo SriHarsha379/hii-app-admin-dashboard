@@ -77,7 +77,7 @@ const filteredEvents = useMemo(() => {
   if (!Array.isArray(events)) return [];
   return events.filter(event => {
     if (!event) return false;
-    const matchesCity = selectedCity === 'ALL' || (event.city ?? '') === selectedCity;
+    const matchesCity = selectedCity === 'ALL' || (event.city ?? '').toLowerCase() === selectedCity.toLowerCase();
     const matchesSearch = (event.title ?? '').toLowerCase().includes(searchTerm.toLowerCase());
     return matchesCity && matchesSearch;
   });
@@ -220,7 +220,7 @@ onClick={() => {
                         >
                           <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10 shrink-0">
                             <img
-                              src={event.poster_url || `https://picsum.photos/seed/${event.id}/100/100`}
+                              src={event.poster_url ? (event.poster_url.startsWith('http') ? event.poster_url : `https://hii.life/app/server/uploads/${event.poster_url}`) : `https://picsum.photos/seed/${event.id}/100/100`}
                               alt=""
                               className="w-full h-full object-cover"
                               referrerPolicy="no-referrer"

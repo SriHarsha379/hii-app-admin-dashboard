@@ -32,7 +32,11 @@ export function FeatureClubModal({
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const clubName    = (c: Club) => c.venue_name || c.name || 'Untitled Club';
-  const clubCity    = (c: Club) => typeof c.city === 'object' ? c.city?.city_name : c.city;
+  const clubCity    = (c: Club) => {
+    if (typeof c.city === 'object' && c.city) return (c.city as any).city_name || '';
+    if (typeof (c as any).city_id === 'object' && (c as any).city_id) return (c as any).city_id.city_name || '';
+    return (c.city as string) || '';
+  };
   const clubKey     = (c: Club) => c._id || c.id || '';
 
   useEffect(() => {
@@ -58,7 +62,7 @@ export function FeatureClubModal({
     if (!Array.isArray(clubs)) return [];
     return clubs.filter(c => {
       if (!c) return false;
-      const matchCity   = selectedCity === 'ALL' || clubCity(c) === selectedCity;
+      const matchCity   = selectedCity === 'ALL' || clubCity(c).toLowerCase() === selectedCity.toLowerCase();
       const matchSearch = clubName(c).toLowerCase().includes(searchTerm.toLowerCase());
       return matchCity && matchSearch;
     });

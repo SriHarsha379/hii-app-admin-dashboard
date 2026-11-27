@@ -612,7 +612,7 @@ export default function Events() {
     if      (filterStatus === 'ACTIVE')    matchesStatus = e.status === 'LIVE' || e.status === 'UPCOMING';
     else if (filterStatus === 'PAST')      matchesStatus = e.status === 'COMPLETED';
     else if (filterStatus !== 'ALL')       matchesStatus = e.status === filterStatus;
-    const matchesCity = filterCity === 'ALL' || e.city === filterCity;
+    const matchesCity = filterCity === 'ALL' || (e.city || '').toLowerCase() === filterCity.toLowerCase();
     return matchesSearch && matchesStatus && matchesCity;
   }).sort((a: any, b: any) => {
     let aValue = a[sortField];
