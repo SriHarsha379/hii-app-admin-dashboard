@@ -14,10 +14,11 @@ import {
   ArrowRight
 } from 'lucide-react';
 
+const UPLOADS_BASE_GLOBAL = 'https://hii.life/app/server/uploads';
 const toUrl = (filename?: string | null): string => {
   if (!filename) return "";
-  if (filename.indexOf("http") === 0) return filename;
-  return filename;
+  if (filename.indexOf("http") === 0 || filename.indexOf("blob:") === 0) return filename;
+  return `${UPLOADS_BASE_GLOBAL}/${filename}`;
 };
 
 
@@ -33,10 +34,10 @@ export default function EventProfilePreview({ onClose, eventData, hideCloseButto
     const UPLOADS_BASE = API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads');
   
     return {
-      name: base.title || base.name || 'Untitled event',
-      portrait_url: toUrl(base.portrait_url || base.poster_url || ''),
+      name: base.title || base.venue_name || base.event_name || base.name || 'Untitled event',
+      portrait_url: toUrl(base.portrait_url || base.poster_url || base.venue_image || ''),
       tags: Array.isArray(base.genre) ? base.genre : (base.genre ? [base.genre] : []),
-      date: base.date ? (isNaN(new Date(base.date).getTime()) ? base.date : new Date(base.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })) : 'Date not set',
+      date: (base.date || base.start_date) ? (isNaN(new Date(base.date || base.start_date).getTime()) ? (base.date || base.start_date) : new Date(base.date || base.start_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })) : 'Date not set',
       time: base.start_time ? `${base.start_time}${base.end_time ? ` – ${base.end_time}` : ''}` : 'Time not set',
       location: base.address || base.city || 'Location not set',
       venue: base.venue_name || base.venue || 'Venue not set',

@@ -26,7 +26,7 @@ import EventProfilePreview from '../components/EventProfilePreview';
 import { FeatureClubModal } from '../components/FeatureClubModal';
 import { API_BASE } from '../lib/apiConfig';
 
-const UPLOADS_BASE = API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads');
+const UPLOADS_BASE = 'https://hii.life/app/server/uploads';
 const assetUrl = (filename?: string | null) => {
   if (!filename) return '';
   if (/^https?:\/\//i.test(filename)) return filename;
@@ -427,10 +427,19 @@ export default function Clubs() {
 
   const { data: events } = useQuery({
     queryKey: ['events-admin'],
+    staleTime: 0,
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/events/list`, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error('Failed to load events');
-      const data = await res.json(); return Array.isArray(data.data) ? data.data : [];
+      const data = await res.json();
+      const raw = Array.isArray(data.data) ? data.data : [];
+      return raw.map((e: any) => ({
+        ...e,
+        title: e.title || e.venue_name || e.event_name || '',
+        poster_url: e.poster_url || e.venue_image || '',
+        date: e.date || e.start_date || '',
+        description: e.about || e.description || '',
+      }));
     },
   });
 
@@ -588,7 +597,14 @@ export default function Clubs() {
   const clubData = Array.isArray(clubs) ? clubs.find((c: any) => c.name === user?.organisation) : null;
 
   const clubEvents = Array.isArray(events)
-    ? events.filter((e: any) => e.club_id === clubData?.id || e.club_id === clubData?._id || e.venue === clubData?.name)
+    ? events.filter((e: any) => {
+        const cId = String(clubData?._id || clubData?.id || '');
+        return String(e.club_id || '') === cId
+          || String(e.vendor_id?._id || e.vendor_id || '') === cId
+          || String(e.venue_id || '') === cId
+          || e.venue === clubData?.name
+          || e.venue === (clubData?.venue_name || clubData?.name);
+      })
     : [];
   const filteredClubEvents = clubEvents.filter((e: any) => {
     const now = new Date(); const eventDate = new Date(e.date);
@@ -717,7 +733,14 @@ export default function Clubs() {
           <div className="p-2">
             <div className="grid gap-2">
               {filteredClubEvents.length > 0 ? filteredClubEvents.map((event: any) => (
-                <div key={event._id || event.id} onClick={() => { setSelectedEvent(event); setIsPreviewing(true); }}
+                <div key={event._id || event.id} onClick={() => { setSelectedEvent({
+                    ...event,
+                    title: event.title || event.venue_name || event.event_name || '',
+                    poster_url: event.poster_url || event.venue_image || event.imageUrl || '',
+                    landscape_urls: Array.isArray(event.gallery_images) && event.gallery_images.length ? event.gallery_images : (Array.isArray(event.landscape_urls) ? event.landscape_urls : []),
+                    date: event.date || event.start_date || '',
+                    description: event.about || event.description || '',
+                  }); setIsPreviewing(true); }}
                   className="p-4 rounded-2xl hover:bg-white/[0.03] transition-all flex items-center justify-between group cursor-pointer">
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-20 rounded-xl overflow-hidden border border-white/10 shrink-0 bg-white/5 flex items-center justify-center">

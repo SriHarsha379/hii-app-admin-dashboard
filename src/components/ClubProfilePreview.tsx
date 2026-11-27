@@ -21,7 +21,7 @@ export default function ClubProfilePreview({ club, onClose, onEdit, hideCloseBut
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [activeTab, setActiveTab]         = useState<'info' | 'events' | 'gallery'>('info');
 
-  const UPLOADS_BASE = API_BASE.replace(/\/api\/v1\/admin\/?$/, '/uploads');
+  const UPLOADS_BASE = 'https://hii.life/app/server/uploads';
   const imgUrl = (f: any) => !f ? '' : (/^https?:\/\//i.test(f) ? f : UPLOADS_BASE + '/' + f);
 
   const data = React.useMemo(() => {
@@ -222,7 +222,7 @@ export default function ClubProfilePreview({ club, onClose, onEdit, hideCloseBut
                   className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] transition-all cursor-pointer group">
                   <div className="w-14 h-14 rounded-xl overflow-hidden border border-white/10 bg-white/5 shrink-0">
                     {event.venue_image || event.poster_url ? (
-                      <img src={event.venue_image || event.poster_url} alt="" className="w-full h-full object-cover" />
+                      <img src={imgUrl(event.venue_image || event.poster_url)} alt="" className="w-full h-full object-cover" />
                     ) : <CalendarDays className="w-5 h-5 text-white/20 m-auto mt-4" />}
                   </div>
                   <div className="flex-1 min-w-0">

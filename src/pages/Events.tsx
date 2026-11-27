@@ -591,12 +591,14 @@ export default function Events() {
 
   const { data: featuredEvents, isLoading: featuredLoading } = useQuery({
     queryKey: ['featured-events'],
+    staleTime: 0,
+    refetchOnMount: true,
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/events/featured`, { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json();
       return Array.isArray(json.data) ? json.data : [];
     },
-    enabled: isViewingFeatured,
+    enabled: true, // ✅ Point 4 fix — always fetch to show star in list
   });
 
   // ── Derived stats ──────────────────────────────────────────────────────────
@@ -980,7 +982,7 @@ export default function Events() {
                             <div className="flex items-center gap-1.5">
                               <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{event.title}</p>
                               {/* ✅ Point 4 — star mark for featured events */}
-                              {Array.isArray(featuredEvents) && featuredEvents.some((fe: any) => eventId(fe) === eventId(event)) && (
+                              {Array.isArray(featuredEvents) && featuredEvents.some((fe: any) => String(eventId(fe)) === String(eventId(event))) && (
                                 <Star className="w-3 h-3 text-yellow-400 fill-yellow-400 shrink-0" title="Featured" />
                               )}
                             </div>
