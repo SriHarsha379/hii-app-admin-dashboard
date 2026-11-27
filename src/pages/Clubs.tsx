@@ -567,7 +567,7 @@ export default function Clubs() {
       if (!res.ok || json?.success === false) throw new Error(json?.message || 'Failed to deactivate');
       return json;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['clubs'] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['clubs'] }); queryClient.invalidateQueries({ queryKey: ['venues-for-clubs'] }); },
   });
 
   // NEW: Delete venue
