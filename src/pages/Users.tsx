@@ -173,7 +173,7 @@ export default function Users() {
   });
 
   const filteredUsers = (Array.isArray(users) ? users : []).filter((u: any) => {
-    const matchesSearch = u.name?.toLowerCase().includes(searchTerm.toLowerCase()) || u.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = u.name?.toLowerCase().includes(searchTerm.toLowerCase()) || u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || u.username?.toLowerCase().includes(searchTerm.toLowerCase()) || u.first_name?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = filterStatus === 'ALL' || u.status === filterStatus;
     const userCity = typeof u.city === 'object' ? u.city?.city_name : u.city;

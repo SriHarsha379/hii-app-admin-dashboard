@@ -144,7 +144,7 @@ function ImageUploadZone({
 // ─── GalleryUploadZone ────────────────────────────────────────────────────────
 // FIXED: same pre-upload problem as ImageUploadZone — now holds raw Files
 // via onFilesChange for direct multipart submission, using local preview URLs.
-function GalleryUploadZone({ urls, onChange, onFilesChange }: { urls: string[]; onChange: (u: string[]) => void; onFilesChange: (i: number, f: File) => void }) {
+function GalleryUploadZone({ urls, onChange, onFilesChange, onRemove }: { urls: string[]; onChange: (u: string[]) => void; onFilesChange: (i: number, f: File) => void; onRemove?: (i: number) => void }) {
   const handleFile = (index: number, file: File) => {
     onFilesChange(index, file);
     const next = [...urls]; next[index] = URL.createObjectURL(file); onChange(next);
@@ -160,8 +160,14 @@ function GalleryUploadZone({ urls, onChange, onFilesChange }: { urls: string[]; 
               {urls[i] ? (
                 <>
                   <img src={(/^https?:\/\//i.test(urls[i]) || urls[i].startsWith('blob:')) ? urls[i] : `${UPLOADS_BASE}/${urls[i]}`} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
                     <Upload className="w-5 h-5 text-white" />
+                    {onRemove && (
+                      <button type="button" onClick={(e) => { e.stopPropagation(); onRemove(i); }}
+                        className="w-7 h-7 rounded-full bg-red-500/80 flex items-center justify-center hover:bg-red-500 transition-all">
+                        <X className="w-4 h-4 text-white" />
+                      </button>
+                    )}
                   </div>
                 </>
               ) : (
@@ -456,6 +462,7 @@ export default function Events() {
       body.append('recurrence_days', JSON.stringify(eventFormData.recurrence_days || []));
     }
     body.append('about', eventFormData.description || '');
+    if (eventFormData.ticketing_link) body.append('ticketing_link', eventFormData.ticketing_link);
     body.append('latitude', eventFormData.latitude || '0');
     body.append('longitude', eventFormData.longitude || '0');
     if (eventFormData.vendor_id) body.append('vendor_id', eventFormData.vendor_id);
@@ -743,7 +750,9 @@ export default function Events() {
       landscape_url: event.landscape_url
         || (Array.isArray(event.landscape_urls) ? event.landscape_urls[0] : '')
         || '',
-      gallery_urls:  Array.isArray(event.landscape_urls)
+      gallery_urls:  Array.isArray(event.gallery_images) && event.gallery_images.length
+        ? [...event.gallery_images, '', '', '', ''].slice(0, 4)
+        : Array.isArray(event.landscape_urls) && event.landscape_urls.length > 1
         ? [...event.landscape_urls.slice(1), '', '', '', ''].slice(0, 4)
         : ['', '', '', ''],
       ticketing_link: event.ticketing_link || '',
@@ -986,9 +995,23 @@ export default function Events() {
                                 <Star className="w-3 h-3 text-yellow-400 fill-yellow-400 shrink-0" title="Featured" />
                               )}
                             </div>
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                              {Array.isArray(event.genre) ? event.genre.join(', ') : (event.genre || '—')}
-                            </p>
+                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                                {Array.isArray(event.genre) ? event.genre.join(', ') : (event.genre || '—')}
+                              </p>
+                              {/* ✅ Point 11 — Recurring badge */}
+                              {event.is_recurring && (
+                                <span className="px-1.5 py-0.5 rounded bg-purple-500/20 border border-purple-500/30 text-[8px] font-black text-purple-400 uppercase">
+                                  {event.recurrence_frequency || 'Recurring'}
+                                </span>
+                              )}
+                              {/* ✅ Point 10 — Multi-day badge */}
+                              {event.is_multi_day && event.end_date && (
+                                <span className="px-1.5 py-0.5 rounded bg-blue-500/20 border border-blue-500/30 text-[8px] font-black text-blue-400 uppercase">
+                                  Multi-day
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -1092,12 +1115,10 @@ export default function Events() {
 
                 {/* ── Hero image — Point 8 fix: Cover left, Poster right ── */}
                 <div className="relative flex" style={{ aspectRatio: '16/8' }}>
-                  {/* Left: Cover/Landscape image */}
+                  {/* Left: Cover/Landscape image — ✅ Point 8 fix: only show landscape, not poster */}
                   <div className="flex-1 relative overflow-hidden">
                     {selectedEvent.landscape_urls?.[0] ? (
                       <img src={eventImgUrl(selectedEvent.landscape_urls[0])} alt={selectedEvent.title} className="w-full h-full object-cover" />
-                    ) : selectedEvent.poster_url ? (
-                      <img src={eventImgUrl(selectedEvent.poster_url)} alt={selectedEvent.title} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #1a0a2e 0%, #0d0d1a 50%, #1a0a10 100%)' }}>
                         <div className="text-center space-y-3 opacity-30">
@@ -1176,7 +1197,9 @@ export default function Events() {
                       color: '#FF2D9A',
                       label: 'Date',
                       value: selectedEvent.date
-                        ? new Date(selectedEvent.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                        ? selectedEvent.is_multi_day && selectedEvent.end_date
+                          ? `${new Date(selectedEvent.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(selectedEvent.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                          : new Date(selectedEvent.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
                         : 'Date not set',
                     },
                     {
@@ -1645,7 +1668,7 @@ export default function Events() {
                         <ImageUploadZone label="Main Banner (Landscape)" hint="Recommended: 1920×820 JPG/PNG" value={eventFormData.landscape_url} onChange={(url) => setEventFormData({ ...eventFormData, landscape_url: url })} onFileChange={setLandscapeFile} aspect="aspect-[21/9]" />
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                           <ImageUploadZone label="Main Poster (Portrait)" hint="Recommended: 1080×1350 · Required" value={eventFormData.poster_url} onChange={(url) => setEventFormData({ ...eventFormData, poster_url: url })} onFileChange={setPosterFile} aspect="aspect-[4/5]" />
-                          <GalleryUploadZone urls={eventFormData.gallery_urls} onChange={(urls) => setEventFormData({ ...eventFormData, gallery_urls: urls })} onFilesChange={(i, f) => setGalleryFiles((prev) => { const next = [...prev]; next[i] = f; return next; })} />
+                          <GalleryUploadZone urls={eventFormData.gallery_urls} onChange={(urls) => setEventFormData({ ...eventFormData, gallery_urls: urls })} onFilesChange={(i, f) => setGalleryFiles((prev) => { const next = [...prev]; next[i] = f; return next; })} onRemove={(i) => { const next = [...eventFormData.gallery_urls]; next[i] = ''; setEventFormData({ ...eventFormData, gallery_urls: next }); setGalleryFiles((prev) => { const nf = [...prev]; nf[i] = null; return nf; }); }} />
                         </div>
                       </div>
                     </FormSection>
