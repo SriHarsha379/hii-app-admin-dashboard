@@ -395,7 +395,7 @@ export default function Clubs() {
       const orphanVenues = allVenues.filter((v: any) => {
         const vid = typeof v.vendor_id === 'object' ? v.vendor_id?._id : v.vendor_id;
         return !vid || !vendorIds.has(String(vid));
-      }).map((v: any) => ({ ...v, name: v.venue_name, _id: v._id, isOrphanVenue: true, is_verified: true, is_active: true }));
+      }).map((v: any) => ({ ...v, name: v.venue_name, _id: v._id, isOrphanVenue: true, is_verified: true, is_active: v.is_active !== false }));
       return [...vendors, ...orphanVenues];
     },
   });
