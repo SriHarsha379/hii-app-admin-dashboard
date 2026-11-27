@@ -351,6 +351,7 @@ export default function Events() {
       return raw.map((e: any) => ({
         ...e,
         title:         e.title || e.venue_name || e.event_name || '',
+        genre:         Array.isArray(e.genre) ? e.genre : (typeof e.genre === 'string' && e.genre.startsWith('[') ? (() => { try { return JSON.parse(e.genre); } catch(x) { return []; } })() : (e.genre ? [e.genre] : [])),
         city:          (typeof e.city_id === 'object' && e.city_id) ? (e.city_id.city_name || '') : (e.city || ''),
         date:          e.date || e.start_date || '',
         // venue_image is the backend field name — map to poster_url so all
@@ -730,7 +731,7 @@ export default function Events() {
                        : (event.city_id || event.city || ''),
       venue_id:      getVendorId(event),
       vendor_id:     getVendorId(event),
-      genre:         Array.isArray(event.genre)      ? event.genre      : (event.genre      ? [event.genre]      : []),
+      genre:         Array.isArray(event.genre) ? event.genre : (typeof event.genre === 'string' && event.genre.startsWith('[') ? JSON.parse(event.genre) : (event.genre ? [event.genre] : [])),
       event_type:    Array.isArray(event.category_ids) ? event.category_ids.map((c: any) => c?._id || c)
                        : Array.isArray(event.event_type) ? event.event_type
                        : (event.event_type ? [event.event_type] : []),
@@ -1109,7 +1110,7 @@ export default function Events() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 24 }}
               transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-              className="fixed inset-0 z-[120] flex items-center justify-center p-4 lg:pr-[440px] pointer-events-none"
+              className="fixed inset-0 z-[120] flex items-center justify-center p-4 lg:pr-[440px] pointer-events-none overflow-y-auto"
             >
               <div className="w-full max-w-2xl pointer-events-auto flex flex-col gap-0 rounded-[2.5rem] overflow-hidden border border-white/10 shadow-[0_0_120px_rgba(0,0,0,0.8)]">
 
@@ -1276,7 +1277,7 @@ export default function Events() {
             <motion.div
               initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="fixed inset-y-0 right-0 w-full max-w-[420px] bg-[#08080c] z-[130] shadow-[0_0_100px_rgba(0,0,0,0.8)] border-l border-white/5 overflow-hidden"
+              className="fixed inset-y-0 right-0 w-full max-w-[420px] bg-[#08080c] z-[130] shadow-[0_0_100px_rgba(0,0,0,0.8)] border-l border-white/5 overflow-y-auto"
             >
               <EventProfilePreview
                 eventData={selectedEvent}

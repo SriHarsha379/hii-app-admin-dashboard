@@ -41,8 +41,8 @@ export default function EventProfilePreview({ onClose, eventData, hideCloseButto
       time: base.start_time ? `${base.start_time}${base.end_time ? ` – ${base.end_time}` : ''}` : 'Time not set',
       location: base.address || base.city || 'Location not set',
       venue: base.venue_name || base.venue || 'Venue not set',
-      followers: String(base.likes || 0),
-      capacity: base.capacity || 'Not set',
+      followers: String(base.rsvp_count || base.attendees || base.likes || 0),
+      capacity: (base.capacity != null && base.capacity !== '') ? String(base.capacity) : (base.max_capacity != null ? String(base.max_capacity) : 'Not set'),
       about: base.description || base.about || 'No description available.',
       gallery: (
         Array.isArray(base.gallery_images) && base.gallery_images.length ? base.gallery_images :
@@ -55,7 +55,7 @@ export default function EventProfilePreview({ onClose, eventData, hideCloseButto
   }, [eventData]);
 
   return (
-    <div className="flex flex-col h-full bg-black text-white relative select-none font-sans overflow-hidden">
+    <div className="flex flex-col min-h-full bg-black text-white relative select-none font-sans">
       {/* Top Header Bar */}
       {!hideCloseButton && (
         <div className="absolute top-0 inset-x-0 h-20 z-50 flex items-center justify-between px-6 pointer-events-none">
@@ -74,7 +74,7 @@ export default function EventProfilePreview({ onClose, eventData, hideCloseButto
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto scrollbar-hide">
+      <div className="flex-1">
         {/* Cover Image Section */}
         <div className="relative h-[480px] shrink-0 overflow-hidden">
           {data.portrait_url ? (
