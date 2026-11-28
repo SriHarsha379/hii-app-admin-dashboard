@@ -109,12 +109,13 @@ export default function Users() {
 
   // ISSUE 16 FIX: paginated fetch
   const { data: usersData, isLoading } = useQuery({
-    queryKey: ['users', currentPage],
+    queryKey: ['users', currentPage, searchTerm],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(currentPage),
         limit: String(PAGE_SIZE),
       });
+      if (searchTerm) params.set('search', searchTerm);
       const res = await fetch(`${API_BASE}/user/get_all_user?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
