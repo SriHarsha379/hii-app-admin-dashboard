@@ -825,7 +825,7 @@ export default function AdsBroadcast() {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-white">{event.date ? new Date(event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : event.start_date || '—'}</td>
-                        <td className="px-6 py-4 text-sm text-white">{typeof event.city === 'object' ? event.city?.city_name : event.city}</td>
+                        <td className="px-6 py-4 text-sm text-white">{typeof event.city === 'object' ? event.city?.city_name : (event.city || (typeof event.city_id === 'object' ? event.city_id?.city_name : '—'))}</td>
                         <td className="px-6 py-4 text-right">
                           <button
                             onClick={() => unfeatureEventMutation.mutate(event.id || event._id)}
