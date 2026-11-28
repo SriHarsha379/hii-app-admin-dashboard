@@ -651,6 +651,19 @@ export default function Clubs() {
       ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-primary" /> : <ArrowDown className="w-3 h-3 text-primary" />)
       : <ArrowUpDown className="w-3 h-3 opacity-50" />;
 
+  // ✅ Point 7 — ESC key to close club preview
+  React.useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isViewingVenue) setIsViewingVenue(false);
+        if (isPreviewing) setIsPreviewing(false);
+        if (isFeaturingClub) setIsFeaturingClub(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isViewingVenue, isPreviewing, isFeaturingClub]);
+
   const toggleDay = (index: number) => {
     const nh = [...workingHours]; const isActive = !nh[index].active;
     nh[index].active = isActive; if (isActive) nh[index].time = lastUsedTime;

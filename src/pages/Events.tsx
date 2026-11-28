@@ -486,12 +486,11 @@ export default function Events() {
     } else if (eventFormData.landscape_url) {
       body.append('existing_landscape_url', eventFormData.landscape_url);
     }
-    galleryFiles.forEach((f, i) => {
-      if (f) {
-        body.append('gallery_images', f);
-      } else if (eventFormData.gallery_urls?.[i]) {
-        body.append('existing_gallery_urls', eventFormData.gallery_urls[i]);
-      }
+    // ✅ Fix Points 1&2 — always send existing gallery so deletions are respected
+    const keptGalleryUrls = (eventFormData.gallery_urls || []).filter((url, i) => url && !galleryFiles[i]);
+    body.append('existing_gallery_images', JSON.stringify(keptGalleryUrls));
+    galleryFiles.forEach((f) => {
+      if (f) body.append('gallery_images', f);
     });
     return body;
   };
@@ -718,6 +717,19 @@ export default function Events() {
     }
   };
 
+  // ✅ Point 7 — ESC key to close preview
+  React.useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isPreviewing) { setSelectedEvent(null); setIsPreviewing(false); }
+        if (isCreatingEvent) { setIsCreatingEvent(false); setIsEditingEvent(false); }
+        if (isFeaturing) setIsFeaturing(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isPreviewing, isCreatingEvent, isFeaturing]);
+
   // ── Open Edit ──────────────────────────────────────────────────────────────
   const openEdit = (event: any) => {
     // Build the pre-filled form FIRST before opening the modal
@@ -749,6 +761,7 @@ export default function Events() {
       longitude:     event.longitude != null ? String(event.longitude) : '',
       poster_url:    event.poster_url   || '',
       landscape_url: event.landscape_url
+        || (Array.isArray(event.event_layout_images) && event.event_layout_images[0] ? event.event_layout_images[0].image_url || event.event_layout_images[0] : '')
         || (Array.isArray(event.landscape_urls) ? event.landscape_urls[0] : '')
         || '',
       gallery_urls:  Array.isArray(event.gallery_images) && event.gallery_images.length
@@ -1000,10 +1013,13 @@ export default function Events() {
                               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
                                 {Array.isArray(event.genre) ? event.genre.join(', ') : (event.genre || '—')}
                               </p>
-                              {/* ✅ Point 11 — Recurring badge */}
+                              {/* ✅ Point 4/11 — Recurring badge with days */}
                               {event.is_recurring && (
-                                <span className="px-1.5 py-0.5 rounded bg-purple-500/20 border border-purple-500/30 text-[8px] font-black text-purple-400 uppercase">
-                                  {event.recurrence_frequency || 'Recurring'}
+                                <span className="px-1.5 py-0.5 rounded bg-purple-500/20 border border-purple-500/30 text-[8px] font-black text-purple-400 uppercase flex items-center gap-1">
+                                  🔄 {event.recurrence_frequency || 'Recurring'}
+                                  {Array.isArray(event.recurrence_days) && event.recurrence_days.length > 0 && (
+                                    <span className="normal-case font-semibold">· Every {event.recurrence_days.join(', ')}</span>
+                                  )}
                                 </span>
                               )}
                               {/* ✅ Point 10 — Multi-day badge */}
@@ -1118,8 +1134,8 @@ export default function Events() {
                 <div className="relative flex" style={{ aspectRatio: '16/8' }}>
                   {/* Left: Cover/Landscape image — ✅ Point 8 fix: only show landscape, not poster */}
                   <div className="flex-1 relative overflow-hidden">
-                    {selectedEvent.landscape_urls?.[0] ? (
-                      <img src={eventImgUrl(selectedEvent.landscape_urls[0])} alt={selectedEvent.title} className="w-full h-full object-cover" />
+                    {(selectedEvent.landscape_urls?.[0] || selectedEvent.event_layout_images?.[0]?.image_url || selectedEvent.landscape_url) ? (
+                      <img src={eventImgUrl(selectedEvent.landscape_urls?.[0] || selectedEvent.event_layout_images?.[0]?.image_url || selectedEvent.landscape_url)} alt={selectedEvent.title} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #1a0a2e 0%, #0d0d1a 50%, #1a0a10 100%)' }}>
                         <div className="text-center space-y-3 opacity-30">
@@ -1614,7 +1630,7 @@ export default function Events() {
                           <div className="space-y-3 p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
                             <div className="space-y-2">
                               <label className="text-[10px] font-black text-white/30 uppercase tracking-widest">Frequency</label>
-                              <div className="flex gap-2">
+                              <div className="flex flex-wrap gap-2">
                                 {['daily', 'weekly', 'monthly'].map(f => (
                                   <button key={f} type="button"
                                     onClick={() => setEventFormData({ ...eventFormData, recurrence_frequency: f })}
@@ -1627,7 +1643,7 @@ export default function Events() {
                                 ))}
                               </div>
                             </div>
-                            {eventFormData.recurrence_frequency === 'weekly' && (
+                            {(eventFormData.recurrence_frequency === 'weekly' || eventFormData.recurrence_frequency === 'monthly') && (
                               <div className="space-y-2">
                                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest">Repeat on</label>
                                 <div className="flex gap-2 flex-wrap">

@@ -811,12 +811,12 @@ export default function AdsBroadcast() {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10">
-                              {event.venue_image
-                                ? <img src={(adAssetUrl(event.venue_image)) || null} alt="" className="w-full h-full object-cover" />
+                              {(event.venue_image || event.poster_url)
+                                ? <img src={(adAssetUrl(event.venue_image || event.poster_url)) || null} alt="" className="w-full h-full object-cover" />
                                 : <Calendar className="w-5 h-5 text-white/20" />}
                             </div>
                             <div>
-                              <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{event.title}</p>
+                              <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{event.title || event.venue_name || event.event_name || "Untitled"}</p>
                               <p className={cn(
                                 "text-[10px] uppercase font-bold tracking-wider",
                                 event.status === 'ACTIVE' ? "text-emerald-400" : "text-amber-400"
@@ -824,7 +824,7 @@ export default function AdsBroadcast() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-white">{event.date}</td>
+                        <td className="px-6 py-4 text-sm text-white">{event.date ? new Date(event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : event.start_date || '—'}</td>
                         <td className="px-6 py-4 text-sm text-white">{typeof event.city === 'object' ? event.city?.city_name : event.city}</td>
                         <td className="px-6 py-4 text-right">
                           <button
